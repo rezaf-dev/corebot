@@ -250,9 +250,11 @@ Admin → **Widget** → customize → copy snippet:
 <script src="https://YOUR_DOMAIN/widget.js" data-bot-key="BOT_PUBLIC_KEY"></script>
 ```
 
+If the app is served from a subfolder (e.g. `https://YOUR_DOMAIN/corebot/widget.js`), the widget resolves API calls under that same path (`…/corebot/api/public/chat`). Set `APP_URL` to the subfolder URL so admin embed snippets match. Optional override: `data-api-base="api/public/chat"` (relative to the script) or a full URL.
+
 ## Public API
 
-`/api/public/chat` — `widget-config`, `start`, `message`, `message/stream`, `contact` (rate-limited).
+`/api/public/chat` — `widget-config`, `start`, `message`, `message/stream`, `contact` (rate-limited). Under a subfolder deploy, prefix with the app path (e.g. `/corebot/api/public/chat`).
 
 ## Tests
 

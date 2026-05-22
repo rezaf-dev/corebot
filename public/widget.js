@@ -3,7 +3,7 @@
     const botKey = script && script.dataset.botKey;
     if (!botKey) return;
 
-    const apiBase = new URL('/api/public/chat', script.src).toString().replace(/\/$/, '');
+    const apiBase = resolveApiBase(script);
     const storageKey = 'crm_ai_bot_' + botKey;
     const state = JSON.parse(localStorage.getItem(storageKey) || '{}');
     state.visitor_id = state.visitor_id || crypto.randomUUID();
@@ -323,6 +323,12 @@
         sendBtn.textContent = next.send_button_label || DEFAULT_CONFIG.send_button_label;
 
         iconChat.innerHTML = LAUNCHER_ICONS[next.launcher_icon] || LAUNCHER_ICONS.chat;
+    }
+
+    function resolveApiBase(script) {
+        const path = script.dataset.apiBase || 'api/public/chat';
+
+        return new URL(path, script.src).toString().replace(/\/$/, '');
     }
 
     function parseDatasetConfig(dataset) {

@@ -61,6 +61,14 @@ it('saves widget settings for tenant admins', function () {
         ->position->toBe('bottom-left');
 });
 
+it('resolves api base from widget script url', function (string $widgetUrl, string $expectedApiBase) {
+    expect(WidgetConfig::apiBaseFromWidgetUrl($widgetUrl))->toBe($expectedApiBase);
+})->with([
+    'site root' => ['https://app.test/widget.js', 'https://app.test/api/public/chat'],
+    'subfolder' => ['https://app.test/corebot/widget.js', 'https://app.test/corebot/api/public/chat'],
+    'nested subfolder' => ['https://app.test/apps/crm/widget.js', 'https://app.test/apps/crm/api/public/chat'],
+]);
+
 it('builds embed snippets with data attributes', function () {
     $snippet = WidgetConfig::embedSnippet(
         'https://app.test/widget.js',

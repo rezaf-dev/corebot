@@ -104,6 +104,23 @@ class WidgetConfig
         ];
     }
 
+    public static function apiBaseFromWidgetUrl(string $widgetScriptUrl): string
+    {
+        $parts = parse_url($widgetScriptUrl);
+
+        if ($parts === false || ! isset($parts['scheme'], $parts['host'])) {
+            return rtrim($widgetScriptUrl, '/');
+        }
+
+        $path = $parts['path'] ?? '/widget.js';
+        $directory = dirname($path);
+        $directory = ($directory === '/' || $directory === '\\') ? '' : $directory;
+        $apiPath = ($directory !== '' ? $directory : '').'/api/public/chat';
+        $port = isset($parts['port']) ? ':'.$parts['port'] : '';
+
+        return $parts['scheme'].'://'.$parts['host'].$port.$apiPath;
+    }
+
     public static function embedSnippet(string $widgetUrl, string $publicKey, array $config): string
     {
         $attributes = array_merge(
