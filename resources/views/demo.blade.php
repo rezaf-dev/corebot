@@ -51,6 +51,26 @@
         ul { margin: 12px 0 0; padding-left: 20px; color: #94a3b8; font-size: 14px; }
         li { margin-bottom: 6px; }
         .links { margin-top: 24px; display: flex; flex-wrap: wrap; gap: 16px; font-size: 14px; }
+        .prompts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+        .prompt {
+            font: inherit;
+            font-size: 13px;
+            line-height: 1.4;
+            text-align: left;
+            color: #cbd5e1;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 999px;
+            padding: 8px 14px;
+            cursor: pointer;
+            transition: border-color 0.15s, color 0.15s, background 0.15s;
+        }
+        .prompt:hover:not(:disabled) {
+            color: #f1f5f9;
+            border-color: #67e8f9;
+            background: rgba(103, 232, 249, 0.08);
+        }
+        .prompt:disabled { opacity: 0.45; cursor: not-allowed; }
     </style>
 </head>
 <body>
@@ -85,6 +105,29 @@
             </div>
         @endif
 
+        <div class="card">
+            <h2>Try asking</h2>
+            <p>Click a question to send it in the chat widget.</p>
+            <div class="prompts" id="demo-prompts">
+                @foreach ([
+                    'What does this company do?',
+                    'How much is the Business Plan?',
+                    'Can you install this chatbot on WordPress?',
+                    'How long does setup take?',
+                    'Do you offer refunds?',
+                    'What do you need from me to start?',
+                    'Can the chatbot collect leads?',
+                    'Can I use this on Laravel?',
+                    'Is there a free trial?',
+                    'What happens if the chatbot cannot answer?',
+                ] as $question)
+                    <button type="button" class="prompt" data-question="{{ $question }}" @disabled(! $botPublicKey)>
+                        {{ $question }}
+                    </button>
+                @endforeach
+            </div>
+        </div>
+
         <div class="links">
             <a href="{{ url('/') }}">← Project home</a>
         </div>
@@ -92,6 +135,27 @@
 
     @if ($botPublicKey)
         <script src="{{ $widgetUrl }}" data-bot-key="{{ $botPublicKey }}"></script>
+        <script>
+            document.getElementById('demo-prompts')?.addEventListener('click', function (event) {
+                const btn = event.target.closest('[data-question]');
+                if (!btn) return;
+
+                const question = btn.dataset.question;
+                const launcher = document.querySelector('.crm-ai-btn');
+                const panel = document.querySelector('.crm-ai-panel');
+                const input = document.querySelector('.crm-ai-form input');
+                const form = document.querySelector('.crm-ai-form');
+
+                if (!launcher || !input || !form) return;
+
+                if (!panel?.classList.contains('is-open')) {
+                    launcher.click();
+                }
+
+                input.value = question;
+                form.requestSubmit();
+            });
+        </script>
     @endif
 </body>
 </html>
