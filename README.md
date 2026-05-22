@@ -70,7 +70,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 git clone https://github.com/rezaf-dev/corebot.git
 cd corebot
 composer install
-npm install --legacy-peer-deps
+npm install
 cp .env.example .env
 php artisan key:generate
 ```
