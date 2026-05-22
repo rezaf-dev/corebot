@@ -1,9 +1,9 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "corefixlab/corebot",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
+    "description": "Open-source multi-tenant CRM AI support bot with RAG, embeddable widget, and per-tenant OpenAI keys.",
+    "keywords": ["laravel", "openai", "rag", "chatbot", "crm", "support", "widget"],
     "license": "MIT",
     "require": {
         "php": "^8.3",

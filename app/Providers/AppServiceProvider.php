@@ -27,6 +27,10 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(30)->by($request->ip().'|'.$request->input('bot_public_key', 'unknown'));
         });
 
+        RateLimiter::for('support-request', function (Request $request) {
+            return Limit::perMinute(5)->by($request->ip());
+        });
+
         Vite::prefetch(concurrency: 3);
     }
 }

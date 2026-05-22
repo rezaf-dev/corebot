@@ -7,13 +7,19 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\KnowledgeSourceController;
 use App\Http\Controllers\Admin\TenantController;
 use App\Http\Controllers\Admin\WidgetInstallController;
+use App\Http\Controllers\DemoController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SupportRequestController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', fn () => Inertia::render('Welcome'));
 
-Route::view('/demo', 'demo');
+Route::get('/demo', DemoController::class)->name('demo');
+
+Route::post('/support-requests', [SupportRequestController::class, 'store'])
+    ->middleware('throttle:support-request')
+    ->name('support-requests.store');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');

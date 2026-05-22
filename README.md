@@ -1,385 +1,177 @@
-# Multi-Tenant CRM AI Support Bot
+# corebot
 
-Laravel 13 + Inertia React application for CRM owners who need an embeddable AI support bot. Tenants upload approved CRM knowledge, connect their own OpenAI API key, and install a vanilla JavaScript chat widget on their CRM or website.
+Open-source, multi-tenant **CRM AI support bot** — Laravel 13, Inertia React, PostgreSQL + **pgvector**, and a vanilla JavaScript chat widget. Each tenant uses their own OpenAI key, uploads approved CRM knowledge, and embeds a customizable widget on their site.
 
-The bot is intentionally constrained: it retrieves tenant-owned knowledge, answers only from that context, and falls back/escalates when the knowledge base does not safely answer the visitor's question.
+Professional services: [corefixlab.com/corebot](https://corefixlab.com/corebot)
 
-## Current V1 Status
+## What it does
 
-Implemented:
+corebot is built for **SaaS CRM operators** who want client-specific support bots without cross-tenant data leaks or hallucinated business rules.
 
-- Laravel 13 application with Breeze auth, Inertia, React, Tailwind, and Pest.
-- Explicit tenant scoping without a tenancy package.
-- Super admin tenant creation.
-- Tenant admin AI settings with encrypted OpenAI key storage and connection test action.
-- Bot CRUD with public embed key, domain allow-list, prompt, fallback, and retrieval settings.
-- Knowledge sources for text, FAQ, PDF, and DOCX.
-- PDF extraction through `spatie/pdf-to-text`.
-- DOCX extraction through `scripts/extract_docx.py`.
-- Text chunking, embedding job, pgvector-aware search, and SQLite test fallback.
-- RAG chat answer service with message, retrieval, and AI usage logs.
-- Public chat API and vanilla `public/widget.js` embed.
-- Admin dashboard, knowledge review, conversation review, and widget install pages.
-- CRM-focused demo seed data.
+### Multi-tenant admin
 
-Not implemented in V1:
+- **Super admin** creates isolated tenant workspaces.
+- **Tenant admin** manages bots, AI settings, knowledge, conversations, and widget appearance.
+- Every query is scoped by `tenant_id` through `TenantAccess` — no generic tenancy package.
 
-- OCR for scanned PDFs.
-- Legacy `.doc` support.
-- Multiple LLM providers.
-- Streaming chat.
-- Live human-agent handoff integration.
-- Billing.
-- Tenant impersonation.
-- Production-grade analytics/cost calculation.
+### Per-tenant OpenAI
 
-## Stack
+- Encrypted API key storage; only masked keys appear in the UI.
+- Connection test must pass before chat or knowledge indexing runs.
+- Configurable chat and embedding models per tenant.
 
-- Backend: Laravel 13, PHP 8.3+
-- Frontend/admin: Inertia React, Tailwind
-- Database: PostgreSQL with `pgvector` for production
-- Queue: Redis preferred
-- Storage: Laravel filesystem, local by default, S3-compatible when configured
-- LLM provider: OpenAI
-- Embeddings: `text-embedding-3-small`, 1536 dimensions
-- Chat default: `gpt-4o-mini`
-- Tests: Pest
-- Widget: framework-free JavaScript in `public/widget.js`
+### Knowledge & RAG
 
-## Important Paths
+- Sources: plain text, FAQ pairs, PDF (`pdftotext`), DOCX (`python-docx`).
+- Background job chunks content, generates embeddings, stores vectors in **PostgreSQL pgvector**.
+- Chat retrieves the closest chunks per bot, applies similarity thresholds, and builds a strict context-only prompt.
+- If nothing relevant is found, the bot returns a **fallback** and can **escalate** the conversation.
 
-- Admin routes: `routes/web.php`
-- Public API routes: `routes/api.php`
-- Tenant scoping helper: `app/Support/TenantAccess.php`
-- AI client: `app/Services/AI/OpenAIService.php`
-- RAG services: `app/Services/Rag`
-- Document extraction services: `app/Services/Documents`
-- Knowledge processing job: `app/Jobs/ProcessKnowledgeSourceJob.php`
-- DOCX extractor: `scripts/extract_docx.py`
-- Widget: `public/widget.js`
-- Admin React pages: `resources/js/Pages`
-- Database schema: `database/migrations`
-- Demo seed data: `database/seeders/DatabaseSeeder.php`
+### Public chat & widget
 
-## Local Setup
+- REST + **SSE streaming** API for visitor chat.
+- `public/widget.js` — no framework required on the host site.
+- Widget: colors, corner position, labels, launcher icon, welcome message.
+- Optional domain allow-list per bot; rate limiting on public endpoints.
+- Visitor contact capture when the bot cannot answer.
 
-Install PHP and Node dependencies:
+### Operations
 
-```bash
-composer install
-npm install --legacy-peer-deps
+- Dashboard with usage logs.
+- Conversation review including **retrieval logs** (which chunks were used).
+- Live **demo page** (`/demo`) driven by `DEMO_BOT_PUBLIC_KEY`.
+- Welcome-page contact form emails your inbox (`SUPPORT_REQUEST_EMAIL`).
+
+## Requirements
+
+| Requirement | Notes |
+|-------------|--------|
+| PHP 8.3+ | |
+| PostgreSQL 15+ | **Required** — with `pgvector` extension |
+| Redis | Queue worker for knowledge indexing |
+| Node.js 20+ | Frontend build |
+| `pdftotext` | PDF knowledge (Poppler) |
+| `python3` + `python-docx` | DOCX knowledge |
+
+## Database setup
+
+corebot **requires PostgreSQL with pgvector**. SQLite is not supported for running the application.
+
+```sql
+CREATE DATABASE corebot;
+\c corebot
+CREATE EXTENSION IF NOT EXISTS vector;
 ```
 
-Create the environment file:
+## Quick start
 
 ```bash
+git clone https://github.com/rezaf-dev/corebot.git
+cd corebot
+composer install
+npm install --legacy-peer-deps
 cp .env.example .env
 php artisan key:generate
 ```
 
-For quick local development, SQLite is acceptable:
-
-```env
-DB_CONNECTION=sqlite
-QUEUE_CONNECTION=sync
-```
-
-Then create the SQLite file and seed demo data:
+Configure `.env` (see below), then:
 
 ```bash
-touch database/database.sqlite
-php artisan migrate:fresh --seed
-```
-
-Run the app:
-
-```bash
-php artisan serve
-npm run dev
-```
-
-Or use Laravel's combined dev script:
-
-```bash
+php artisan migrate --seed
 composer run dev
 ```
 
-Default seeded accounts:
+Seeded accounts:
 
-```text
-Super admin:  super@example.com / password
-Tenant admin: tenant@example.com / password
-```
+| Role | Email | Password |
+|------|-------|----------|
+| Super admin | super@example.com | password |
+| Tenant admin | tenant@example.com | password |
 
-## Production-Oriented Setup
+- Admin: `http://localhost:8000`
+- Widget demo: `http://localhost:8000/demo` (set `DEMO_BOT_PUBLIC_KEY` first)
 
-`.env.example` defaults to PostgreSQL and Redis:
+## Environment variables
+
+Only the variables you typically need to change:
+
+| Variable | Purpose |
+|----------|---------|
+| `APP_KEY` | `php artisan key:generate` — also decrypts stored API keys |
+| `APP_URL` | Public URL of the app |
+| `DB_*` | PostgreSQL connection (`DB_CONNECTION=pgsql`) |
+| `QUEUE_CONNECTION` | Use `redis` and run `php artisan queue:work` |
+| `REDIS_*` | Redis connection for queues |
+| `MAIL_MAILER`, `MAIL_FROM_*` | Outbound mail |
+| `SUPPORT_REQUEST_EMAIL` | Inbox for the welcome-page contact form |
+| `DEMO_BOT_PUBLIC_KEY` | Bot `public_key` embedded on `/demo` |
+
+Example `.env` fragment:
 
 ```env
+APP_URL=http://localhost
+
 DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=corebot
+DB_USERNAME=postgres
+DB_PASSWORD=
+
 QUEUE_CONNECTION=redis
+REDIS_HOST=127.0.0.1
+
+MAIL_MAILER=smtp
+MAIL_FROM_ADDRESS=hello@yourdomain.com
+SUPPORT_REQUEST_EMAIL=hello@yourdomain.com
+
+DEMO_BOT_PUBLIC_KEY=bot_xxxxxxxx
 ```
 
-PostgreSQL must have the `vector` extension available. The migration for `knowledge_chunks` runs:
+For local mail testing, `MAIL_MAILER=log` writes to `storage/logs/laravel.log`.
 
-```sql
-CREATE EXTENSION IF NOT EXISTS vector;
-ALTER TABLE knowledge_chunks ADD COLUMN embedding vector(1536);
-```
-
-Run migrations and queues:
+## Production checklist
 
 ```bash
 php artisan migrate --force
 php artisan queue:work redis --tries=3 --timeout=300
 npm run build
+php artisan config:cache
+php artisan route:cache
 ```
 
-For PDF extraction, install `pdftotext` on the server. On macOS:
+Install system tools: Poppler (`pdftotext`), Python `python-docx`.
 
-```bash
-brew install poppler
+## Widget embed
+
+Admin → **Widget** → customize → copy snippet:
+
+```html
+<script src="https://YOUR_DOMAIN/widget.js" data-bot-key="BOT_PUBLIC_KEY"></script>
 ```
-
-For DOCX extraction, install Python and `python-docx`:
-
-```bash
-python3 -m pip install python-docx
-```
-
-## Data Model Overview
-
-Core tenant/admin data:
-
-- `tenants`: tenant account, slug, status.
-- `users`: auth users, nullable `tenant_id`, role `super_admin` or `tenant_admin`.
-- `tenant_ai_settings`: per-tenant OpenAI settings and encrypted API key.
-
-Bot and knowledge data:
-
-- `bots`: tenant bot configuration, public key, prompt, fallback, domain allow-list, retrieval settings.
-- `knowledge_sources`: uploaded or entered source material.
-- `knowledge_chunks`: chunk content plus `embedding_json`; in PostgreSQL also has `embedding vector(1536)`.
-
-Chat/review data:
-
-- `chat_conversations`: public visitor conversation metadata and escalation status.
-- `chat_messages`: user and assistant messages.
-- `retrieval_logs`: selected chunk IDs, distances, and context text used for an answer.
-- `ai_usage_logs`: embedding/chat usage and provider errors.
-
-## Tenant Boundaries
-
-V1 deliberately does not use a tenancy package. Tenant safety is implemented with explicit filtering:
-
-- Tenant admins have a non-null `tenant_id`.
-- Super admins can view cross-tenant admin data where routes allow it.
-- Tenant-scoped queries go through `TenantAccess::scope(...)` or explicit `tenant_id` checks.
-- Controllers call `TenantAccess::ensureCanAccess(...)` before editing/showing tenant-owned records.
-- Public chat resolves a bot by `public_key`, then validates active tenant and active bot.
-
-When adding a feature, do not query tenant-owned tables without filtering by `tenant_id`, unless the route is intentionally super-admin-only.
-
-## AI Key Handling
-
-Tenant admins configure AI settings at `/ai-settings`.
-
-Rules:
-
-- The raw OpenAI key is accepted only on save/test.
-- It is stored encrypted in `tenant_ai_settings.api_key_encrypted`.
-- The model exposes it through the virtual `api_key` attribute.
-- The frontend receives only `masked_api_key`, for example `sk-...abcd`.
-- New or changed keys mark settings inactive until the test action succeeds.
-- Knowledge processing and chat fail safely when AI settings are missing or inactive.
-
-## Knowledge Processing Flow
-
-`ProcessKnowledgeSourceJob` handles indexing:
-
-1. Load the source with tenant, bot, and AI settings.
-2. Verify tenant AI settings are active.
-3. Mark the source `processing`.
-4. Extract source text.
-5. Chunk text with `TextChunker`.
-6. Generate an embedding for each chunk with the tenant's key.
-7. Delete old chunks only after new chunks are ready.
-8. Insert replacement chunks.
-9. Mark the source `ready`, update `chunks_count`, and set `last_indexed_at`.
-10. On failure, mark the source `failed` and store a sanitized error.
-
-PDF extraction:
-
-- Uses `PdfTextExtractor`.
-- Requires `pdftotext`.
-- No OCR in V1.
-
-DOCX extraction:
-
-- Uses `DocxExtractionClient`.
-- Calls `python3 scripts/extract_docx.py /absolute/path/to/file.docx`.
-- Uses Symfony Process array arguments, not shell strings.
-- Extracts paragraphs and tables.
-
-## RAG Chat Flow
-
-Public chat calls `POST /api/public/chat/message`, which delegates to `ChatAnswerService`:
-
-1. Save the user message.
-2. Generate query embedding with tenant API key.
-3. Search chunks by `tenant_id` and `bot_id`.
-4. Sort by cosine distance.
-5. Apply bot `similarity_threshold`.
-6. If no chunks pass, save fallback message and mark the conversation `escalated`.
-7. Build a strict context-only prompt.
-8. Call OpenAI chat completion.
-9. Save assistant message.
-10. Save retrieval log and usage log.
-11. Return answer and source metadata.
-
-PostgreSQL uses pgvector:
-
-```sql
-embedding <=> ? AS distance
-```
-
-SQLite/local tests use `embedding_json` and PHP cosine distance fallback.
 
 ## Public API
 
-Routes are defined in `routes/api.php` under `/api/public/chat`.
-
-Start:
-
-```http
-POST /api/public/chat/start
-```
-
-```json
-{
-  "bot_public_key": "bot_xxx",
-  "visitor_id": "browser-uuid",
-  "source_url": "https://clientcrm.com/help"
-}
-```
-
-Message:
-
-```http
-POST /api/public/chat/message
-```
-
-```json
-{
-  "bot_public_key": "bot_xxx",
-  "conversation_id": 123,
-  "message": "How do I change an order status?"
-}
-```
-
-Contact:
-
-```http
-POST /api/public/chat/contact
-```
-
-```json
-{
-  "bot_public_key": "bot_xxx",
-  "conversation_id": 123,
-  "visitor_name": "John",
-  "visitor_email": "john@example.com",
-  "visitor_phone": "+1..."
-}
-```
-
-Security behavior:
-
-- Validates active bot and active tenant.
-- Validates `allowed_domains` when configured.
-- Rate limits by IP and `bot_public_key`.
-- Caps messages at 2,000 characters.
-- Does not expose raw API/provider errors publicly.
-
-## Widget
-
-Admin page: `/widget-install`
-
-Embed example:
-
-```html
-<script src="https://YOUR_APP_DOMAIN/widget.js" data-bot-key="BOT_PUBLIC_KEY"></script>
-```
-
-V1 widget behavior:
-
-- Floating bottom-right button.
-- Chat panel.
-- Persists `visitor_id` and `conversation_id` in `localStorage`.
-- Starts a conversation through the public API.
-- Sends visitor messages.
-- Displays loading/error state.
-- Shows contact form after fallback.
-
-## Admin Pages
-
-- `/dashboard`: counts and recent AI usage.
-- `/tenants`: super-admin tenant creation.
-- `/ai-settings`: tenant OpenAI settings and test action.
-- `/bots`: bot list and CRUD.
-- `/knowledge-sources`: add text/FAQ/PDF/DOCX knowledge and reprocess sources.
-- `/knowledge-sources/{id}`: source status and chunk review.
-- `/conversations`: conversation list.
-- `/conversations/{id}`: messages, visitor data, retrieval logs, context text.
-- `/widget-install`: embed snippets.
+`/api/public/chat` — `widget-config`, `start`, `message`, `message/stream`, `contact` (rate-limited).
 
 ## Tests
 
-Run:
+Automated tests use SQLite in `phpunit.xml`; the application itself expects PostgreSQL + pgvector.
 
 ```bash
-php artisan test
+php artisan test --compact
 ```
 
-Current coverage includes:
+## Security
 
-- Auth starter tests.
-- API key encryption/masking.
-- Tenant isolation for bot edits.
-- Public chat inactive bot rejection.
-- Public chat allowed-domain validation.
-- Text chunking behavior.
+- Scope all tenant-owned data by `tenant_id`.
+- Never expose raw OpenAI keys to the browser or public APIs.
+- Rotate `APP_KEY` with care — it decrypts tenant API keys.
 
-Run formatting:
+## License
 
-```bash
-./vendor/bin/pint
-```
+MIT — see [LICENSE](LICENSE).
 
-Build frontend assets:
+## Author
 
-```bash
-npm run build
-```
-
-## Known Implementation Notes
-
-- `npm install` currently needs `--legacy-peer-deps` because Laravel's Vite plugin targets Vite 8 while the React plugin peer range lags behind. Production build currently succeeds.
-- The exact pgvector index is intentionally omitted in V1. Add an IVFFlat/HNSW index later after production data exists and query behavior is measured.
-- `embedding_json` is retained for local SQLite tests and non-Postgres fallback behavior.
-- The local dev database can be SQLite, but production should use PostgreSQL with `pgvector`.
-- Queue workers must run for PDF/DOCX/text/FAQ sources to become searchable.
-- Public chat quality depends on successful source processing and active tenant AI settings.
-
-## Agent/Developer Guidelines
-
-When extending the app:
-
-- Preserve explicit tenant filtering.
-- Never return raw API keys to Inertia or public APIs.
-- Keep public chat errors generic.
-- Do not delete old knowledge chunks until replacement extraction/chunking/embedding has succeeded.
-- Use Process array arguments for local commands.
-- Avoid adding a tenancy package unless the architecture is intentionally revisited.
-- Add tests for every tenant boundary, public endpoint, and AI failure path you change.
-- Keep demo data CRM-specific, not generic company FAQ content.
+[CoreFix Lab](https://corefixlab.com/corebot)
