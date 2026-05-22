@@ -5,8 +5,12 @@ export default function GuestLayout({ children }) {
     return (
         <div className="flex min-h-screen flex-col items-center bg-gray-100 pt-6 sm:justify-center sm:pt-0 dark:bg-gray-900">
             <div>
-                <Link href="/">
-                    <ApplicationLogo className="h-20 w-20 fill-current text-gray-500" />
+                <Link
+                    href="/"
+                    className="inline-flex items-center justify-center"
+                    aria-label="corebot home"
+                >
+                    <ApplicationLogo markClassName="h-20 w-20" />
                 </Link>
             </div>
 

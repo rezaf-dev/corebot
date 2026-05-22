@@ -1,14 +1,20 @@
+import ApplicationLogo from '@/Components/ApplicationLogo';
 import { Head, Link } from '@inertiajs/react';
 
 export default function Welcome({ auth }) {
     return (
         <>
-            <Head title="CRM AI Support Bot" />
+            <Head title="corebot" />
 
             <main className="min-h-screen bg-slate-950 text-white">
                 <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-                    <Link href="/" className="text-sm font-semibold tracking-wide">
-                        CRM AI Support Bot
+                    <Link href="/" aria-label="corebot home">
+                        <ApplicationLogo
+                            showWordmark
+                            className="text-white"
+                            markClassName="h-9 w-9"
+                            wordmarkClassName="text-lg"
+                        />
                     </Link>
 
                     <nav className="flex items-center gap-3 text-sm">
@@ -44,7 +50,7 @@ export default function Welcome({ auth }) {
                             Multi-tenant CRM support
                         </p>
                         <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight sm:text-6xl">
-                            AI answers from your approved CRM knowledge.
+                            corebot answers from your approved CRM knowledge.
                         </h1>
                         <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">
                             Create tenant-owned support bots, upload CRM workflow

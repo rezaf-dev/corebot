@@ -28,8 +28,16 @@ export default function AuthenticatedLayout({ header, children }) {
                     <div className="flex h-16 justify-between">
                         <div className="flex">
                             <div className="flex shrink-0 items-center">
-                                <Link href="/">
-                                    <ApplicationLogo className="block h-9 w-auto fill-current text-gray-800 dark:text-gray-200" />
+                                <Link
+                                    href="/"
+                                    className="inline-flex items-center"
+                                    aria-label="corebot home"
+                                >
+                                    <ApplicationLogo
+                                        showWordmark
+                                        markClassName="h-9 w-9"
+                                        wordmarkClassName="hidden text-lg sm:inline"
+                                    />
                                 </Link>
                             </div>
 
