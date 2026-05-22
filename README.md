@@ -39,6 +39,7 @@ corebot is built for **SaaS CRM operators** who want client-specific support bot
 ### Operations
 
 - Dashboard with usage logs.
+- **Laravel Horizon** for Redis queue workers and job monitoring (`/horizon`).
 - Conversation review including **retrieval logs** (which chunks were used).
 - Live **demo page** (`/demo`) driven by `DEMO_BOT_PUBLIC_KEY`.
 - Welcome-page contact form emails your inbox (`SUPPORT_REQUEST_EMAIL`).
@@ -49,7 +50,7 @@ corebot is built for **SaaS CRM operators** who want client-specific support bot
 |-------------|--------|
 | PHP 8.3+ | |
 | PostgreSQL 15+ | **Required** — with `pgvector` extension |
-| Redis | Queue worker for knowledge indexing |
+| Redis | Queues + Horizon (knowledge indexing jobs) |
 | Node.js 20+ | Frontend build |
 | `pdftotext` | PDF knowledge (Poppler) |
 | `python3` + `python-docx` | DOCX knowledge |
@@ -143,8 +144,9 @@ Only the variables you typically need to change:
 | `APP_KEY` | `php artisan key:generate` — also decrypts stored API keys |
 | `APP_URL` | Public URL of the app |
 | `DB_*` | PostgreSQL connection (`DB_CONNECTION=pgsql`) |
-| `QUEUE_CONNECTION` | Use `redis` and run `php artisan queue:work` |
-| `REDIS_*` | Redis connection for queues |
+| `QUEUE_CONNECTION` | Use `redis` and run Horizon (`php artisan horizon`) |
+| `REDIS_*` | Redis connection for queues and Horizon metadata |
+| `REDIS_QUEUE_RETRY_AFTER` | Must be greater than job timeout (default `330` for 300s indexing jobs) |
 | `MAIL_MAILER`, `MAIL_FROM_*` | Outbound mail |
 | `SUPPORT_REQUEST_EMAIL` | Inbox for the welcome-page contact form |
 | `DEMO_BOT_PUBLIC_KEY` | Bot `public_key` embedded on `/demo` |
@@ -163,6 +165,7 @@ DB_PASSWORD=
 
 QUEUE_CONNECTION=redis
 REDIS_HOST=127.0.0.1
+REDIS_QUEUE_RETRY_AFTER=330
 
 MAIL_MAILER=smtp
 MAIL_FROM_ADDRESS=hello@yourdomain.com
@@ -173,15 +176,69 @@ DEMO_BOT_PUBLIC_KEY=bot_xxxxxxxx
 
 For local mail testing, `MAIL_MAILER=log` writes to `storage/logs/laravel.log`.
 
+## Queue & Horizon
+
+Knowledge sources are indexed in the background (`ProcessKnowledgeSourceJob`). This project uses **Laravel Horizon** on top of Redis instead of a plain `queue:work` process.
+
+### Local development
+
+`composer run dev` starts Horizon together with the app server, logs, and Vite. You can also run it alone:
+
+```bash
+php artisan horizon
+```
+
+Open the dashboard at `http://localhost:8000/horizon`. In the `local` environment, any logged-in user can view it. Failed and completed jobs, throughput, and wait times are visible there.
+
+### Production
+
+Run a single long-lived Horizon process (Supervisor or systemd is recommended):
+
+```bash
+php artisan horizon
+```
+
+After deploys, gracefully restart workers so they pick up code changes:
+
+```bash
+php artisan horizon:terminate
+```
+
+The scheduler records metrics snapshots every five minutes (`horizon:snapshot`). Ensure your server cron runs Laravel’s scheduler:
+
+```bash
+* * * * * cd /path/to/corebot && php artisan schedule:run >> /dev/null 2>&1
+```
+
+### Dashboard access
+
+Horizon lives at `/horizon` and requires authentication. In non-local environments, only **super admins** may open the dashboard (`viewHorizon` gate in `app/Providers/HorizonServiceProvider.php`).
+
+Sign in as the seeded super admin (`super@example.com`) or a super admin created via `app:user-create --role=super_admin`.
+
+### Worker settings
+
+Horizon supervisors are defined in `config/horizon.php`:
+
+| Setting | Value | Why |
+|---------|-------|-----|
+| `timeout` | 300 | Matches `ProcessKnowledgeSourceJob` (PDF/DOCX + embeddings) |
+| `tries` | 3 | Retries transient OpenAI or I/O failures |
+| `memory` | 256 | Headroom for document extraction |
+
+`REDIS_QUEUE_RETRY_AFTER` must stay **above** the job timeout so Redis does not re-queue a job that is still running.
+
 ## Production checklist
 
 ```bash
 php artisan migrate --force
-php artisan queue:work redis --tries=3 --timeout=300
+php artisan horizon   # keep running via Supervisor/systemd
 npm run build
 php artisan config:cache
 php artisan route:cache
 ```
+
+Configure cron for `php artisan schedule:run` (Horizon metrics snapshots).
 
 Install system tools: Poppler (`pdftotext`), Python `python-docx`.
 
