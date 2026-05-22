@@ -41,7 +41,7 @@ export default function Welcome({ auth }) {
 
             <main className="min-h-screen bg-slate-950 text-white">
                 <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-                    <Link href="/" aria-label="corebot home">
+                    <Link href={route('home')} aria-label="corebot home">
                         <ApplicationLogo
                             showWordmark
                             className="text-white"

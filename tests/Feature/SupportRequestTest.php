@@ -2,6 +2,7 @@
 
 use App\Mail\SupportRequestMail;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\URL;
 
 it('sends support request emails to the configured inbox', function () {
     config(['corebot.support_request_email' => 'support@corefixlab.com']);
@@ -37,6 +38,13 @@ it('rejects support requests when no inbox is configured', function () {
     ])
         ->assertRedirect()
         ->assertSessionHas('error');
+});
+
+it('generates support request urls with a subfolder app url', function () {
+    config(['app.url' => 'https://app.test/corebot']);
+    URL::forceRootUrl(config('app.url'));
+
+    expect(route('support-requests.store'))->toBe('https://app.test/corebot/support-requests');
 });
 
 it('validates support request fields', function () {

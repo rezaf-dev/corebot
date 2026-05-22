@@ -13,7 +13,7 @@ use App\Http\Controllers\SupportRequestController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::get('/', fn () => Inertia::render('Welcome'));
+Route::get('/', fn () => Inertia::render('Welcome'))->name('home');
 
 Route::get('/demo', DemoController::class)->name('demo');
 

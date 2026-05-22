@@ -6,7 +6,7 @@ export default function GuestLayout({ children }) {
         <div className="flex min-h-screen flex-col items-center bg-gray-100 pt-6 text-gray-900 sm:justify-center sm:pt-0 dark:bg-gray-900 dark:text-gray-100">
             <div>
                 <Link
-                    href="/"
+                    href={route('home')}
                     className="inline-flex items-center justify-center"
                     aria-label="corebot home"
                 >
