@@ -10,8 +10,9 @@ corebot is built for **SaaS CRM operators** who want client-specific support bot
 
 ### Multi-tenant admin
 
-- **Super admin** creates isolated tenant workspaces.
-- **Tenant admin** manages bots, AI settings, knowledge, conversations, and widget appearance.
+- **Super admin** creates isolated tenant workspaces (UI or seed data).
+- **Tenant admin** accounts can be added with `php artisan app:user-create` — see [Create users (CLI)](#create-users-cli).
+- Tenant admins manage bots, AI settings, knowledge, conversations, and widget appearance.
 - Every query is scoped by `tenant_id` through `TenantAccess` — no generic tenancy package.
 
 ### Per-tenant OpenAI
@@ -90,6 +91,48 @@ Seeded accounts:
 
 - Admin: `http://localhost:8000`
 - Widget demo: `http://localhost:8000/demo` (set `DEMO_BOT_PUBLIC_KEY` first)
+
+## Create users (CLI)
+
+After tenants exist, add admin accounts with the Artisan command defined in `app/Console/Commands/CreateUserCommand.php`:
+
+```bash
+php artisan app:user-create
+```
+
+The command prompts for name, email, password, and tenant (for tenant admins). You can pass everything via options for scripts and production setup:
+
+**Tenant admin** (must belong to an existing tenant — use id or slug from `/tenants` or seed data):
+
+```bash
+php artisan app:user-create \
+  --name="Acme Admin" \
+  --email=admin@acme.com \
+  --password='your-secure-password' \
+  --role=tenant_admin \
+  --tenant=acme \
+  --verified
+```
+
+**Super admin** (no tenant; can create tenants in the UI):
+
+```bash
+php artisan app:user-create \
+  --name="Platform Admin" \
+  --email=super@yourcompany.com \
+  --password='your-secure-password' \
+  --role=super_admin \
+  --verified
+```
+
+| Option | Description |
+|--------|-------------|
+| `--name` | Display name |
+| `--email` | Login email (must be unique) |
+| `--password` | Initial password (min. 8 characters) |
+| `--role` | `tenant_admin` (default) or `super_admin` |
+| `--tenant` | Tenant id or slug — required for `tenant_admin` |
+| `--verified` | Mark email as verified (skips verification flow) |
 
 ## Environment variables
 
