@@ -26,7 +26,11 @@ class ConversationController extends Controller
         $access->ensureCanAccess(auth()->user(), $conversation);
 
         return Inertia::render('Conversations/Show', [
-            'conversation' => $conversation->load(['bot:id,name', 'messages', 'retrievalLogs']),
+            'conversation' => $conversation->load([
+                'bot:id,name',
+                'messages' => fn ($query) => $query->orderBy('created_at'),
+                'retrievalLogs' => fn ($query) => $query->latest(),
+            ]),
         ]);
     }
 }

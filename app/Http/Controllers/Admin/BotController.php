@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Bot;
 use App\Support\TenantAccess;
+use App\Support\WidgetConfig;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -36,7 +37,15 @@ class BotController extends Controller
     {
         $access->ensureCanAccess(auth()->user(), $bot);
 
-        return Inertia::render('Bots/Form', ['bot' => $bot]);
+        return Inertia::render('Bots/Form', [
+            'bot' => $bot,
+            'widgetUrl' => url('/widget.js'),
+            'widgetSnippet' => WidgetConfig::embedSnippet(
+                url('/widget.js'),
+                $bot->public_key,
+                $bot->resolvedWidgetConfig(),
+            ),
+        ]);
     }
 
     public function update(Request $request, Bot $bot, TenantAccess $access): RedirectResponse

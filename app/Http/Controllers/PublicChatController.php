@@ -36,6 +36,22 @@ class PublicChatController extends Controller
             'welcome_message' => $bot->welcome_message,
             'collect_visitor_email' => $bot->collect_visitor_email,
             'collect_visitor_phone' => $bot->collect_visitor_phone,
+            'widget' => $bot->resolvedWidgetConfig(),
+        ]);
+    }
+
+    public function widgetConfig(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'bot_public_key' => ['required', 'string'],
+        ]);
+
+        $bot = $this->activeBot($data['bot_public_key']);
+
+        return response()->json([
+            'widget' => array_merge($bot->resolvedWidgetConfig(), [
+                'welcome_message' => $bot->welcome_message,
+            ]),
         ]);
     }
 

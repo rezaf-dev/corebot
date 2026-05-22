@@ -34,6 +34,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/conversations/{conversation}', [ConversationController::class, 'show'])->name('conversations.show');
 
     Route::get('/widget-install', WidgetInstallController::class)->name('widget.install');
+    Route::put('/widget-install/{bot}', [WidgetInstallController::class, 'update'])->name('widget.install.update');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

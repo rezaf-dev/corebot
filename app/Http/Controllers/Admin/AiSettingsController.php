@@ -84,6 +84,8 @@ class AiSettingsController extends Controller
                 'last_test_status' => 'success',
                 'last_test_error' => null,
             ]);
+
+            return back()->with('success', 'Connection test passed. AI features are now active.');
         } catch (Throwable $e) {
             $settings->update([
                 'is_active' => false,
@@ -91,8 +93,8 @@ class AiSettingsController extends Controller
                 'last_test_status' => 'failed',
                 'last_test_error' => str($e->getMessage())->limit(500)->toString(),
             ]);
-        }
 
-        return back();
+            return back()->with('error', 'Connection test failed. Check the details below and try again.');
+        }
     }
 }

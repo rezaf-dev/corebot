@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\WidgetConfig;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -23,6 +24,7 @@ use Illuminate\Support\Str;
     'similarity_threshold',
     'collect_visitor_email',
     'collect_visitor_phone',
+    'widget_config',
 ])]
 class Bot extends Model
 {
@@ -67,11 +69,20 @@ PROMPT;
         return $this->status === 'active';
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    public function resolvedWidgetConfig(): array
+    {
+        return WidgetConfig::resolve($this->widget_config);
+    }
+
     protected function casts(): array
     {
         return [
             'use_tenant_ai_settings' => 'boolean',
             'allowed_domains' => 'array',
+            'widget_config' => 'array',
             'temperature' => 'decimal:2',
             'similarity_threshold' => 'decimal:3',
             'collect_visitor_email' => 'boolean',
