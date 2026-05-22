@@ -13,6 +13,8 @@ use Inertia\Inertia;
 
 Route::get('/', fn () => Inertia::render('Welcome'));
 
+Route::view('/demo', 'demo');
+
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
 

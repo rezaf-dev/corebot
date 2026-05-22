@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Bot;
 use App\Models\ChatConversation;
 use App\Services\Rag\ChatAnswerService;
+use Generator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PublicChatController extends Controller
 {
@@ -39,20 +41,25 @@ class PublicChatController extends Controller
 
     public function message(Request $request, ChatAnswerService $answerService): JsonResponse
     {
-        $data = $request->validate([
-            'bot_public_key' => ['required', 'string'],
-            'conversation_id' => ['required', 'integer'],
-            'message' => ['required', 'string', 'max:2000'],
-        ]);
+        [$bot, $conversation, $message] = $this->messageContext($request);
 
-        $bot = $this->activeBot($data['bot_public_key']);
-        $conversation = ChatConversation::query()
-            ->where('id', $data['conversation_id'])
-            ->where('tenant_id', $bot->tenant_id)
-            ->where('bot_id', $bot->id)
-            ->firstOrFail();
+        return response()->json($answerService->answer($bot->load('tenant.aiSetting'), $conversation, $message));
+    }
 
-        return response()->json($answerService->answer($bot->load('tenant.aiSetting'), $conversation, $data['message']));
+    public function stream(Request $request, ChatAnswerService $answerService): StreamedResponse
+    {
+        [$bot, $conversation, $message] = $this->messageContext($request);
+
+        return response()->stream(
+            function () use ($answerService, $bot, $conversation, $message): Generator {
+                yield from $answerService->stream($bot->load('tenant.aiSetting'), $conversation, $message);
+            },
+            headers: [
+                'Content-Type' => 'text/event-stream',
+                'Cache-Control' => 'no-cache',
+                'X-Accel-Buffering' => 'no',
+            ],
+        );
     }
 
     public function contact(Request $request): JsonResponse
@@ -84,6 +91,24 @@ class PublicChatController extends Controller
         abort_unless($bot->isActive() && $bot->tenant->isActive(), 404);
 
         return $bot;
+    }
+
+    private function messageContext(Request $request): array
+    {
+        $data = $request->validate([
+            'bot_public_key' => ['required', 'string'],
+            'conversation_id' => ['required', 'integer'],
+            'message' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $bot = $this->activeBot($data['bot_public_key']);
+        $conversation = ChatConversation::query()
+            ->where('id', $data['conversation_id'])
+            ->where('tenant_id', $bot->tenant_id)
+            ->where('bot_id', $bot->id)
+            ->firstOrFail();
+
+        return [$bot, $conversation, $data['message']];
     }
 
     private function ensureAllowedDomain(Bot $bot, ?string $sourceUrl): void

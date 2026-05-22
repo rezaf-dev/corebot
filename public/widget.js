@@ -52,13 +52,17 @@
         if (!text) return;
         input.value = '';
         add('user', text);
-        add('assistant', '...');
+        const assistant = add('assistant', '');
         try {
-            const res = await post('/message', { conversation_id: state.conversation_id, message: text });
-            messages.lastChild.textContent = res.message;
-            if (res.fallback) contact.style.display = 'block';
+            await streamMessage(text, assistant);
         } catch {
-            messages.lastChild.textContent = 'Support is unavailable right now.';
+            try {
+                const res = await post('/message', { conversation_id: state.conversation_id, message: text });
+                assistant.textContent = res.message;
+                if (res.fallback) contact.style.display = 'block';
+            } catch {
+                assistant.textContent = 'Support is unavailable right now.';
+            }
         }
     });
 
@@ -87,11 +91,50 @@
         return response.json();
     }
 
+    async function streamMessage(text, node) {
+        const response = await fetch(apiBase + '/message/stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+            body: JSON.stringify({ bot_public_key: botKey, conversation_id: state.conversation_id, message: text }),
+        });
+
+        if (!response.ok || !response.body) throw new Error('Stream failed');
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const events = buffer.split('\n\n');
+            buffer = events.pop() || '';
+
+            for (const event of events) {
+                const line = event.split('\n').find((item) => item.startsWith('data: '));
+                if (!line) continue;
+
+                const payload = JSON.parse(line.slice(6));
+                if (payload.type === 'text_delta') {
+                    node.textContent += payload.delta;
+                    messages.scrollTop = messages.scrollHeight;
+                }
+
+                if (payload.type === 'meta' && payload.fallback) {
+                    contact.style.display = 'block';
+                }
+            }
+        }
+    }
+
     function add(role, text) {
         const node = document.createElement('div');
         node.className = 'crm-ai-msg crm-ai-' + role;
         node.textContent = text;
         messages.appendChild(node);
         messages.scrollTop = messages.scrollHeight;
+        return node;
     }
 })();

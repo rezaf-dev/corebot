@@ -14,8 +14,8 @@ export default function Edit({ settings }) {
                     {['api_key', 'base_url', 'chat_model', 'embedding_model'].map((field) => (
                         <label key={field} className="mt-4 block text-sm text-gray-700 dark:text-gray-300">
                             {field.replace('_', ' ')}
-                            <input type={field === 'api_key' ? 'password' : 'text'} value={data[field]} onChange={(e) => setData(field, e.target.value)} placeholder={field === 'api_key' ? 'Leave blank to keep current key' : ''} className="mt-1 w-full rounded border-gray-300 dark:border-gray-700 dark:bg-gray-900" />
-                            {errors[field] && <span className="text-xs text-red-600">{errors[field]}</span>}
+                            <input type={field === 'api_key' ? 'password' : 'text'} value={data[field]} onChange={(e) => setData(field, e.target.value)} placeholder={field === 'api_key' ? 'Leave blank to keep current key' : ''} className="mt-1 w-full rounded border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100" />
+                            {errors[field] && <span className="text-xs text-red-600 dark:text-red-400">{errors[field]}</span>}
                         </label>
                     ))}
                     <div className="mt-5 flex gap-3">

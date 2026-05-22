@@ -19,7 +19,7 @@ class SemanticSearchService
         if (DB::connection()->getDriverName() === 'pgsql') {
             $vector = '['.implode(',', $embedding).']';
 
-            return KnowledgeChunk::query()
+            $candidates = KnowledgeChunk::query()
                 ->select('*')
                 ->selectRaw('embedding <=> ? AS distance', [$vector])
                 ->where('tenant_id', $bot->tenant_id)
@@ -27,23 +27,47 @@ class SemanticSearchService
                 ->orderByRaw('embedding <=> ?', [$vector])
                 ->limit($bot->max_context_chunks)
                 ->get()
-                ->filter(fn ($chunk) => (float) $chunk->distance <= (float) $bot->similarity_threshold)
                 ->values();
+
+            return $this->withinThresholdOrNearest($candidates, $bot);
         }
 
-        return KnowledgeChunk::query()
+        $candidates = KnowledgeChunk::query()
             ->where('tenant_id', $bot->tenant_id)
             ->where('bot_id', $bot->id)
             ->get()
             ->map(function (KnowledgeChunk $chunk) use ($embedding) {
-                $chunk->distance = $this->cosineDistance($embedding, $chunk->embedding_json ?? []);
+                $chunk->distance = $this->cosineDistance($embedding, $this->embeddingArray($chunk->embedding_json));
 
                 return $chunk;
             })
-            ->filter(fn ($chunk) => $chunk->distance <= (float) $bot->similarity_threshold)
             ->sortBy('distance')
             ->take($bot->max_context_chunks)
             ->values();
+
+        return $this->withinThresholdOrNearest($candidates, $bot);
+    }
+
+    private function withinThresholdOrNearest(Collection $candidates, Bot $bot): Collection
+    {
+        $matches = $candidates
+            ->filter(fn ($chunk) => (float) $chunk->distance <= (float) $bot->similarity_threshold)
+            ->values();
+
+        return $matches->isNotEmpty() ? $matches : $candidates;
+    }
+
+    private function embeddingArray(mixed $embedding): array
+    {
+        if (is_array($embedding)) {
+            return $embedding;
+        }
+
+        if (is_string($embedding)) {
+            return json_decode($embedding, true) ?: [];
+        }
+
+        return [];
     }
 
     private function cosineDistance(array $a, array $b): float

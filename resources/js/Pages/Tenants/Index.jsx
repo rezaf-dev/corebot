@@ -14,15 +14,15 @@ export default function Index({ tenants }) {
                     {['name', 'admin_name', 'admin_email', 'admin_password'].map((field) => (
                         <label key={field} className="mt-4 block text-sm text-gray-700 dark:text-gray-300">
                             {field.replace('_', ' ')}
-                            <input type={field.includes('password') ? 'password' : 'text'} value={data[field]} onChange={(e) => setData(field, e.target.value)} className="mt-1 w-full rounded border-gray-300 dark:border-gray-700 dark:bg-gray-900" />
-                            {errors[field] && <span className="text-xs text-red-600">{errors[field]}</span>}
+                            <input type={field.includes('password') ? 'password' : 'text'} value={data[field]} onChange={(e) => setData(field, e.target.value)} className="mt-1 w-full rounded border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100" />
+                            {errors[field] && <span className="text-xs text-red-600 dark:text-red-400">{errors[field]}</span>}
                         </label>
                     ))}
                     <button disabled={processing} className="mt-5 rounded bg-gray-900 px-4 py-2 text-sm text-white">Create</button>
                 </form>
                 <div className="rounded-lg bg-white p-5 shadow dark:bg-gray-800">
                     <table className="w-full text-left text-sm">
-                        <thead className="text-gray-500"><tr><th>Name</th><th>Status</th><th>Admins</th><th>Bots</th></tr></thead>
+                        <thead className="text-gray-500 dark:text-gray-400"><tr><th>Name</th><th>Status</th><th>Admins</th><th>Bots</th></tr></thead>
                         <tbody className="divide-y dark:divide-gray-700">{tenants.map((tenant) => <tr key={tenant.id}><td className="py-2">{tenant.name}</td><td>{tenant.status}</td><td>{tenant.users_count}</td><td>{tenant.bots_count}</td></tr>)}</tbody>
                     </table>
                 </div>

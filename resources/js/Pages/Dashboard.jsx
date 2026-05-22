@@ -25,7 +25,7 @@ export default function Dashboard({ stats }) {
                     <h3 className="font-semibold text-gray-900 dark:text-white">Recent AI usage</h3>
                     <div className="mt-4 overflow-x-auto text-sm">
                         <table className="w-full text-left">
-                            <thead className="text-gray-500"><tr><th>Type</th><th>Model</th><th>Tokens</th><th>Error</th></tr></thead>
+                            <thead className="text-gray-500 dark:text-gray-400"><tr><th>Type</th><th>Model</th><th>Tokens</th><th>Error</th></tr></thead>
                             <tbody className="divide-y dark:divide-gray-700">
                                 {stats.usage_logs?.map((log) => (
                                     <tr key={log.id}><td className="py-2">{log.type}</td><td>{log.model}</td><td>{log.total_tokens || '-'}</td><td>{log.error_message || '-'}</td></tr>
