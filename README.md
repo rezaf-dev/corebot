@@ -140,6 +140,59 @@ The second command should print plain text on success. Exit code `1` means no ex
 - PDFs do **not** use Python; they use `pdftotext` (Poppler) via `PdfTextExtractor`.
 - If DOCX indexing fails with import errors, set `DOCX_PYTHON` to the interpreter where you ran `pip install python-docx`, or install the package for the `python3` on the worker `PATH` (`which python3` as the Horizon user).
 
+### Laravel Forge (zero-downtime)
+
+Yes — with Forge zero-downtime, `current` is a symlink that moves to a **new release folder** on every deploy (`releases/1234567890`, etc.). Anything you put **inside** that release tree (including `current/.venv`) is tied to that deploy unless you recreate it each time.
+
+**Do not** rely on a venv that only exists under a single release path, and avoid baking a release id into `DOCX_PYTHON`:
+
+```env
+# Fragile — old release is removed; new release may have no venv yet
+DOCX_PYTHON=/home/forge/example.com/releases/1234567890/.venv/bin/python3
+```
+
+Using `current` in the path is slightly better (`/home/forge/example.com/current/.venv/bin/python3`) because the symlink always resolves to the active release — but you must still **create** `.venv` on every deploy inside the new release, or DOCX jobs break right after deploy.
+
+**Recommended:** keep one virtualenv **outside** `releases/` and `current/`, at the **site root** (same level as `releases/`, `storage/`, shared `.env`):
+
+```text
+/home/forge/example.com/
+  .env                 # Forge shared env — survives deploys
+  .venv/               # stable Python env (not in releases/)
+  current -> releases/…
+  releases/
+  storage/
+```
+
+One-time (or in the first deploy script):
+
+```bash
+cd /home/forge/example.com
+python3 -m venv .venv
+.venv/bin/pip install python-docx
+```
+
+In Forge **Environment** (shared `.env`):
+
+```env
+DOCX_PYTHON=/home/forge/example.com/.venv/bin/python3
+```
+
+Use your real site path from Forge (not `example.com`). This path stays the same across zero-downtime deploys; only `current` changes. After deploy, Forge restarts Horizon — workers pick up the same `DOCX_PYTHON`.
+
+Optional: in the Forge **Deploy Script**, only ensure the venv exists (idempotent), not per-release:
+
+```bash
+if [ ! -d "$FORGE_SITE_ROOT/.venv" ]; then
+  python3 -m venv "$FORGE_SITE_ROOT/.venv"
+fi
+"$FORGE_SITE_ROOT/.venv/bin/pip" install -q python-docx
+```
+
+Forge injects `$FORGE_SITE_ROOT` as the site directory above `releases/` (e.g. `/home/forge/example.com`). `$FORGE_SITE_PATH` points at `current` and changes each deploy — use `$FORGE_SITE_ROOT` for `.venv`, not `$FORGE_SITE_PATH`.
+
+**Alternative:** skip `DOCX_PYTHON` and install `python-docx` for the system `python3` on the server; then PATH alone is enough and deploy layout does not matter.
+
 ## Database setup
 
 corebot **requires PostgreSQL with pgvector**. SQLite is not supported for running the application.
