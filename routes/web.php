@@ -33,8 +33,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::resource('bots', BotController::class)->except(['show']);
 
-    Route::resource('knowledge-sources', KnowledgeSourceController::class)->only(['index', 'store', 'show', 'destroy']);
+    Route::resource('knowledge-sources', KnowledgeSourceController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
     Route::post('/knowledge-sources/{knowledgeSource}/reprocess', [KnowledgeSourceController::class, 'reprocess'])->name('knowledge-sources.reprocess');
+    Route::post('/knowledge-sources/{knowledgeSource}/cancel', [KnowledgeSourceController::class, 'cancel'])->name('knowledge-sources.cancel');
 
     Route::get('/conversations', [ConversationController::class, 'index'])->name('conversations.index');
     Route::get('/conversations/{conversation}', [ConversationController::class, 'show'])->name('conversations.show');

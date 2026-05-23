@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('bot_id')->constrained()->cascadeOnDelete();
             $table->string('type');
             $table->string('title');
-            $table->string('status')->default('draft')->index();
+            $table->string('status')->default('queued')->index();
             $table->string('original_file_path')->nullable();
             $table->string('original_file_name')->nullable();
             $table->string('mime_type')->nullable();

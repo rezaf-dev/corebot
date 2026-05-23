@@ -19,6 +19,8 @@ pest()->extend(TestCase::class)
     ->beforeEach(fn () => $this->withoutVite())
     ->in('Feature');
 
+pest()->extend(TestCase::class)->in('Unit');
+
 /*
 |--------------------------------------------------------------------------
 | Expectations

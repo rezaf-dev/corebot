@@ -18,4 +18,16 @@ return [
 
     'demo_bot_public_key' => env('DEMO_BOT_PUBLIC_KEY'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | DOCX text extraction (python-docx via scripts/extract_docx.py)
+    |--------------------------------------------------------------------------
+    |
+    | Absolute path to a Python 3 interpreter (e.g. project venv). When null,
+    | Laravel invokes `python3` from the worker process PATH.
+    |
+    */
+
+    'docx_python' => env('DOCX_PYTHON'),
+
 ];

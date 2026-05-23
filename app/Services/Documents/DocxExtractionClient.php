@@ -15,7 +15,8 @@ class DocxExtractionClient
         }
 
         $script = base_path('scripts/extract_docx.py');
-        $process = new Process(['python3', $script, $realPath]);
+        $python = config('corebot.docx_python') ?: 'python3';
+        $process = new Process([$python, $script, $realPath]);
         $process->setTimeout(30);
         $process->run();
 

@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Enums\KnowledgeSourceStatus;
 use App\Models\KnowledgeChunk;
 use App\Models\KnowledgeSource;
 use App\Services\AI\OpenAIService;
@@ -24,12 +25,20 @@ class ProcessKnowledgeSourceJob implements ShouldQueue
     {
         $source = KnowledgeSource::query()->with(['tenant.aiSetting', 'bot'])->findOrFail($this->knowledgeSourceId);
 
+        if ($this->wasCancelled($source)) {
+            return;
+        }
+
         try {
             if (! $source->tenant->aiSetting?->canUseAi()) {
                 throw new \RuntimeException('Tenant AI settings are not active.');
             }
 
-            $source->update(['status' => 'processing', 'error_message' => null]);
+            $source->update(['status' => KnowledgeSourceStatus::Processing->value, 'error_message' => null]);
+
+            if ($this->wasCancelled($source)) {
+                return;
+            }
 
             $text = $extractor->extract($source);
             $chunks = $chunker->chunk($text);
@@ -41,6 +50,10 @@ class ProcessKnowledgeSourceJob implements ShouldQueue
             $newChunks = [];
 
             foreach ($chunks as $index => $content) {
+                if ($this->wasCancelled($source)) {
+                    return;
+                }
+
                 $embedding = $openAI->createEmbedding($source->tenant, $content, [
                     'bot_id' => $source->bot_id,
                     'knowledge_source_id' => $source->id,
@@ -64,7 +77,15 @@ class ProcessKnowledgeSourceJob implements ShouldQueue
                 ];
             }
 
+            if ($this->wasCancelled($source)) {
+                return;
+            }
+
             DB::transaction(function () use ($source, $newChunks) {
+                if ($this->wasCancelled($source)) {
+                    return;
+                }
+
                 KnowledgeChunk::query()->where('knowledge_source_id', $source->id)->delete();
 
                 foreach ($newChunks as $chunk) {
@@ -80,17 +101,30 @@ class ProcessKnowledgeSourceJob implements ShouldQueue
                 }
 
                 $source->update([
-                    'status' => 'ready',
+                    'status' => KnowledgeSourceStatus::Ready->value,
                     'raw_text' => $source->type === 'text' || $source->type === 'faq' ? $source->raw_text : null,
                     'chunks_count' => count($newChunks),
                     'last_indexed_at' => now(),
                 ]);
             });
         } catch (Throwable $e) {
+            $source->refresh();
+
+            if ($this->wasCancelled($source)) {
+                return;
+            }
+
             $source->update([
-                'status' => 'failed',
+                'status' => KnowledgeSourceStatus::Failed->value,
                 'error_message' => str($e->getMessage())->limit(500)->toString(),
             ]);
         }
+    }
+
+    private function wasCancelled(KnowledgeSource $source): bool
+    {
+        $source->refresh();
+
+        return KnowledgeSourceStatus::fromStored($source->status) === KnowledgeSourceStatus::Cancelled;
     }
 }

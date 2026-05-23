@@ -53,7 +53,92 @@ corebot is built for **SaaS CRM operators** who want client-specific support bot
 | Redis | Queues + Horizon (knowledge indexing jobs) |
 | Node.js 20+ | Frontend build |
 | `pdftotext` | PDF knowledge (Poppler) |
-| `python3` + `python-docx` | DOCX knowledge |
+| `python3` + `python-docx` | DOCX knowledge — see [Python (DOCX extraction)](#python-docx-extraction) |
+
+## Python (DOCX extraction)
+
+Python is used **only** to turn uploaded Word (`.docx`) knowledge sources into plain text before chunking and embedding. The rest of the app is PHP/Laravel; there is no Python web server or separate Python service.
+
+### How it fits in the pipeline
+
+1. A tenant uploads a DOCX file as a knowledge source.
+2. `ProcessKnowledgeSourceJob` runs on the queue (Horizon).
+3. `DocumentTextExtractor` calls `DocxExtractionClient`, which runs a short-lived subprocess:
+
+   ```text
+   {DOCX_PYTHON or python3} scripts/extract_docx.py /absolute/path/to/file.docx
+   ```
+
+4. The script prints extracted text to **stdout**; Laravel reads that output and continues with chunking, OpenAI embeddings, and pgvector storage.
+
+Set `DOCX_PYTHON` in `.env` when you use a virtualenv or a non-default interpreter (see below). Horizon does not read this variable itself — PHP queue workers do when they spawn the subprocess.
+
+Relevant code:
+
+| Piece | Location |
+|-------|----------|
+| Extraction script | `scripts/extract_docx.py` |
+| PHP wrapper | `app/Services/Documents/DocxExtractionClient.php` |
+| Type routing (text / FAQ / PDF / DOCX) | `app/Services/Documents/DocumentTextExtractor.php` |
+
+The script uses the [`python-docx`](https://python-docx.readthedocs.io/) library. It collects non-empty paragraph text and table rows (cells joined with ` | `). If nothing is extractable, it exits with a non-zero status and Laravel surfaces the error on the knowledge source.
+
+### What to install
+
+You need **Python 3** on the same machine that runs queue workers (Horizon), not only the web process — indexing happens in the background job.
+
+1. **Python 3.9+** with **`python-docx`** installed for that interpreter.
+2. **`DOCX_PYTHON`** (optional) — absolute path to the interpreter used for DOCX jobs. If unset, Laravel runs `python3` from the queue worker’s `PATH`.
+
+   ```bash
+   python3 -m venv .venv
+   .venv/bin/pip install python-docx
+   ```
+
+   In `.env` (use the real path on your server):
+
+   ```env
+   DOCX_PYTHON=/path/to/corebot/.venv/bin/python3
+   ```
+
+   After changing `.env`, restart Horizon so workers reload config (`php artisan horizon:terminate`, or restart Supervisor/systemd).
+
+   You do **not** configure Python inside `config/horizon.php`. Point `DOCX_PYTHON` at the venv’s `python3` instead of tweaking Supervisor `PATH`, unless you prefer PATH-only setup.
+
+There is no `requirements.txt` in the repo today; the only Python dependency is `python-docx`.
+
+### OS examples
+
+**macOS (Homebrew)**
+
+```bash
+brew install python@3
+python3 -m pip install python-docx
+```
+
+**Debian / Ubuntu**
+
+```bash
+sudo apt update
+sudo apt install python3 python3-pip
+python3 -m pip install python-docx
+```
+
+**Verify**
+
+```bash
+python3 -c "import docx; print('python-docx OK')"
+python3 scripts/extract_docx.py /path/to/sample.docx
+```
+
+The second command should print plain text on success. Exit code `1` means no extractable content; `2` means missing file argument.
+
+### Production notes
+
+- Install Python and `python-docx` on every host that runs `php artisan horizon` (or any `queue:work` setup).
+- The subprocess timeout is **30 seconds** per file (`DocxExtractionClient`).
+- PDFs do **not** use Python; they use `pdftotext` (Poppler) via `PdfTextExtractor`.
+- If DOCX indexing fails with import errors, set `DOCX_PYTHON` to the interpreter where you ran `pip install python-docx`, or install the package for the `python3` on the worker `PATH` (`which python3` as the Horizon user).
 
 ## Database setup
 
@@ -72,6 +157,7 @@ git clone https://github.com/rezaf-dev/corebot.git
 cd corebot
 composer install
 npm install
+python3 -m pip install python-docx
 cp .env.example .env
 php artisan key:generate
 ```
@@ -150,6 +236,7 @@ Only the variables you typically need to change:
 | `MAIL_MAILER`, `MAIL_FROM_*` | Outbound mail |
 | `SUPPORT_REQUEST_EMAIL` | Inbox for the welcome-page contact form |
 | `DEMO_BOT_PUBLIC_KEY` | Bot `public_key` embedded on `/demo` |
+| `DOCX_PYTHON` | Optional absolute path to Python 3 for DOCX indexing (default: `python3` on worker `PATH`) |
 
 Example `.env` fragment:
 
@@ -172,6 +259,9 @@ MAIL_FROM_ADDRESS=hello@yourdomain.com
 SUPPORT_REQUEST_EMAIL=hello@yourdomain.com
 
 DEMO_BOT_PUBLIC_KEY=bot_xxxxxxxx
+
+# Optional venv interpreter for DOCX knowledge sources
+# DOCX_PYTHON=/var/www/corebot/.venv/bin/python3
 ```
 
 For local mail testing, `MAIL_MAILER=log` writes to `storage/logs/laravel.log`.
@@ -240,7 +330,7 @@ php artisan route:cache
 
 Configure cron for `php artisan schedule:run` (Horizon metrics snapshots).
 
-Install system tools: Poppler (`pdftotext`), Python `python-docx`.
+Install system tools: Poppler (`pdftotext`), Python 3 + `python-docx` (see [Python (DOCX extraction)](#python-docx-extraction)).
 
 ## Widget embed
 

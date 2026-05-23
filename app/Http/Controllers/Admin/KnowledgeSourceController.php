@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\KnowledgeSourceStatus;
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessKnowledgeSourceJob;
 use App\Models\Bot;
@@ -9,18 +10,60 @@ use App\Models\KnowledgeSource;
 use App\Support\TenantAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class KnowledgeSourceController extends Controller
 {
-    public function index(TenantAccess $access): Response
+    public function index(Request $request, TenantAccess $access): Response
     {
         $user = auth()->user();
+        $search = $request->string('search')->trim()->toString();
+
+        $baseQuery = $access->scope(KnowledgeSource::query(), $user);
+
+        $statsQuery = clone $baseQuery;
+
+        $sources = (clone $baseQuery)
+            ->with('bot:id,name')
+            ->when($search !== '', function ($query) use ($search) {
+                $term = '%'.$search.'%';
+
+                $query->where(function ($query) use ($term) {
+                    $query->where('title', 'like', $term)
+                        ->orWhere('original_file_name', 'like', $term)
+                        ->orWhere('type', 'like', $term)
+                        ->orWhere('status', 'like', $term)
+                        ->orWhereHas('bot', fn ($botQuery) => $botQuery->where('name', 'like', $term));
+                });
+            })
+            ->latest()
+            ->paginate(10)
+            ->withQueryString();
 
         return Inertia::render('Knowledge/Index', [
-            'sources' => $access->scope(KnowledgeSource::query(), $user)->with('bot:id,name')->latest()->get(),
+            'sources' => $sources,
             'bots' => $access->scope(Bot::query(), $user)->where('status', 'active')->orderBy('name')->get(['id', 'name']),
+            'filters' => [
+                'search' => $search,
+            ],
+            'stats' => [
+                'total' => $statsQuery->count(),
+                'ready' => (clone $statsQuery)->where('status', KnowledgeSourceStatus::Ready->value)->count(),
+                'processing' => (clone $statsQuery)->whereIn('status', [
+                    KnowledgeSourceStatus::Queued->value,
+                    KnowledgeSourceStatus::Processing->value,
+                    'draft',
+                ])->count(),
+                'failed' => (clone $statsQuery)->where('status', KnowledgeSourceStatus::Failed->value)->count(),
+                'chunks' => (int) (clone $statsQuery)->sum('chunks_count'),
+            ],
+            'hasActiveSources' => (clone $statsQuery)->whereIn('status', [
+                KnowledgeSourceStatus::Queued->value,
+                KnowledgeSourceStatus::Processing->value,
+                'draft',
+            ])->exists(),
         ]);
     }
 
@@ -43,7 +86,7 @@ class KnowledgeSourceController extends Controller
             'bot_id' => $bot->id,
             'type' => $data['type'],
             'title' => $data['title'],
-            'status' => 'draft',
+            'status' => KnowledgeSourceStatus::Queued->value,
         ];
 
         if ($data['type'] === 'faq') {
@@ -62,7 +105,7 @@ class KnowledgeSourceController extends Controller
         }
 
         $source = KnowledgeSource::create($attributes);
-        ProcessKnowledgeSourceJob::dispatch($source->id);
+        $this->queueProcessing($source);
 
         return back()->with('success', 'Knowledge source queued for processing.');
     }
@@ -71,18 +114,82 @@ class KnowledgeSourceController extends Controller
     {
         $access->ensureCanAccess(auth()->user(), $knowledgeSource);
 
+        $source = $knowledgeSource->load('bot:id,name');
+        $faq = $source->type === 'faq' ? $this->parseFaqRawText($source->raw_text) : null;
+
         return Inertia::render('Knowledge/Show', [
-            'source' => $knowledgeSource->load('bot:id,name'),
+            'source' => $source,
+            'faq' => $faq,
             'chunks' => $knowledgeSource->chunks()->orderBy('chunk_index')->get(),
         ]);
+    }
+
+    public function update(Request $request, KnowledgeSource $knowledgeSource, TenantAccess $access): RedirectResponse
+    {
+        $access->ensureCanAccess(auth()->user(), $knowledgeSource);
+
+        $status = KnowledgeSourceStatus::fromStored($knowledgeSource->status);
+
+        if (! $status->canEdit()) {
+            throw ValidationException::withMessages([
+                'title' => 'This source cannot be edited while it is queued or processing.',
+            ]);
+        }
+
+        $rules = [
+            'title' => ['required', 'string', 'max:255'],
+            'raw_text' => ['nullable', 'string'],
+            'question' => ['nullable', 'string'],
+            'answer' => ['nullable', 'string'],
+        ];
+
+        $data = $request->validate($rules);
+
+        $attributes = ['title' => $data['title']];
+
+        if ($knowledgeSource->type === 'faq') {
+            $attributes['raw_text'] = "Question: {$data['question']}\nAnswer: {$data['answer']}";
+        } elseif ($knowledgeSource->type === 'text') {
+            $attributes['raw_text'] = $data['raw_text'];
+        }
+
+        $knowledgeSource->update($attributes);
+        $this->queueProcessing($knowledgeSource);
+
+        return back()->with('success', 'Knowledge source updated and queued for reprocessing.');
     }
 
     public function reprocess(KnowledgeSource $knowledgeSource, TenantAccess $access): RedirectResponse
     {
         $access->ensureCanAccess(auth()->user(), $knowledgeSource);
-        ProcessKnowledgeSourceJob::dispatch($knowledgeSource->id);
+
+        $status = KnowledgeSourceStatus::fromStored($knowledgeSource->status);
+
+        if ($status->isInProgress()) {
+            return back()->with('error', 'This source is already queued or processing.');
+        }
+
+        $this->queueProcessing($knowledgeSource);
 
         return back()->with('success', 'Knowledge source queued for reprocessing.');
+    }
+
+    public function cancel(KnowledgeSource $knowledgeSource, TenantAccess $access): RedirectResponse
+    {
+        $access->ensureCanAccess(auth()->user(), $knowledgeSource);
+
+        $status = KnowledgeSourceStatus::fromStored($knowledgeSource->status);
+
+        if (! $status->canCancel()) {
+            return back()->with('error', 'Only queued or processing sources can be cancelled.');
+        }
+
+        $knowledgeSource->update([
+            'status' => KnowledgeSourceStatus::Cancelled->value,
+            'error_message' => null,
+        ]);
+
+        return back()->with('success', 'Processing cancelled.');
     }
 
     public function destroy(KnowledgeSource $knowledgeSource, TenantAccess $access): RedirectResponse
@@ -91,5 +198,33 @@ class KnowledgeSourceController extends Controller
         $knowledgeSource->delete();
 
         return back()->with('success', 'Knowledge source deleted.');
+    }
+
+    private function queueProcessing(KnowledgeSource $source): void
+    {
+        $source->update([
+            'status' => KnowledgeSourceStatus::Queued->value,
+            'error_message' => null,
+        ]);
+
+        ProcessKnowledgeSourceJob::dispatch($source->id);
+    }
+
+    /**
+     * @return array{question: string, answer: string}
+     */
+    private function parseFaqRawText(?string $rawText): array
+    {
+        if (preg_match('/^Question:\s*(.*?)\nAnswer:\s*(.*)$/s', (string) $rawText, $matches)) {
+            return [
+                'question' => $matches[1],
+                'answer' => $matches[2],
+            ];
+        }
+
+        return [
+            'question' => '',
+            'answer' => (string) $rawText,
+        ];
     }
 }
