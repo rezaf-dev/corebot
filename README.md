@@ -142,7 +142,7 @@ The second command should print plain text on success. Exit code `1` means no ex
 
 ### Laravel Forge (zero-downtime)
 
-Yes — with Forge zero-downtime, `current` is a symlink that moves to a **new release folder** on every deploy (`releases/1234567890`, etc.). Anything you put **inside** that release tree (including `current/.venv`) is tied to that deploy unless you recreate it each time.
+With Forge zero-downtime, `current` is a symlink that moves to a **new release folder** on every deploy (`releases/1234567890`, etc.). Anything you put **inside** that release tree (including `current/.venv`) is tied to that deploy unless you recreate it each time.
 
 **Do not** rely on a venv that only exists under a single release path, and avoid baking a release id into `DOCX_PYTHON`:
 
