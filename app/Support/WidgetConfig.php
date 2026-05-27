@@ -21,6 +21,7 @@ class WidgetConfig
         'send_button_label' => 'Send',
         'input_placeholder' => 'Type your message…',
         'launcher_icon' => 'chat',
+        'initial_open' => false,
     ];
 
     /**
@@ -44,6 +45,7 @@ class WidgetConfig
         $config['launcher_icon'] = in_array($config['launcher_icon'], self::icons(), true)
             ? $config['launcher_icon']
             : self::DEFAULTS['launcher_icon'];
+        $config['initial_open'] = filter_var($config['initial_open'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
         foreach (['primary_color', 'accent_color', 'background_color', 'surface_color', 'text_color'] as $key) {
             $config[$key] = self::normalizeColor((string) $config[$key], self::DEFAULTS[$key]);
@@ -74,6 +76,7 @@ class WidgetConfig
             'send_button_label' => ['required', 'string', 'max:24'],
             'input_placeholder' => ['required', 'string', 'max:120'],
             'launcher_icon' => ['required', 'in:'.implode(',', self::icons())],
+            'initial_open' => ['required', 'boolean'],
         ];
     }
 
@@ -101,6 +104,7 @@ class WidgetConfig
             'data-send-button-label' => (string) $config['send_button_label'],
             'data-input-placeholder' => (string) $config['input_placeholder'],
             'data-launcher-icon' => (string) $config['launcher_icon'],
+            'data-initial-open' => $config['initial_open'] ? 'true' : 'false',
         ];
     }
 

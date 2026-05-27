@@ -188,6 +188,22 @@ export default function Install({ bots, widgetUrl, defaults, positions, icons })
                                     onChange={(v) => setData('offset_y', v)}
                                     error={errors.offset_y}
                                 />
+                                <div>
+                                    <InputLabel htmlFor="initial_open" value="Initial state" />
+                                    <select
+                                        id="initial_open"
+                                        value={data.initial_open ? 'open' : 'closed'}
+                                        onChange={(e) => setData('initial_open', e.target.value === 'open')}
+                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+                                    >
+                                        <option value="closed">Closed (launcher only)</option>
+                                        <option value="open">Open (chat panel visible)</option>
+                                    </select>
+                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                        When open, visitors see the welcome message immediately on page load.
+                                    </p>
+                                    <InputError message={errors.initial_open} className="mt-1" />
+                                </div>
                             </div>
                         </section>
 
@@ -220,7 +236,7 @@ export default function Install({ bots, widgetUrl, defaults, positions, icons })
                     </form>
 
                     <aside className="space-y-6">
-                        <WidgetPreview config={data} />
+                        <WidgetPreview config={data} initialOpen={data.initial_open} />
                         <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
@@ -252,7 +268,7 @@ export default function Install({ bots, widgetUrl, defaults, positions, icons })
     );
 }
 
-function WidgetPreview({ config }) {
+function WidgetPreview({ config, initialOpen }) {
     const positionClass = {
         'bottom-right': 'items-end justify-end',
         'bottom-left': 'items-end justify-start',
@@ -267,6 +283,7 @@ function WidgetPreview({ config }) {
             <div
                 className={`relative mt-4 flex h-80 overflow-hidden rounded-xl border border-gray-200 bg-gradient-to-br from-slate-100 to-slate-200 p-4 dark:border-gray-700 dark:from-gray-900 dark:to-gray-800 ${positionClass}`}
             >
+                {initialOpen && (
                 <div
                     className="flex w-[min(100%,280px)] flex-col overflow-hidden shadow-lg"
                     style={{
@@ -308,8 +325,9 @@ function WidgetPreview({ config }) {
                         </div>
                     </div>
                 </div>
+                )}
                 <div
-                    className="absolute flex items-center justify-center rounded-full text-white shadow-lg"
+                    className={`absolute flex items-center justify-center rounded-full text-white shadow-lg ${initialOpen ? 'opacity-0 pointer-events-none' : ''}`}
                     style={{
                         width: config.launcher_size,
                         height: config.launcher_size,
@@ -397,6 +415,7 @@ function buildEmbedSnippet(widgetUrl, publicKey, config) {
         'data-send-button-label': config.send_button_label,
         'data-input-placeholder': config.input_placeholder,
         'data-launcher-icon': config.launcher_icon,
+        'data-initial-open': config.initial_open ? 'true' : 'false',
     };
 
     return (

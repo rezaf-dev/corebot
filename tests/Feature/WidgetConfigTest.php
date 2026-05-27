@@ -22,6 +22,7 @@ it('returns widget config for an active bot', function () {
         ->assertJsonPath('widget.title', 'Help Desk')
         ->assertJsonPath('widget.primary_color', '#ff0000')
         ->assertJsonPath('widget.position', 'bottom-right')
+        ->assertJsonPath('widget.initial_open', false)
         ->assertJsonPath('widget.welcome_message', 'Welcome to our CRM help chat.');
 });
 
@@ -50,6 +51,7 @@ it('saves widget settings for tenant admins', function () {
     $payload = WidgetConfig::DEFAULTS;
     $payload['title'] = 'CRM Help';
     $payload['position'] = 'bottom-left';
+    $payload['initial_open'] = true;
 
     $this->actingAs($user)
         ->put(route('widget.install.update', $bot), $payload)
@@ -58,7 +60,8 @@ it('saves widget settings for tenant admins', function () {
 
     expect($bot->fresh()->resolvedWidgetConfig())
         ->title->toBe('CRM Help')
-        ->position->toBe('bottom-left');
+        ->position->toBe('bottom-left')
+        ->initial_open->toBeTrue();
 });
 
 it('resolves api base from widget script url', function (string $widgetUrl, string $expectedApiBase) {
@@ -80,5 +83,14 @@ it('builds embed snippets with data attributes', function () {
         ->toContain('src="https://app.test/widget.js"')
         ->toContain('data-bot-key="bot_testkey"')
         ->toContain('data-title="Help"')
-        ->toContain('data-primary-color="#112233"');
+        ->toContain('data-primary-color="#112233"')
+        ->toContain('data-initial-open="false"');
+});
+
+it('includes initial open in embed snippets when enabled', function () {
+    $config = array_merge(WidgetConfig::DEFAULTS, ['initial_open' => true]);
+
+    $snippet = WidgetConfig::embedSnippet('https://app.test/widget.js', 'bot_testkey', $config);
+
+    expect($snippet)->toContain('data-initial-open="true"');
 });

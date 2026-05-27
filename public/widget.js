@@ -26,10 +26,12 @@
         send_button_label: 'Send',
         input_placeholder: 'Type your message…',
         launcher_icon: 'chat',
+        initial_open: false,
     };
 
     let config = parseDatasetConfig(script.dataset);
     let isOpen = false;
+    let initialOpenApplied = false;
     let isLoading = false;
     let isStarting = false;
 
@@ -70,6 +72,8 @@
             config.welcome_message = remote.welcome_message;
             localStorage.setItem(storageKey, JSON.stringify(state));
         }
+
+        applyInitialOpen();
     });
 
     button.addEventListener('click', () => togglePanel());
@@ -127,6 +131,12 @@
             contactBtn.disabled = false;
         }
     });
+
+    function applyInitialOpen() {
+        if (initialOpenApplied || !config.initial_open) return;
+        initialOpenApplied = true;
+        togglePanel(true);
+    }
 
     async function togglePanel(forceOpen) {
         const next = typeof forceOpen === 'boolean' ? forceOpen : !isOpen;
@@ -349,15 +359,24 @@
             send_button_label: dataset.sendButtonLabel,
             input_placeholder: dataset.inputPlaceholder,
             launcher_icon: dataset.launcherIcon,
+            initial_open: parseBoolean(dataset.initialOpen),
         });
+    }
+
+    function parseBoolean(value) {
+        if (value === undefined || value === null || value === '') return undefined;
+        return value === true || value === 'true' || value === '1';
     }
 
     function mergeConfig(base, patch) {
         const merged = { ...base };
         Object.keys(patch || {}).forEach((key) => {
-            if (patch[key] !== undefined && patch[key] !== null && patch[key] !== '') {
-                merged[key] = patch[key];
+            if (patch[key] === undefined || patch[key] === null || patch[key] === '') return;
+            if (key === 'initial_open') {
+                merged[key] = parseBoolean(patch[key]) ?? false;
+                return;
             }
+            merged[key] = patch[key];
         });
         return merged;
     }
