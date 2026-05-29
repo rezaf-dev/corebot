@@ -1,16 +1,35 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link } from '@inertiajs/react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 export default function Index({ conversations }) {
+    const [filter, setFilter] = useState('all');
+
     const stats = useMemo(() => {
         const open = conversations.filter((c) => c.status === 'open').length;
         const escalated = conversations.filter((c) => c.status === 'escalated').length;
         const messages = conversations.reduce((sum, c) => sum + (c.messages_count || 0), 0);
-        const withContact = conversations.filter((c) => c.visitor_email || c.visitor_phone || c.visitor_name).length;
+        const withContact = conversations.filter((c) => hasContact(c)).length;
+        const needsFollowUp = conversations.filter((c) => c.status === 'escalated' && !hasContact(c)).length;
 
-        return { total: conversations.length, open, escalated, messages, withContact };
+        return { total: conversations.length, open, escalated, messages, withContact, needsFollowUp };
     }, [conversations]);
+
+    const filtered = useMemo(() => {
+        if (filter === 'escalated') {
+            return conversations.filter((c) => c.status === 'escalated');
+        }
+
+        if (filter === 'leads') {
+            return conversations.filter((c) => hasContact(c));
+        }
+
+        if (filter === 'needs_follow_up') {
+            return conversations.filter((c) => c.status === 'escalated' && !hasContact(c));
+        }
+
+        return conversations;
+    }, [conversations, filter]);
 
     return (
         <AuthenticatedLayout
@@ -30,11 +49,30 @@ export default function Index({ conversations }) {
                     <StatCard label="Total conversations" value={stats.total} />
                     <StatCard label="Open" value={stats.open} />
                     <StatCard label="Escalated" value={stats.escalated} />
-                    <StatCard label="Total messages" value={stats.messages} hint={`${stats.withContact} with contact info`} />
+                    <StatCard label="Total messages" value={stats.messages} hint={`${stats.withContact} leads`} />
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                    <FilterButton active={filter === 'all'} onClick={() => setFilter('all')}>
+                        All ({stats.total})
+                    </FilterButton>
+                    <FilterButton active={filter === 'escalated'} onClick={() => setFilter('escalated')}>
+                        Escalated ({stats.escalated})
+                    </FilterButton>
+                    <FilterButton active={filter === 'leads'} onClick={() => setFilter('leads')}>
+                        Has contact ({stats.withContact})
+                    </FilterButton>
+                    <FilterButton active={filter === 'needs_follow_up'} onClick={() => setFilter('needs_follow_up')}>
+                        Needs follow-up ({stats.needsFollowUp})
+                    </FilterButton>
                 </div>
 
                 {conversations.length === 0 ? (
                     <EmptyState />
+                ) : filtered.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-gray-200 bg-white px-6 py-10 text-center dark:border-gray-700 dark:bg-gray-800">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">No conversations match this filter.</p>
+                    </div>
                 ) : (
                     <>
                         <div className="hidden overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800 lg:block">
@@ -45,13 +83,14 @@ export default function Index({ conversations }) {
                                         <th className="px-5 py-3">Bot</th>
                                         <th className="px-5 py-3">Status</th>
                                         <th className="px-5 py-3">Visitor</th>
+                                        <th className="px-5 py-3">Country</th>
                                         <th className="px-5 py-3">Messages</th>
                                         <th className="px-5 py-3">Started</th>
                                         <th className="px-5 py-3">Source</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                                    {conversations.map((conversation) => (
+                                    {filtered.map((conversation) => (
                                         <ConversationRow key={conversation.id} conversation={conversation} layout="table" />
                                     ))}
                                 </tbody>
@@ -59,7 +98,7 @@ export default function Index({ conversations }) {
                         </div>
 
                         <div className="grid gap-4 lg:hidden">
-                            {conversations.map((conversation) => (
+                            {filtered.map((conversation) => (
                                 <ConversationRow key={conversation.id} conversation={conversation} layout="card" />
                             ))}
                         </div>
@@ -67,6 +106,27 @@ export default function Index({ conversations }) {
                 )}
             </div>
         </AuthenticatedLayout>
+    );
+}
+
+function hasContact(conversation) {
+    return Boolean(conversation.visitor_email || conversation.visitor_phone || conversation.visitor_name);
+}
+
+function FilterButton({ active, onClick, children }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={
+                'rounded-full px-3 py-1.5 text-xs font-semibold transition ' +
+                (active
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-white text-gray-700 shadow-sm hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700')
+            }
+        >
+            {children}
+        </button>
     );
 }
 
@@ -155,6 +215,9 @@ function ConversationRow({ conversation, layout }) {
                 <StatusBadge status={conversation.status} />
             </td>
             <td className="px-5 py-4 text-gray-700 dark:text-gray-300">{visitor}</td>
+            <td className="px-5 py-4 text-gray-700 dark:text-gray-300">
+                {conversation.country_name || conversation.country_code || '—'}
+            </td>
             <td className="px-5 py-4 text-gray-700 dark:text-gray-300">{conversation.messages_count}</td>
             <td className="px-5 py-4 text-gray-500 dark:text-gray-400">{formatDateTime(conversation.created_at)}</td>
             <td className="max-w-[200px] px-5 py-4">

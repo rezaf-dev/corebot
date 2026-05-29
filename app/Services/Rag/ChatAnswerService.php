@@ -6,6 +6,7 @@ use App\Models\Bot;
 use App\Models\ChatConversation;
 use App\Models\RetrievalLog;
 use App\Services\AI\OpenAIService;
+use App\Support\BotContactConfig;
 use Generator;
 use Laravel\Ai\Streaming\Events\TextDelta;
 use Throwable;
@@ -19,19 +20,20 @@ class ChatAnswerService
 
     public function answer(Bot $bot, ChatConversation $conversation, string $userMessage): array
     {
-        $user = $conversation->messages()->create([
+        $conversation->messages()->create([
             'tenant_id' => $bot->tenant_id,
             'bot_id' => $bot->id,
             'role' => 'user',
             'content' => $userMessage,
         ]);
 
-        $chunks = $this->chunks($bot, $conversation, $userMessage);
+        $retrieval = $this->retrieve($bot, $conversation, $userMessage);
 
-        if (is_array($chunks)) {
-            return $chunks;
+        if (is_array($retrieval)) {
+            return $retrieval;
         }
 
+        $chunks = $retrieval->chunks;
         $context = $this->context($chunks);
 
         $messages = [
@@ -70,7 +72,7 @@ class ChatAnswerService
             'context_text' => $context,
         ]);
 
-        return [
+        return $this->withContactMeta($bot, $conversation, [
             'message' => $answer,
             'fallback' => false,
             'sources' => $chunks->map(fn ($chunk) => [
@@ -78,7 +80,7 @@ class ChatAnswerService
                 'title' => $chunk->metadata['source_title'] ?? 'Knowledge source',
                 'distance' => $chunk->distance,
             ])->values(),
-        ];
+        ], $retrieval->confident);
     }
 
     public function stream(Bot $bot, ChatConversation $conversation, string $userMessage): Generator
@@ -90,16 +92,21 @@ class ChatAnswerService
             'content' => $userMessage,
         ]);
 
-        $chunks = $this->chunks($bot, $conversation, $userMessage);
+        $retrieval = $this->retrieve($bot, $conversation, $userMessage);
 
-        if (is_array($chunks)) {
-            yield $this->streamEvent('text_delta', ['delta' => $chunks['message']]);
-            yield $this->streamEvent('meta', ['fallback' => true, 'sources' => []]);
+        if (is_array($retrieval)) {
+            yield $this->streamEvent('text_delta', ['delta' => $retrieval['message']]);
+            yield $this->streamEvent('meta', [
+                'fallback' => true,
+                'needs_contact' => $retrieval['needs_contact'],
+                'sources' => [],
+            ]);
             yield $this->streamEvent('done');
 
             return;
         }
 
+        $chunks = $retrieval->chunks;
         $context = $this->context($chunks);
         $messages = [
             ['role' => 'system', 'content' => $this->prompt($bot, $context)],
@@ -124,7 +131,11 @@ class ChatAnswerService
             $fallback = $this->fallback($bot, $conversation, $userMessage, 'Chat completion failed.');
 
             yield $this->streamEvent('text_delta', ['delta' => $fallback['message']]);
-            yield $this->streamEvent('meta', ['fallback' => true, 'sources' => []]);
+            yield $this->streamEvent('meta', [
+                'fallback' => true,
+                'needs_contact' => $fallback['needs_contact'],
+                'sources' => [],
+            ]);
             yield $this->streamEvent('done');
 
             return;
@@ -149,21 +160,27 @@ class ChatAnswerService
             'context_text' => $context,
         ]);
 
-        yield $this->streamEvent('meta', [
+        $meta = $this->withContactMeta($bot, $conversation, [
             'fallback' => false,
             'sources' => $chunks->map(fn ($chunk) => [
                 'id' => $chunk->id,
                 'title' => $chunk->metadata['source_title'] ?? 'Knowledge source',
                 'distance' => $chunk->distance,
             ])->values(),
+        ], $retrieval->confident);
+
+        yield $this->streamEvent('meta', [
+            'fallback' => $meta['fallback'],
+            'needs_contact' => $meta['needs_contact'],
+            'sources' => $meta['sources'],
         ]);
         yield $this->streamEvent('done');
     }
 
-    private function chunks(Bot $bot, ChatConversation $conversation, string $userMessage): mixed
+    private function retrieve(Bot $bot, ChatConversation $conversation, string $userMessage): array|SearchResult
     {
         try {
-            return $this->search->search($bot, $userMessage);
+            return $this->search->searchWithMeta($bot, $userMessage);
         } catch (Throwable) {
             return $this->fallback($bot, $conversation, $userMessage, 'AI settings are unavailable.');
         }
@@ -206,7 +223,41 @@ class ChatAnswerService
             'context_text' => null,
         ]);
 
-        return ['message' => $bot->fallback_message, 'fallback' => true, 'sources' => []];
+        return $this->withContactMeta($bot, $conversation, [
+            'message' => $bot->fallback_message,
+            'fallback' => true,
+            'sources' => [],
+        ], confident: false);
+    }
+
+    /**
+     * @param  array<string, mixed>  $response
+     * @return array<string, mixed>
+     */
+    private function withContactMeta(Bot $bot, ChatConversation $conversation, array $response, bool $confident): array
+    {
+        $needsContact = $this->shouldRequestContact($bot, $conversation, $confident);
+
+        if ($needsContact) {
+            $conversation->update(['status' => 'escalated']);
+        }
+
+        $response['needs_contact'] = $needsContact;
+
+        return $response;
+    }
+
+    private function shouldRequestContact(Bot $bot, ChatConversation $conversation, bool $confident): bool
+    {
+        if (BotContactConfig::fields($bot) === []) {
+            return false;
+        }
+
+        if (BotContactConfig::hasCompleteContact($bot, $conversation)) {
+            return false;
+        }
+
+        return ! $confident;
     }
 
     private function prompt(Bot $bot, ?string $context): string

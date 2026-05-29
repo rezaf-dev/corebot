@@ -30,6 +30,12 @@
     };
 
     let config = parseDatasetConfig(script.dataset);
+    let contactConfig = {
+        fields: ['name', 'email'],
+        required: ['email'],
+        has_contact: false,
+        collect_on_start: false,
+    };
     let isOpen = false;
     let initialOpenApplied = false;
     let isLoading = false;
@@ -58,8 +64,9 @@
     const input = form.querySelector('input');
     const sendBtn = form.querySelector('button');
     const contact = root.querySelector('.crm-ai-contact');
-    const contactBtn = contact.querySelector('button');
     const isMobile = () => window.matchMedia('(max-width: 480px)').matches;
+
+    renderContactForm({});
 
     applyConfig(config);
 
@@ -103,7 +110,7 @@
             try {
                 const res = await post('/message', { conversation_id: state.conversation_id, message: text });
                 setBubbleText(assistant, res.message);
-                if (res.fallback) showContact();
+                if (shouldPromptContact(res)) showContact();
             } catch {
                 setBubbleText(assistant, 'Support is unavailable right now. Please try again later.');
             }
@@ -117,18 +124,21 @@
         if (isLoading) return;
 
         setLoading(true);
-        contactBtn.disabled = true;
+        const submitBtn = contact.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
 
         try {
             const payload = Object.fromEntries(new FormData(contact).entries());
             await post('/contact', { conversation_id: state.conversation_id, ...payload });
             contact.classList.remove('is-visible');
+            contactConfig.has_contact = true;
+            localStorage.setItem(storageKey, JSON.stringify(state));
             add('assistant', 'Thanks! Your contact details were saved.');
         } catch {
             add('assistant', 'Could not save your details. Please try again.');
         } finally {
             setLoading(false);
-            contactBtn.disabled = false;
+            if (submitBtn) submitBtn.disabled = false;
         }
     });
 
@@ -202,12 +212,10 @@
         }
 
         try {
-            const res = await post('/start', {
-                visitor_id: state.visitor_id,
-                source_url: location.href,
-            });
+            const res = await post('/start', startPayload());
             state.conversation_id = res.conversation_id;
             state.welcome_message = res.welcome_message || welcomeText();
+            applyContactConfig(res);
             localStorage.setItem(storageKey, JSON.stringify(state));
 
             if (res.widget) {
@@ -216,6 +224,10 @@
             }
 
             showWelcomeMessage(state.welcome_message);
+
+            if (res.collect_contact_on_start && shouldPromptContact(res)) {
+                showContact();
+            }
         } catch {
             showWelcomeMessage('Unable to start chat. Please refresh and try again.');
             state.conversation_id = null;
@@ -289,7 +301,7 @@
                     scrollToBottom();
                 }
 
-                if (payload.type === 'meta' && payload.fallback) {
+                if (payload.type === 'meta' && shouldPromptContact(payload)) {
                     showContact();
                 }
             }
@@ -388,8 +400,100 @@
     }
 
     function showContact() {
+        if (contactConfig.has_contact || !contactConfig.fields.length) return;
         contact.classList.add('is-visible');
         scrollToBottom();
+    }
+
+    function shouldPromptContact(payload) {
+        if (contactConfig.has_contact || !contactConfig.fields.length) return false;
+        return Boolean(payload && (payload.fallback || payload.needs_contact));
+    }
+
+    function applyContactConfig(res) {
+        contactConfig.fields = Array.isArray(res.contact_fields) ? res.contact_fields : ['name', 'email'];
+        contactConfig.required = Array.isArray(res.contact_required) ? res.contact_required : ['email'];
+        contactConfig.has_contact = Boolean(res.has_contact);
+        contactConfig.collect_on_start = Boolean(res.collect_contact_on_start);
+        renderContactForm(res.contact || {});
+    }
+
+    function renderContactForm(values) {
+        const fieldDefs = {
+            name: { name: 'visitor_name', type: 'text', placeholder: 'Name', autocomplete: 'name' },
+            email: { name: 'visitor_email', type: 'email', placeholder: 'Email', autocomplete: 'email' },
+            phone: { name: 'visitor_phone', type: 'tel', placeholder: 'Phone', autocomplete: 'tel' },
+        };
+
+        const inputs = contactConfig.fields
+            .filter((field) => fieldDefs[field])
+            .map((field) => {
+                const def = fieldDefs[field];
+                const required = contactConfig.required.includes(field) ? ' required' : '';
+                const value = values[field] ? ' value="' + escapeAttr(values[field]) + '"' : '';
+                return (
+                    '<input name="' +
+                    def.name +
+                    '" type="' +
+                    def.type +
+                    '" placeholder="' +
+                    def.placeholder +
+                    (contactConfig.required.includes(field) ? ' *' : '') +
+                    '" autocomplete="' +
+                    def.autocomplete +
+                    '"' +
+                    required +
+                    value +
+                    ' />'
+                );
+            })
+            .join('');
+
+        contact.innerHTML =
+            '<p class="crm-ai-contact-title">Leave your details</p>' +
+            '<p class="crm-ai-contact-hint">So our team can follow up with you.</p>' +
+            inputs +
+            '<button type="submit">Submit</button>';
+    }
+
+    function escapeAttr(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;');
+    }
+
+    function startPayload() {
+        const utm = parseUtmParams();
+        let timezone = null;
+        try {
+            timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        } catch {
+            timezone = null;
+        }
+
+        return {
+            visitor_id: state.visitor_id,
+            source_url: location.href,
+            referrer_url: document.referrer || null,
+            timezone,
+            utm_source: utm.source,
+            utm_medium: utm.medium,
+            utm_campaign: utm.campaign,
+        };
+    }
+
+    function parseUtmParams() {
+        try {
+            const params = new URL(location.href).searchParams;
+            return {
+                source: params.get('utm_source'),
+                medium: params.get('utm_medium'),
+                campaign: params.get('utm_campaign'),
+            };
+        } catch {
+            return { source: null, medium: null, campaign: null };
+        }
     }
 
     function scrollToBottom() {
@@ -791,14 +895,7 @@
                         <button type="submit">Send</button>
                     </div>
                 </form>
-                <form class="crm-ai-contact">
-                    <p class="crm-ai-contact-title">Leave your details</p>
-                    <p class="crm-ai-contact-hint">So our team can follow up with you.</p>
-                    <input name="visitor_name" placeholder="Name" autocomplete="name" />
-                    <input name="visitor_email" type="email" placeholder="Email" autocomplete="email" />
-                    <input name="visitor_phone" type="tel" placeholder="Phone" autocomplete="tel" />
-                    <button type="submit">Submit</button>
-                </form>
+                <form class="crm-ai-contact"></form>
             </section>
         </div>`;
     }

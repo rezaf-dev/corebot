@@ -24,6 +24,10 @@ use Illuminate\Support\Str;
     'similarity_threshold',
     'collect_visitor_email',
     'collect_visitor_phone',
+    'contact_fields',
+    'contact_required',
+    'notification_email',
+    'collect_contact_on_start',
     'widget_config',
 ])]
 class Bot extends Model
@@ -87,6 +91,9 @@ PROMPT;
             'similarity_threshold' => 'decimal:3',
             'collect_visitor_email' => 'boolean',
             'collect_visitor_phone' => 'boolean',
+            'contact_fields' => 'array',
+            'contact_required' => 'array',
+            'collect_contact_on_start' => 'boolean',
         ];
     }
 }

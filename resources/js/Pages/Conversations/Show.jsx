@@ -82,6 +82,50 @@ export default function Show({ conversation }) {
                             <MetaItem label="Last updated" value={formatDateTime(conversation.updated_at)} />
                         </dl>
 
+                        <div className="mt-5 border-t border-gray-100 pt-5 dark:border-gray-700">
+                            <h4 className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                Visitor context
+                            </h4>
+                            <dl className="mt-4 space-y-4">
+                                <MetaItem
+                                    label="Country"
+                                    value={
+                                        conversation.country_name
+                                            ? `${conversation.country_name}${conversation.country_code ? ` (${conversation.country_code})` : ''}`
+                                            : '—'
+                                    }
+                                />
+                                <MetaItem label="City" value={conversation.city || '—'} />
+                                <MetaItem label="IP address" value={conversation.ip_address || '—'} />
+                                <MetaItem label="Language" value={conversation.language || '—'} />
+                                <MetaItem label="Timezone" value={conversation.timezone || '—'} />
+                                <MetaItem
+                                    label="Referrer"
+                                    value={
+                                        conversation.referrer_url ? (
+                                            <a
+                                                href={conversation.referrer_url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="break-all text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+                                            >
+                                                {conversation.referrer_url}
+                                            </a>
+                                        ) : (
+                                            '—'
+                                        )
+                                    }
+                                />
+                                {(conversation.utm_source || conversation.utm_medium || conversation.utm_campaign) && (
+                                    <>
+                                        <MetaItem label="UTM source" value={conversation.utm_source || '—'} />
+                                        <MetaItem label="UTM medium" value={conversation.utm_medium || '—'} />
+                                        <MetaItem label="UTM campaign" value={conversation.utm_campaign || '—'} />
+                                    </>
+                                )}
+                            </dl>
+                        </div>
+
                         {conversation.source_url && (
                             <div className="mt-5 border-t border-gray-100 pt-5 dark:border-gray-700">
                                 <dt className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Source URL</dt>

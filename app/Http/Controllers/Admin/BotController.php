@@ -76,9 +76,20 @@ class BotController extends Controller
             'temperature' => ['required', 'numeric', 'min:0', 'max:1'],
             'max_context_chunks' => ['required', 'integer', 'min:1', 'max:12'],
             'similarity_threshold' => ['required', 'numeric', 'min:0', 'max:1'],
-            'collect_visitor_email' => ['boolean'],
-            'collect_visitor_phone' => ['boolean'],
+            'contact_fields' => ['nullable', 'array'],
+            'contact_fields.*' => ['string', 'in:name,email,phone'],
+            'contact_required' => ['nullable', 'array'],
+            'contact_required.*' => ['string', 'in:name,email,phone'],
+            'notification_email' => ['nullable', 'email', 'max:255'],
+            'collect_contact_on_start' => ['boolean'],
         ]);
+
+        $contactFields = $data['contact_fields'] ?? ['name', 'email'];
+        $data['contact_fields'] = array_values(array_unique($contactFields ?: ['name', 'email']));
+        $data['contact_required'] = array_values(array_intersect(
+            $data['contact_required'] ?? ['email'],
+            $data['contact_fields'],
+        ));
 
         $data['allowed_domains'] = collect(preg_split('/[\s,]+/', $data['allowed_domains'] ?? '', flags: PREG_SPLIT_NO_EMPTY))
             ->map(fn ($domain) => strtolower(trim($domain)))

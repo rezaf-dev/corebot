@@ -26,7 +26,7 @@ corebot is built for **SaaS CRM operators** who want client-specific support bot
 - Sources: plain text, FAQ pairs, PDF (`pdftotext`), DOCX (`python-docx`).
 - Background job chunks content, generates embeddings, stores vectors in **PostgreSQL pgvector**.
 - Chat retrieves the closest chunks per bot, applies similarity thresholds, and builds a strict context-only prompt.
-- If nothing relevant is found, the bot returns a **fallback** and can **escalate** the conversation.
+- When retrieval is not confident, the bot escalates and can prompt for visitor contact (configurable fields per bot).
 
 ### Public chat & widget
 
@@ -34,7 +34,8 @@ corebot is built for **SaaS CRM operators** who want client-specific support bot
 - `public/widget.js` — no framework required on the host site.
 - Widget: colors, corner position, labels, launcher icon, welcome message.
 - Optional domain allow-list per bot; rate limiting on public endpoints.
-- Visitor contact capture when the bot cannot answer.
+- Visitor contact capture when the bot cannot answer confidently; per-bot notification email on lead submit.
+- Visitor context on conversations: IP, referrer, country/city (MaxMind GeoLite2), UTM, timezone, and language.
 
 ### Operations
 
@@ -54,6 +55,7 @@ corebot is built for **SaaS CRM operators** who want client-specific support bot
 | Node.js 20+ | Frontend build |
 | `pdftotext` | PDF knowledge (Poppler) |
 | `python3` + `python-docx` | DOCX knowledge — see [Python (DOCX extraction)](#python-docx-extraction) |
+| MaxMind GeoLite2 City (optional) | Visitor country/city on widget chat — see [MaxMind GeoLite2](#maxmind-geolite2) |
 
 ## Python (DOCX extraction)
 
@@ -193,6 +195,67 @@ Forge injects `$FORGE_SITE_ROOT` as the site directory above `releases/` (e.g. `
 
 **Alternative:** skip `DOCX_PYTHON` and install `python-docx` for the system `python3` on the server; then PATH alone is enough and deploy layout does not matter.
 
+## MaxMind GeoLite2
+
+corebot uses a local **MaxMind GeoLite2 City** database (`.mmdb`) to resolve visitor **country** and **city** when a widget conversation starts. Lookup runs in PHP via [`geoip2/geoip2`](https://github.com/maxmind/GeoIP2-php); no per-request external GeoIP API is called.
+
+Geo fields are stored on `chat_conversations` and shown in the admin **Conversations** UI. Chat still works if GeoIP is not configured — country/city are simply left empty.
+
+### What to install
+
+1. A free [MaxMind account](https://www.maxmind.com/en/geolite2/signup) and access to **GeoLite2** downloads.
+2. The **GeoLite2 City** binary database file, usually named `GeoLite2-City.mmdb` after you extract the downloaded archive.
+3. **`GEOIP_DATABASE_PATH`** in `.env` — absolute path to that `.mmdb` file.
+
+### Download the database
+
+1. Sign in at [MaxMind](https://www.maxmind.com/en/account/login).
+2. Open **Download Files** (or **GeoIP / GeoLite2** → **Download Databases**).
+3. Download **GeoLite2 City** (GZIP). MaxMind updates these files regularly; plan to refresh on a schedule (e.g. monthly).
+4. Extract the archive and locate `GeoLite2-City.mmdb`.
+
+Keep the file **outside** per-release deploy folders on production (same idea as `.venv` above), e.g.:
+
+```text
+/home/forge/example.com/
+  storage/
+    app/
+      geoip/
+        GeoLite2-City.mmdb
+```
+
+Or use MaxMind’s [`geoipupdate`](https://github.com/maxmind/geoipupdate) tool with a license key to refresh the file automatically into a fixed path.
+
+### Configure corebot
+
+In `.env`:
+
+```env
+GEOIP_DATABASE_PATH=/home/forge/example.com/storage/app/geoip/GeoLite2-City.mmdb
+```
+
+Use your real absolute path. After changing `.env`, restart PHP-FPM / queue workers if they cache config (`php artisan config:clear` in development).
+
+**Verify** (optional):
+
+```bash
+php artisan tinker --execute 'dump(app(\App\Services\GeoIp\MaxMindGeoIpService::class)->lookup("8.8.8.8"));'
+```
+
+You should see `country_code`, `country_name`, and optionally `city`. Local/private IPs (e.g. `127.0.0.1`) intentionally return empty values.
+
+### Privacy
+
+Widget `/start` also records IP address, user agent, referrer, UTM parameters, timezone, and `Accept-Language` for support context. Document this in your site privacy policy if required. GeoLite2 is subject to [MaxMind’s GeoLite2 EULA](https://www.maxmind.com/en/geolite2/eula); do not redistribute the raw database.
+
+Relevant code:
+
+| Piece | Location |
+|-------|----------|
+| GeoIP service | `app/Services/GeoIp/MaxMindGeoIpService.php` |
+| Config key | `config/corebot.php` → `geoip_database_path` |
+| Capture on chat start | `app/Http/Controllers/PublicChatController.php` |
+
 ## Database setup
 
 corebot **requires PostgreSQL with pgvector**. SQLite is not supported for running the application.
@@ -290,6 +353,7 @@ Only the variables you typically need to change:
 | `SUPPORT_REQUEST_EMAIL` | Inbox for the welcome-page contact form |
 | `DEMO_BOT_PUBLIC_KEY` | Bot `public_key` embedded on `/demo` |
 | `DOCX_PYTHON` | Optional absolute path to Python 3 for DOCX indexing (default: `python3` on worker `PATH`) |
+| `GEOIP_DATABASE_PATH` | Optional absolute path to `GeoLite2-City.mmdb` for visitor country/city — see [MaxMind GeoLite2](#maxmind-geolite2) |
 
 Example `.env` fragment:
 
@@ -315,6 +379,9 @@ DEMO_BOT_PUBLIC_KEY=bot_xxxxxxxx
 
 # Optional venv interpreter for DOCX knowledge sources
 # DOCX_PYTHON=/var/www/corebot/.venv/bin/python3
+
+# Optional MaxMind GeoLite2 City database for visitor geo on widget chat
+# GEOIP_DATABASE_PATH=/var/www/corebot/storage/app/geoip/GeoLite2-City.mmdb
 ```
 
 For local mail testing, `MAIL_MAILER=log` writes to `storage/logs/laravel.log`.

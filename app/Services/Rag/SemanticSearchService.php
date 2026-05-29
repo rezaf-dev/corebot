@@ -14,6 +14,11 @@ class SemanticSearchService
 
     public function search(Bot $bot, string $query): Collection
     {
+        return $this->searchWithMeta($bot, $query)->chunks;
+    }
+
+    public function searchWithMeta(Bot $bot, string $query): SearchResult
+    {
         $embedding = $this->openAI->createEmbedding($bot->tenant, $query, ['bot_id' => $bot->id]);
 
         if (DB::connection()->getDriverName() === 'pgsql') {
@@ -48,13 +53,16 @@ class SemanticSearchService
         return $this->withinThresholdOrNearest($candidates, $bot);
     }
 
-    private function withinThresholdOrNearest(Collection $candidates, Bot $bot): Collection
+    private function withinThresholdOrNearest(Collection $candidates, Bot $bot): SearchResult
     {
         $matches = $candidates
             ->filter(fn ($chunk) => (float) $chunk->distance <= (float) $bot->similarity_threshold)
             ->values();
 
-        return $matches->isNotEmpty() ? $matches : $candidates;
+        $confident = $matches->isNotEmpty();
+        $chunks = $confident ? $matches : $candidates;
+
+        return new SearchResult($chunks, $confident);
     }
 
     private function embeddingArray(mixed $embedding): array

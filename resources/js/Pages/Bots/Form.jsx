@@ -21,8 +21,10 @@ export default function Form({ bot, widgetSnippet = null }) {
         temperature: bot?.temperature ?? '0.20',
         max_context_chunks: bot?.max_context_chunks ?? 6,
         similarity_threshold: bot?.similarity_threshold ?? '0.550',
-        collect_visitor_email: bot?.collect_visitor_email ?? true,
-        collect_visitor_phone: bot?.collect_visitor_phone ?? false,
+        contact_fields: bot?.contact_fields ?? ['name', 'email'],
+        contact_required: bot?.contact_required ?? ['email'],
+        notification_email: bot?.notification_email || '',
+        collect_contact_on_start: bot?.collect_contact_on_start ?? false,
     });
 
     const submit = (e) => {
@@ -199,30 +201,37 @@ export default function Form({ bot, widgetSnippet = null }) {
                 <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
                     <SectionHeading
                         title="Lead capture"
-                        description="Ask visitors for contact details when the bot cannot answer."
+                        description="Collect visitor contact details when the bot cannot answer confidently, and notify your team by email."
                     />
-                    <div className="mt-5 space-y-4">
+                    <div className="mt-5 space-y-5">
+                        <FormField
+                            id="notification_email"
+                            label="Notification email"
+                            value={data.notification_email}
+                            onChange={(value) => setData('notification_email', value)}
+                            error={errors.notification_email}
+                            placeholder="sales@example.com"
+                            hint="Receives an email when a visitor submits their contact details."
+                        />
+                        <ContactFieldGroup
+                            label="Fields to collect"
+                            fields={data.contact_fields}
+                            required={data.contact_required}
+                            onChangeFields={(fields) => setData('contact_fields', fields)}
+                            onChangeRequired={(required) => setData('contact_required', required)}
+                            errors={errors}
+                        />
                         <label className="flex items-start gap-3">
                             <Checkbox
-                                checked={data.collect_visitor_email}
-                                onChange={(e) => setData('collect_visitor_email', e.target.checked)}
+                                checked={data.collect_contact_on_start}
+                                onChange={(e) => setData('collect_contact_on_start', e.target.checked)}
                             />
                             <span>
-                                <span className="block text-sm font-medium text-gray-900 dark:text-white">Collect email</span>
-                                <span className="block text-xs text-gray-500 dark:text-gray-400">
-                                    Show an email field in the widget contact form.
+                                <span className="block text-sm font-medium text-gray-900 dark:text-white">
+                                    Prompt on chat open
                                 </span>
-                            </span>
-                        </label>
-                        <label className="flex items-start gap-3">
-                            <Checkbox
-                                checked={data.collect_visitor_phone}
-                                onChange={(e) => setData('collect_visitor_phone', e.target.checked)}
-                            />
-                            <span>
-                                <span className="block text-sm font-medium text-gray-900 dark:text-white">Collect phone</span>
                                 <span className="block text-xs text-gray-500 dark:text-gray-400">
-                                    Show a phone field in the widget contact form.
+                                    Show the contact form when the visitor opens the widget (if details are not already known).
                                 </span>
                             </span>
                         </label>
@@ -323,6 +332,56 @@ function TextAreaField({ id, label, value, onChange, error, rows = 4, placeholde
             />
             {hint && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{hint}</p>}
             <InputError message={error} className="mt-1" />
+        </div>
+    );
+}
+
+const CONTACT_FIELD_OPTIONS = [
+    { id: 'name', label: 'Name' },
+    { id: 'email', label: 'Email' },
+    { id: 'phone', label: 'Phone' },
+];
+
+function ContactFieldGroup({ label, fields, required, onChangeFields, onChangeRequired, errors }) {
+    const toggleField = (fieldId, checked) => {
+        const next = checked ? [...fields, fieldId] : fields.filter((f) => f !== fieldId);
+        onChangeFields([...new Set(next)]);
+        if (!checked) {
+            onChangeRequired(required.filter((f) => f !== fieldId));
+        }
+    };
+
+    const toggleRequired = (fieldId, checked) => {
+        if (!fields.includes(fieldId)) return;
+        onChangeRequired(checked ? [...new Set([...required, fieldId])] : required.filter((f) => f !== fieldId));
+    };
+
+    return (
+        <div>
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{label}</p>
+            <div className="mt-3 space-y-3">
+                {CONTACT_FIELD_OPTIONS.map((option) => (
+                    <div key={option.id} className="flex flex-wrap items-center gap-4 rounded-lg border border-gray-100 px-4 py-3 dark:border-gray-700">
+                        <label className="flex flex-1 items-center gap-3">
+                            <Checkbox
+                                checked={fields.includes(option.id)}
+                                onChange={(e) => toggleField(option.id, e.target.checked)}
+                            />
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">{option.label}</span>
+                        </label>
+                        {fields.includes(option.id) && (
+                            <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                                <Checkbox
+                                    checked={required.includes(option.id)}
+                                    onChange={(e) => toggleRequired(option.id, e.target.checked)}
+                                />
+                                Required
+                            </label>
+                        )}
+                    </div>
+                ))}
+            </div>
+            <InputError message={errors.contact_fields || errors.contact_required} className="mt-2" />
         </div>
     );
 }
