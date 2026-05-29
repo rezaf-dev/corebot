@@ -1,3 +1,183 @@
+/* MARKDOWN_FORMATTER_START */
+function escapeHtml(text) {
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function sanitizeUrl(url) {
+    const trimmed = String(url || '').trim();
+    if (!trimmed) return null;
+    try {
+        const parsed = new URL(trimmed, 'https://example.invalid');
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+            return parsed.href;
+        }
+    } catch {
+        return null;
+    }
+    return null;
+}
+
+function applyInlineMarkdown(text) {
+    let html = text;
+
+    html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+    html = html.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/__([^_\n]+)__/g, '<strong>$1</strong>');
+    html = html.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>');
+    html = html.replace(/(?<!_)_([^_\n]+)_(?!_)/g, '<em>$1</em>');
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => {
+        const safeUrl = sanitizeUrl(url);
+        if (!safeUrl) {
+            return label;
+        }
+        return (
+            '<a href="' +
+            safeUrl.replace(/"/g, '&quot;') +
+            '" target="_blank" rel="noopener noreferrer">' +
+            label +
+            '</a>'
+        );
+    });
+
+    return html;
+}
+
+function formatMarkdown(text) {
+    const source = String(text || '');
+    if (!source.trim()) {
+        return '';
+    }
+
+    const lines = source.replace(/\r\n/g, '\n').split('\n');
+    const blocks = [];
+    let paragraph = [];
+    let listType = null;
+    let listItems = [];
+    let inCodeBlock = false;
+    let codeLines = [];
+
+    function flushParagraph() {
+        if (!paragraph.length) {
+            return;
+        }
+        blocks.push('<p>' + applyInlineMarkdown(escapeHtml(paragraph.join('\n'))).replace(/\n/g, '<br>') + '</p>');
+        paragraph = [];
+    }
+
+    function flushList() {
+        if (!listType || !listItems.length) {
+            listType = null;
+            listItems = [];
+            return;
+        }
+        const tag = listType === 'ol' ? 'ol' : 'ul';
+        blocks.push(
+            '<' +
+                tag +
+                '>' +
+                listItems.map((item) => '<li>' + applyInlineMarkdown(escapeHtml(item)) + '</li>').join('') +
+                '</' +
+                tag +
+                '>'
+        );
+        listType = null;
+        listItems = [];
+    }
+
+    function flushCodeBlock() {
+        if (!codeLines.length) {
+            return;
+        }
+        blocks.push('<pre><code>' + escapeHtml(codeLines.join('\n')) + '</code></pre>');
+        codeLines = [];
+    }
+
+    for (const line of lines) {
+        const fence = line.match(/^```(\w*)?$/);
+        if (fence) {
+            flushParagraph();
+            flushList();
+            if (inCodeBlock) {
+                flushCodeBlock();
+                inCodeBlock = false;
+            } else {
+                inCodeBlock = true;
+            }
+            continue;
+        }
+
+        if (inCodeBlock) {
+            codeLines.push(line);
+            continue;
+        }
+
+        const trimmed = line.trim();
+        if (!trimmed) {
+            flushParagraph();
+            flushList();
+            continue;
+        }
+
+        const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
+        if (heading) {
+            flushParagraph();
+            flushList();
+            const level = heading[1].length + 2;
+            const tag = 'h' + Math.min(level, 6);
+            blocks.push(
+                '<' + tag + '>' + applyInlineMarkdown(escapeHtml(heading[2])) + '</' + tag + '>'
+            );
+            continue;
+        }
+
+        const ordered = trimmed.match(/^\d+\.\s+(.+)$/);
+        if (ordered) {
+            flushParagraph();
+            if (listType && listType !== 'ol') {
+                flushList();
+            }
+            listType = 'ol';
+            listItems.push(ordered[1]);
+            continue;
+        }
+
+        const unordered = trimmed.match(/^[-*+]\s+(.+)$/);
+        if (unordered) {
+            flushParagraph();
+            if (listType && listType !== 'ul') {
+                flushList();
+            }
+            listType = 'ul';
+            listItems.push(unordered[1]);
+            continue;
+        }
+
+        const quote = trimmed.match(/^>\s?(.+)$/);
+        if (quote) {
+            flushParagraph();
+            flushList();
+            blocks.push('<blockquote>' + applyInlineMarkdown(escapeHtml(quote[1])) + '</blockquote>');
+            continue;
+        }
+
+        flushList();
+        paragraph.push(line);
+    }
+
+    flushParagraph();
+    flushList();
+    if (inCodeBlock) {
+        flushCodeBlock();
+    }
+
+    return blocks.join('');
+}
+/* MARKDOWN_FORMATTER_END */
+
 (function () {
     const script = document.currentScript;
     const botKey = script && script.dataset.botKey;
@@ -511,7 +691,7 @@
             bubble.innerHTML = '<span class="crm-ai-typing" aria-label="Assistant is typing"><span></span><span></span><span></span></span>';
             bubble.dataset.loading = 'true';
         } else {
-            bubble.textContent = text;
+            setBubbleContent(bubble, text, role);
         }
 
         wrap.appendChild(bubble);
@@ -529,21 +709,45 @@
         const bubble = getBubble(node);
         if (!bubble || bubble.dataset.loading !== 'true') return;
         delete bubble.dataset.loading;
+        delete bubble.dataset.rawText;
         bubble.textContent = '';
+        bubble.classList.remove('crm-ai-formatted');
+    }
+
+    function messageRole(node) {
+        const wrap = node.classList && node.classList.contains('crm-ai-msg') ? node : node.closest('.crm-ai-msg');
+        if (!wrap) return 'assistant';
+        return wrap.classList.contains('crm-ai-user') ? 'user' : 'assistant';
+    }
+
+    function setBubbleContent(bubble, text, role) {
+        const raw = String(text || '');
+        if (role === 'user') {
+            delete bubble.dataset.rawText;
+            bubble.classList.remove('crm-ai-formatted');
+            bubble.textContent = raw;
+            return;
+        }
+
+        bubble.dataset.rawText = raw;
+        bubble.classList.add('crm-ai-formatted');
+        bubble.innerHTML = formatMarkdown(raw);
     }
 
     function setBubbleText(node, text) {
         const bubble = getBubble(node);
         if (!bubble) return;
         delete bubble.dataset.loading;
-        bubble.textContent = text;
+        setBubbleContent(bubble, text, messageRole(node));
         scrollToBottom();
     }
 
     function appendBubbleText(node, delta) {
         const bubble = getBubble(node);
         if (!bubble) return;
-        bubble.textContent += delta;
+        const role = messageRole(node);
+        const raw = (bubble.dataset.rawText || bubble.textContent || '') + delta;
+        setBubbleContent(bubble, raw, role);
     }
 
     function clamp(value, min, max) {
@@ -724,6 +928,65 @@
                 border: 1px solid var(--crm-border);
                 color: var(--crm-text);
                 border-bottom-left-radius: 4px;
+            }
+            .crm-ai-bubble.crm-ai-formatted > :first-child { margin-top: 0; }
+            .crm-ai-bubble.crm-ai-formatted > :last-child { margin-bottom: 0; }
+            .crm-ai-bubble.crm-ai-formatted p,
+            .crm-ai-bubble.crm-ai-formatted ul,
+            .crm-ai-bubble.crm-ai-formatted ol,
+            .crm-ai-bubble.crm-ai-formatted pre,
+            .crm-ai-bubble.crm-ai-formatted blockquote,
+            .crm-ai-bubble.crm-ai-formatted h3,
+            .crm-ai-bubble.crm-ai-formatted h4,
+            .crm-ai-bubble.crm-ai-formatted h5 {
+                margin: 0 0 0.55em;
+            }
+            .crm-ai-bubble.crm-ai-formatted h3,
+            .crm-ai-bubble.crm-ai-formatted h4,
+            .crm-ai-bubble.crm-ai-formatted h5 {
+                font-size: inherit;
+                font-weight: 600;
+                line-height: 1.35;
+            }
+            .crm-ai-bubble.crm-ai-formatted ul,
+            .crm-ai-bubble.crm-ai-formatted ol {
+                padding-left: 1.25em;
+            }
+            .crm-ai-bubble.crm-ai-formatted li + li { margin-top: 0.2em; }
+            .crm-ai-bubble.crm-ai-formatted code {
+                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+                font-size: 0.92em;
+                background: color-mix(in srgb, var(--crm-text) 8%, transparent);
+                padding: 0.1em 0.35em;
+                border-radius: 4px;
+            }
+            .crm-ai-bubble.crm-ai-formatted pre {
+                margin: 0 0 0.55em;
+                padding: 10px 12px;
+                border-radius: 8px;
+                background: color-mix(in srgb, var(--crm-text) 8%, transparent);
+                overflow-x: auto;
+            }
+            .crm-ai-bubble.crm-ai-formatted pre code {
+                display: block;
+                padding: 0;
+                background: transparent;
+                white-space: pre-wrap;
+                word-break: break-word;
+            }
+            .crm-ai-bubble.crm-ai-formatted blockquote {
+                margin: 0 0 0.55em;
+                padding-left: 10px;
+                border-left: 3px solid var(--crm-border);
+                color: var(--crm-muted);
+            }
+            .crm-ai-assistant .crm-ai-bubble.crm-ai-formatted a {
+                color: var(--crm-accent);
+                text-decoration: underline;
+                text-underline-offset: 2px;
+            }
+            .crm-ai-user .crm-ai-bubble.crm-ai-formatted a {
+                color: #fff;
             }
             .crm-ai-typing {
                 display: inline-flex;
