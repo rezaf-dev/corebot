@@ -64,6 +64,9 @@ class KnowledgeSourceController extends Controller
                 KnowledgeSourceStatus::Processing->value,
                 'draft',
             ])->exists(),
+            'research' => [
+                'search_provider' => filled(config('corebot.knowledge_research.tavily_api_key')) ? 'tavily' : 'duckduckgo',
+            ],
         ]);
     }
 

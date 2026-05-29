@@ -29,7 +29,8 @@ it('renders the knowledge index for tenant admins', function () {
             ->component('Knowledge/Index')
             ->has('sources.data', 1)
             ->where('sources.data.0.title', 'Policy')
-            ->where('stats.total', 1));
+            ->where('stats.total', 1)
+            ->where('research.search_provider', 'duckduckgo'));
 });
 
 it('filters knowledge sources by search term', function () {

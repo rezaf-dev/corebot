@@ -24,6 +24,7 @@ corebot is built for **SaaS CRM operators** who want client-specific support bot
 ### Knowledge & RAG
 
 - Sources: plain text, FAQ pairs, PDF (`pdftotext`), DOCX (`python-docx`).
+- **Research web** helper on the Knowledge page: fetch a URL or search the web, edit the extracted text, then save it as a text source — see [Knowledge research (web fetch & search)](#knowledge-research-web-fetch--search).
 - Background job chunks content, generates embeddings, stores vectors in **PostgreSQL pgvector**.
 - Chat retrieves the closest chunks per bot, applies similarity thresholds, and builds a strict context-only prompt.
 - When retrieval is not confident, the bot escalates and can prompt for visitor contact (configurable fields per bot).
@@ -256,6 +257,39 @@ Relevant code:
 | Config key | `config/corebot.php` → `geoip_database_path` |
 | Capture on chat start | `app/Http/Controllers/PublicChatController.php` |
 
+## Knowledge research (web fetch & search)
+
+On **Knowledge → Research web**, tenant admins can pull content from the public web into an editable draft before saving it as a normal **text** knowledge source (chunked and embedded like any other text upload).
+
+### Two modes
+
+| Mode | What you enter | What happens |
+|------|----------------|--------------|
+| **Fetch URL** | A public page URL | corebot downloads the page, strips scripts/nav/footer, and extracts readable text. |
+| **Search web** | A search query | corebot searches the web, opens the top results, extracts text from each page, and combines them with source links. |
+
+You can edit the title and content in the modal, pick a bot, then click **Save as knowledge**. Nothing is indexed until you save.
+
+### Search provider
+
+- **Default:** DuckDuckGo (no API key required).
+- **Optional:** [Tavily](https://tavily.com/) — set `TAVILY_API_KEY` in `.env` for higher-quality search results.
+
+```env
+# Optional — better web search in Knowledge → Research web
+TAVILY_API_KEY=tvly-xxxxxxxx
+```
+
+If `TAVILY_API_KEY` is set, search mode uses Tavily; otherwise it falls back to DuckDuckGo.
+
+### Limits & safety
+
+- Rate limited to **10 research requests per minute** per user.
+- Only `http`/`https` URLs on public hosts are allowed (localhost and private IPs are blocked).
+- Fetched content is truncated at 50,000 characters per page.
+
+Relevant code: `app/Services/Knowledge/KnowledgeResearchService.php`, `app/Http/Controllers/Admin/KnowledgeResearchController.php`.
+
 ## Database setup
 
 corebot **requires PostgreSQL with pgvector**. SQLite is not supported for running the application.
@@ -354,6 +388,7 @@ Only the variables you typically need to change:
 | `DEMO_BOT_PUBLIC_KEY` | Bot `public_key` embedded on `/demo` |
 | `DOCX_PYTHON` | Optional absolute path to Python 3 for DOCX indexing (default: `python3` on worker `PATH`) |
 | `GEOIP_DATABASE_PATH` | Optional absolute path to `GeoLite2-City.mmdb` for visitor country/city — see [MaxMind GeoLite2](#maxmind-geolite2) |
+| `TAVILY_API_KEY` | Optional Tavily API key for web search in Knowledge → Research web — see [Knowledge research](#knowledge-research-web-fetch--search) |
 
 Example `.env` fragment:
 
@@ -382,6 +417,9 @@ DEMO_BOT_PUBLIC_KEY=bot_xxxxxxxx
 
 # Optional MaxMind GeoLite2 City database for visitor geo on widget chat
 # GEOIP_DATABASE_PATH=/var/www/corebot/storage/app/geoip/GeoLite2-City.mmdb
+
+# Optional Tavily API key for Knowledge → Research web search
+# TAVILY_API_KEY=tvly-xxxxxxxx
 ```
 
 For local mail testing, `MAIL_MAILER=log` writes to `storage/logs/laravel.log`.

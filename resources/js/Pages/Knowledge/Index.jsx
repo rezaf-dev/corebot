@@ -26,9 +26,10 @@ const SOURCE_TYPES = [
     { value: 'docx', label: 'Word', description: 'Upload a .docx file up to 10 MB.' },
 ];
 
-export default function Index({ sources, bots, filters, stats, hasActiveSources }) {
+export default function Index({ sources, bots, filters, stats, hasActiveSources, research }) {
     const sourceItems = sources.data ?? [];
     const [showAddModal, setShowAddModal] = useState(false);
+    const [showResearchModal, setShowResearchModal] = useState(false);
     const canAddSources = bots.length > 0;
 
     useEffect(() => {
@@ -95,12 +96,20 @@ export default function Index({ sources, bots, filters, stats, hasActiveSources 
                     filters={filters}
                     canAdd={canAddSources}
                     onAddSource={() => setShowAddModal(true)}
+                    onResearch={() => setShowResearchModal(true)}
                 />
 
                 <AddSourceModal
                     show={showAddModal}
                     onClose={() => setShowAddModal(false)}
                     bots={bots}
+                />
+
+                <ResearchKnowledgeModal
+                    show={showResearchModal}
+                    onClose={() => setShowResearchModal(false)}
+                    bots={bots}
+                    research={research}
                 />
             </div>
         </AuthenticatedLayout>
@@ -293,7 +302,7 @@ function AddSourceModal({ show, onClose, bots }) {
     );
 }
 
-function SourcesList({ sources, pagination, filters, canAdd, onAddSource }) {
+function SourcesList({ sources, pagination, filters, canAdd, onAddSource, onResearch }) {
     const hasSearch = Boolean(filters?.search?.trim());
 
     return (
@@ -308,13 +317,22 @@ function SourcesList({ sources, pagination, filters, canAdd, onAddSource }) {
                         </p>
                     </div>
                     {canAdd && (
-                        <PrimaryButton
-                            type="button"
-                            onClick={onAddSource}
-                            className="w-full shrink-0 justify-center sm:w-auto"
-                        >
-                            + Add source
-                        </PrimaryButton>
+                        <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
+                            <SecondaryButton
+                                type="button"
+                                onClick={onResearch}
+                                className="w-full justify-center sm:w-auto"
+                            >
+                                Research web
+                            </SecondaryButton>
+                            <PrimaryButton
+                                type="button"
+                                onClick={onAddSource}
+                                className="w-full justify-center sm:w-auto"
+                            >
+                                + Add source
+                            </PrimaryButton>
+                        </div>
                     )}
                 </div>
                 <SourcesSearch filters={filters} />
@@ -334,9 +352,14 @@ function SourcesList({ sources, pagination, filters, canAdd, onAddSource }) {
                         <ClearSearchButton className="mt-4" />
                     ) : (
                         canAdd && (
-                            <PrimaryButton type="button" onClick={onAddSource} className="mt-4">
-                                Add your first source
-                            </PrimaryButton>
+                            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                                <SecondaryButton type="button" onClick={onResearch}>
+                                    Research web
+                                </SecondaryButton>
+                                <PrimaryButton type="button" onClick={onAddSource}>
+                                    Add your first source
+                                </PrimaryButton>
+                            </div>
                         )
                     )}
                 </div>
@@ -790,4 +813,238 @@ function formatFileSize(bytes) {
         unit += 1;
     }
     return `${size.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
+}
+
+function getCsrfToken() {
+    const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+
+    return match ? decodeURIComponent(match[1]) : '';
+}
+
+function ResearchKnowledgeModal({ show, onClose, bots, research }) {
+    const [mode, setMode] = useState('url');
+    const [query, setQuery] = useState('');
+    const [fetching, setFetching] = useState(false);
+    const [fetchError, setFetchError] = useState('');
+    const [sources, setSources] = useState([]);
+
+    const { data, setData, post, processing, errors, reset, clearErrors } = useForm({
+        bot_id: bots[0]?.id || '',
+        type: 'text',
+        title: '',
+        raw_text: '',
+        question: '',
+        answer: '',
+        file: null,
+    });
+
+    const hasDraft = Boolean(data.raw_text?.trim());
+
+    const close = () => {
+        onClose();
+        clearErrors();
+        reset();
+        setMode('url');
+        setQuery('');
+        setFetching(false);
+        setFetchError('');
+        setSources([]);
+    };
+
+    const fetchContent = async () => {
+        setFetching(true);
+        setFetchError('');
+
+        try {
+            const response = await fetch(route('knowledge-sources.research'), {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-XSRF-TOKEN': getCsrfToken(),
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({ mode, query }),
+            });
+
+            const payload = await response.json();
+
+            if (!response.ok) {
+                throw new Error(payload.message || 'Could not fetch content.');
+            }
+
+            setData('title', payload.title || '');
+            setData('raw_text', payload.content || '');
+            setSources(payload.sources || []);
+        } catch (error) {
+            setFetchError(error.message || 'Could not fetch content.');
+        } finally {
+            setFetching(false);
+        }
+    };
+
+    const submit = (e) => {
+        e.preventDefault();
+        post(route('knowledge-sources.store'), {
+            preserveScroll: true,
+            onSuccess: () => close(),
+        });
+    };
+
+    if (bots.length === 0) {
+        return null;
+    }
+
+    return (
+        <Modal show={show} onClose={close} maxWidth="3xl">
+            <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+                <div className="shrink-0 border-b border-gray-100 px-4 py-4 sm:px-6 dark:border-gray-700">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Research from the web</h3>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        Fetch a page or search the web, edit the extracted text, then save it as a knowledge source.
+                    </p>
+                </div>
+
+                <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:px-6">
+                    <div>
+                        <InputLabel value="Research mode" />
+                        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <button
+                                type="button"
+                                onClick={() => setMode('url')}
+                                className={`rounded-lg border px-3 py-3 text-left transition ${
+                                    mode === 'url'
+                                        ? 'border-indigo-500 bg-indigo-50 dark:border-indigo-500 dark:bg-indigo-950/40'
+                                        : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
+                                }`}
+                            >
+                                <span className="block text-sm font-semibold text-gray-900 dark:text-white">Fetch URL</span>
+                                <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                                    Extract readable content from a specific page.
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setMode('search')}
+                                className={`rounded-lg border px-3 py-3 text-left transition ${
+                                    mode === 'search'
+                                        ? 'border-indigo-500 bg-indigo-50 dark:border-indigo-500 dark:bg-indigo-950/40'
+                                        : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
+                                }`}
+                            >
+                                <span className="block text-sm font-semibold text-gray-900 dark:text-white">Search web</span>
+                                <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                                    Search and combine content from top results.
+                                </span>
+                            </button>
+                        </div>
+                        {mode === 'search' && (
+                            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                Search uses {research?.search_provider === 'tavily' ? 'Tavily' : 'DuckDuckGo'}.
+                                {research?.search_provider !== 'tavily' && ' Set TAVILY_API_KEY for higher-quality results.'}
+                            </p>
+                        )}
+                    </div>
+
+                    <div>
+                        <InputLabel htmlFor="research-query" value={mode === 'url' ? 'Page URL' : 'Search query'} />
+                        <div className="mt-1 flex flex-col gap-2 sm:flex-row">
+                            <TextInput
+                                id="research-query"
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                className="block w-full flex-1"
+                                placeholder={mode === 'url' ? 'https://example.com/docs/getting-started' : 'Laravel queue worker setup'}
+                            />
+                            <SecondaryButton
+                                type="button"
+                                onClick={fetchContent}
+                                disabled={fetching || !query.trim()}
+                                className="w-full shrink-0 justify-center sm:w-auto"
+                            >
+                                {fetching ? 'Fetching…' : 'Fetch content'}
+                            </SecondaryButton>
+                        </div>
+                        {fetchError && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{fetchError}</p>}
+                    </div>
+
+                    {hasDraft && (
+                        <>
+                            <div>
+                                <InputLabel htmlFor="research-bot_id" value="Bot" />
+                                <select
+                                    id="research-bot_id"
+                                    value={data.bot_id}
+                                    onChange={(e) => setData('bot_id', e.target.value)}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+                                >
+                                    {bots.map((bot) => (
+                                        <option key={bot.id} value={bot.id}>
+                                            {bot.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <InputError message={errors.bot_id} className="mt-1" />
+                            </div>
+
+                            <div>
+                                <InputLabel htmlFor="research-title" value="Title" />
+                                <TextInput
+                                    id="research-title"
+                                    value={data.title}
+                                    onChange={(e) => setData('title', e.target.value)}
+                                    className="mt-1 block w-full"
+                                />
+                                <InputError message={errors.title} className="mt-1" />
+                            </div>
+
+                            <TextAreaField
+                                id="research-raw_text"
+                                label="Extracted content"
+                                value={data.raw_text}
+                                onChange={(value) => setData('raw_text', value)}
+                                error={errors.raw_text}
+                                rows={12}
+                                placeholder="Fetched content will appear here for editing…"
+                            />
+
+                            {sources.length > 0 && (
+                                <div>
+                                    <InputLabel value="Sources" />
+                                    <ul className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-300">
+                                        {sources.map((source) => (
+                                            <li key={source.url}>
+                                                <a
+                                                    href={source.url}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+                                                >
+                                                    {source.title}
+                                                </a>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+
+                <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-gray-100 bg-gray-50 px-4 py-4 sm:flex-row sm:justify-end sm:gap-3 sm:px-6 dark:border-gray-700 dark:bg-gray-900/50">
+                    <SecondaryButton
+                        type="button"
+                        onClick={close}
+                        disabled={processing}
+                        className="w-full justify-center !normal-case !tracking-normal sm:w-auto"
+                    >
+                        Cancel
+                    </SecondaryButton>
+                    <PrimaryButton disabled={processing || !hasDraft || !data.title.trim()} className="w-full justify-center sm:w-auto">
+                        {processing ? 'Saving…' : 'Save as knowledge'}
+                    </PrimaryButton>
+                </div>
+            </form>
+        </Modal>
+    );
 }

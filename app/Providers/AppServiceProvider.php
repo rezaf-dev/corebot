@@ -33,6 +33,10 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by($request->ip());
         });
 
+        RateLimiter::for('knowledge-research', function (Request $request) {
+            return Limit::perMinute(10)->by((string) $request->user()?->id ?: $request->ip());
+        });
+
         Vite::prefetch(concurrency: 3);
     }
 }

@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AiSettingsController;
 use App\Http\Controllers\Admin\BotController;
 use App\Http\Controllers\Admin\ConversationController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\KnowledgeResearchController;
 use App\Http\Controllers\Admin\KnowledgeSourceController;
 use App\Http\Controllers\Admin\TenantController;
 use App\Http\Controllers\Admin\WidgetInstallController;
@@ -34,6 +35,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('bots', BotController::class)->except(['show']);
 
     Route::resource('knowledge-sources', KnowledgeSourceController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
+    Route::post('/knowledge-sources/research', [KnowledgeResearchController::class, 'store'])
+        ->middleware('throttle:knowledge-research')
+        ->name('knowledge-sources.research');
     Route::post('/knowledge-sources/{knowledgeSource}/reprocess', [KnowledgeSourceController::class, 'reprocess'])->name('knowledge-sources.reprocess');
     Route::post('/knowledge-sources/{knowledgeSource}/cancel', [KnowledgeSourceController::class, 'cancel'])->name('knowledge-sources.cancel');
 

@@ -38,4 +38,18 @@ return [
 
     'docx_python' => env('DOCX_PYTHON'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Knowledge research (fetch URL / web search helper on Knowledge page)
+    |--------------------------------------------------------------------------
+    */
+
+    'knowledge_research' => [
+        'fetch_timeout' => (int) env('KNOWLEDGE_RESEARCH_FETCH_TIMEOUT', 20),
+        'max_content_length' => (int) env('KNOWLEDGE_RESEARCH_MAX_CONTENT_LENGTH', 50000),
+        'search_max_results' => (int) env('KNOWLEDGE_RESEARCH_SEARCH_MAX_RESULTS', 3),
+        'user_agent' => env('KNOWLEDGE_RESEARCH_USER_AGENT', 'corebot-knowledge-research/1.0'),
+        'tavily_api_key' => env('TAVILY_API_KEY'),
+    ],
+
 ];
