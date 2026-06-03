@@ -181,7 +181,7 @@ export default function BotIntegrationsSection({ bot, integrationTypes }) {
                         <InputError message={form.errors.description} className="mt-1" />
                     </div>
 
-                    {showUrl && (
+                    {(showUrl || form.data.type === 'http_get') && (
                         <div>
                             <InputLabel htmlFor="integration_url" value="URL" />
                             <TextInput
@@ -189,7 +189,17 @@ export default function BotIntegrationsSection({ bot, integrationTypes }) {
                                 value={form.data.config.url}
                                 onChange={(e) => form.setData('config', { ...form.data.config, url: e.target.value })}
                                 className="mt-1 block w-full font-mono text-sm"
+                                placeholder={
+                                    form.data.type === 'http_get'
+                                        ? 'https://api.example.com/verify/{recommendation_id}'
+                                        : 'https://hooks.example.com/lead'
+                                }
                             />
+                            {form.data.type === 'http_get' && (
+                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    Use {'{parameter_name}'} in the path for values the visitor provides (e.g. recommendation ID).
+                                </p>
+                            )}
                             <InputError message={form.errors['config.url']} className="mt-1" />
                         </div>
                     )}

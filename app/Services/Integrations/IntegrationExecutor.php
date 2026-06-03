@@ -17,6 +17,7 @@ class IntegrationExecutor
 {
     public function __construct(
         private readonly IntegrationUrlGuard $urlGuard,
+        private readonly IntegrationUrlBuilder $urlBuilder,
         private readonly LeadCaptureService $leadCapture,
     ) {}
 
@@ -51,10 +52,7 @@ class IntegrationExecutor
                 'response_body' => isset($result['body']) ? str($result['body'])->limit(4000)->toString() : null,
             ]);
 
-            return json_encode([
-                'success' => true,
-                'message' => $result['message'] ?? 'Action completed.',
-            ], JSON_THROW_ON_ERROR);
+            return json_encode($this->toolResponse($result), JSON_THROW_ON_ERROR);
         } catch (Throwable $e) {
             $log->update(['error' => str($e->getMessage())->limit(1000)->toString()]);
 
@@ -63,6 +61,29 @@ class IntegrationExecutor
                 'message' => $e->getMessage(),
             ], JSON_THROW_ON_ERROR);
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $result
+     * @return array<string, mixed>
+     */
+    private function toolResponse(array $result): array
+    {
+        $response = [
+            'success' => true,
+            'message' => $result['message'] ?? 'Action completed.',
+        ];
+
+        if (isset($result['body'])) {
+            $body = (string) $result['body'];
+            $decoded = json_decode($body, true);
+
+            $response['data'] = json_last_error() === JSON_ERROR_NONE && is_array($decoded)
+                ? $decoded
+                : $body;
+        }
+
+        return $response;
     }
 
     public function test(BotIntegration $integration, Bot $bot): array
@@ -203,16 +224,18 @@ class IntegrationExecutor
     private function runHttpGet(BotIntegration $integration, array $arguments): array
     {
         $config = $integration->resolvedConfig();
-        $url = (string) ($config['url'] ?? '');
+        $urlTemplate = (string) ($config['url'] ?? '');
 
-        if ($url === '') {
+        if ($urlTemplate === '') {
             throw new InvalidArgumentException('HTTP GET URL is not configured.');
         }
+
+        $url = $this->urlBuilder->build($urlTemplate, $arguments);
 
         $allowed = $integration->resolvedAllowedDomains();
 
         if ($allowed === []) {
-            $allowed = $this->urlGuard->domainsFromUrl($url);
+            $allowed = $this->urlBuilder->domainsForAllowlist($urlTemplate);
         }
 
         $this->urlGuard->assertAllowed($url, $allowed);

@@ -67,3 +67,63 @@ it('posts to a webhook integration', function () {
     Http::assertSent(fn ($request) => $request->url() === 'https://hooks.example.com/lead'
         && $request['arguments']['note'] === 'test');
 });
+
+it('returns api response data from http get integrations', function () {
+    Http::fake([
+        'https://admin.onlinemedicalcard.com/api/v2/status*' => Http::response(['status' => 'approved'], 200),
+    ]);
+
+    $tenant = Tenant::create(['name' => 'Demo', 'slug' => 'demo-exec-status', 'status' => 'active']);
+    $bot = Bot::create(['tenant_id' => $tenant->id, 'name' => 'Support']);
+    $integration = BotIntegration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'bot_id' => $bot->id,
+        'type' => IntegrationType::HttpGet,
+        'config' => ['url' => 'https://admin.onlinemedicalcard.com/api/v2/status'],
+        'allowed_domains' => ['admin.onlinemedicalcard.com'],
+    ]);
+    $conversation = ChatConversation::create([
+        'tenant_id' => $tenant->id,
+        'bot_id' => $bot->id,
+        'status' => 'open',
+    ]);
+
+    $result = json_decode(app(IntegrationExecutor::class)->run($bot, $conversation, $integration, [
+        'query' => ['secret' => '38827717'],
+    ]), true);
+
+    expect($result['success'])->toBeTrue()
+        ->and($result['data'])->toBe(['status' => 'approved']);
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://admin.onlinemedicalcard.com/api/v2/status?secret=38827717');
+});
+
+it('supports path placeholders in http get urls', function () {
+    Http::fake([
+        'https://admin.onlinemedicalcard.com/api/v2/verify/*' => Http::response(['valid' => true], 200),
+    ]);
+
+    $tenant = Tenant::create(['name' => 'Demo', 'slug' => 'demo-exec-verify', 'status' => 'active']);
+    $bot = Bot::create(['tenant_id' => $tenant->id, 'name' => 'Support']);
+    $integration = BotIntegration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'bot_id' => $bot->id,
+        'type' => IntegrationType::HttpGet,
+        'config' => ['url' => 'https://admin.onlinemedicalcard.com/api/v2/verify/{recommendation_id}'],
+        'allowed_domains' => ['admin.onlinemedicalcard.com'],
+    ]);
+    $conversation = ChatConversation::create([
+        'tenant_id' => $tenant->id,
+        'bot_id' => $bot->id,
+        'status' => 'open',
+    ]);
+
+    $result = json_decode(app(IntegrationExecutor::class)->run($bot, $conversation, $integration, [
+        'recommendation_id' => 'N6000053720',
+    ]), true);
+
+    expect($result['success'])->toBeTrue()
+        ->and($result['data'])->toBe(['valid' => true]);
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://admin.onlinemedicalcard.com/api/v2/verify/N6000053720');
+});

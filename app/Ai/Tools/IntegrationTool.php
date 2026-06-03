@@ -7,6 +7,7 @@ use App\Models\Bot;
 use App\Models\BotIntegration;
 use App\Models\ChatConversation;
 use App\Services\Integrations\IntegrationExecutor;
+use App\Services\Integrations\IntegrationUrlBuilder;
 use App\Support\BotContactConfig;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Tool;
@@ -50,9 +51,7 @@ class IntegrationTool implements Tool
                 'subject' => $schema->string()->description('Email subject line.'),
                 'body' => $schema->string()->description('Email body text.')->required(),
             ],
-            IntegrationType::HttpGet => [
-                'query' => $schema->object()->description('Optional query string parameters as key-value pairs.'),
-            ],
+            IntegrationType::HttpGet => $this->httpGetSchema($schema),
             IntegrationType::Webhook => [
                 'payload' => $schema->object()->description('Optional extra fields to include in the webhook payload.'),
             ],
@@ -77,6 +76,26 @@ class IntegrationTool implements Tool
         if (in_array('phone', BotContactConfig::fields($this->bot), true)) {
             $fields['visitor_phone'] = $schema->string()->description('Visitor phone number.');
         }
+
+        return $fields;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function httpGetSchema(JsonSchema $schema): array
+    {
+        $fields = [];
+        $urlBuilder = app(IntegrationUrlBuilder::class);
+
+        foreach ($urlBuilder->pathParameterNames((string) ($this->integration->resolvedConfig()['url'] ?? '')) as $name) {
+            $fields[$name] = $schema->string()
+                ->description(str_replace('_', ' ', $name).' for the API request.')
+                ->required();
+        }
+
+        $fields['query'] = $schema->object()
+            ->description('Optional query string parameters as key-value pairs.');
 
         return $fields;
     }
