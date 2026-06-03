@@ -73,6 +73,11 @@ PROMPT;
         return $this->hasMany(BotIntegration::class);
     }
 
+    public function aiUsageLogs(): HasMany
+    {
+        return $this->hasMany(AiUsageLog::class);
+    }
+
     public function isActive(): bool
     {
         return $this->status === 'active';
