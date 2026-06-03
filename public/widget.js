@@ -178,6 +178,77 @@ function formatMarkdown(text) {
 }
 /* MARKDOWN_FORMATTER_END */
 
+/* CONTACT_HELPERS_START */
+function contactCopy(reason) {
+    if (reason === 'start') {
+        return {
+            title: 'Start the conversation',
+            hint: 'Share your details so our team can follow up if needed.',
+            submit: 'Continue',
+            privacy: 'We only use this to respond to your chat.',
+        };
+    }
+
+    return {
+        title: 'Stay in touch',
+        hint: 'Leave your details and our team will follow up on this conversation.',
+        submit: 'Send details',
+        privacy: 'We only use this to respond to your chat.',
+    };
+}
+
+function validateContactPayload(fields, required, payload) {
+    const errors = {};
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    for (const field of fields) {
+        const key = field === 'name' ? 'visitor_name' : field === 'email' ? 'visitor_email' : 'visitor_phone';
+        const raw = payload[key];
+        const value = typeof raw === 'string' ? raw.trim() : '';
+
+        if (required.includes(field) && !value) {
+            const label = field === 'name' ? 'Name' : field === 'email' ? 'Email' : 'Phone';
+            errors[key] = label + ' is required.';
+            continue;
+        }
+
+        if (field === 'email' && value && !emailPattern.test(value)) {
+            errors[key] = 'Enter a valid email address.';
+        }
+    }
+
+    if (Object.keys(errors).length === 0) {
+        const hasValue = fields.some((field) => {
+            const key = field === 'name' ? 'visitor_name' : field === 'email' ? 'visitor_email' : 'visitor_phone';
+            const value = payload[key];
+            return typeof value === 'string' && value.trim() !== '';
+        });
+
+        if (!hasValue && fields.length) {
+            errors._form = 'Please fill in at least one field.';
+        }
+    }
+
+    return errors;
+}
+
+function mapContactFieldErrors(apiErrors) {
+    const mapped = {};
+    if (!apiErrors || typeof apiErrors !== 'object') {
+        return mapped;
+    }
+
+    Object.keys(apiErrors).forEach((key) => {
+        const messages = apiErrors[key];
+        if (Array.isArray(messages) && messages[0]) {
+            mapped[key] = String(messages[0]);
+        }
+    });
+
+    return mapped;
+}
+/* CONTACT_HELPERS_END */
+
 (function () {
     const script = document.currentScript;
     const botKey = script && script.dataset.botKey;
@@ -213,9 +284,11 @@ function formatMarkdown(text) {
     let contactConfig = {
         fields: ['name', 'email'],
         required: ['email'],
-        has_contact: false,
+        has_contact: Boolean(state.has_contact),
         collect_on_start: false,
+        reason: null,
     };
+    let contactErrors = {};
     let isOpen = false;
     let initialOpenApplied = false;
     let isLoading = false;
@@ -251,8 +324,9 @@ function formatMarkdown(text) {
     applyConfig(config);
 
     loadRemoteConfig().then((remote) => {
-        config = mergeConfig(config, remote);
+        config = mergeConfig(config, remote.widget || {});
         applyConfig(config);
+        applyRemoteContactConfig(remote);
 
         if (remote.welcome_message) {
             state.welcome_message = remote.welcome_message;
@@ -290,7 +364,7 @@ function formatMarkdown(text) {
             try {
                 const res = await post('/message', { conversation_id: state.conversation_id, message: text });
                 setBubbleText(assistant, res.message);
-                if (shouldPromptContact(res)) showContact();
+                if (shouldPromptContact(res)) showContact('fallback');
             } catch {
                 setBubbleText(assistant, 'Support is unavailable right now. Please try again later.');
             }
@@ -301,25 +375,36 @@ function formatMarkdown(text) {
 
     contact.addEventListener('submit', async (event) => {
         event.preventDefault();
-        if (isLoading) return;
+        if (isLoading || contactConfig.has_contact) return;
 
-        setLoading(true);
-        const submitBtn = contact.querySelector('button[type="submit"]');
-        if (submitBtn) submitBtn.disabled = true;
+        const payload = Object.fromEntries(new FormData(contact).entries());
+        contactErrors = validateContactPayload(contactConfig.fields, contactConfig.required, payload);
+
+        if (Object.keys(contactErrors).length) {
+            renderContactForm(getContactFormValues());
+            return;
+        }
+
+        setContactSubmitting(true);
 
         try {
-            const payload = Object.fromEntries(new FormData(contact).entries());
             await post('/contact', { conversation_id: state.conversation_id, ...payload });
-            contact.classList.remove('is-visible');
-            contactConfig.has_contact = true;
-            localStorage.setItem(storageKey, JSON.stringify(state));
-            add('assistant', 'Thanks! Your contact details were saved.');
-        } catch {
-            add('assistant', 'Could not save your details. Please try again.');
+            completeContactSubmission();
+        } catch (error) {
+            const apiErrors = mapContactFieldErrors(error && error.data && error.data.errors);
+            contactErrors = Object.keys(apiErrors).length
+                ? apiErrors
+                : { _form: 'Could not save your details. Please try again.' };
+            renderContactForm(getContactFormValues());
         } finally {
-            setLoading(false);
-            if (submitBtn) submitBtn.disabled = false;
+            setContactSubmitting(false);
         }
+    });
+
+    contact.addEventListener('click', (event) => {
+        const skip = event.target.closest('[data-contact-skip]');
+        if (!skip || contactConfig.required.length) return;
+        hideContact();
     });
 
     function applyInitialOpen() {
@@ -406,7 +491,7 @@ function formatMarkdown(text) {
             showWelcomeMessage(state.welcome_message);
 
             if (res.collect_contact_on_start && shouldPromptContact(res)) {
-                showContact();
+                showContact('start');
             }
         } catch {
             showWelcomeMessage('Unable to start chat. Please refresh and try again.');
@@ -424,11 +509,26 @@ function formatMarkdown(text) {
             const url = apiBase + '/widget-config?bot_public_key=' + encodeURIComponent(botKey);
             const response = await fetch(url, { headers: { Accept: 'application/json' } });
             if (!response.ok) return {};
-            const data = await response.json();
-            return data.widget || {};
+            return await response.json();
         } catch {
             return {};
         }
+    }
+
+    function applyRemoteContactConfig(remote) {
+        if (!remote || typeof remote !== 'object') return;
+
+        if (Array.isArray(remote.contact_fields)) {
+            contactConfig.fields = remote.contact_fields;
+        }
+        if (Array.isArray(remote.contact_required)) {
+            contactConfig.required = remote.contact_required;
+        }
+        if (typeof remote.collect_contact_on_start === 'boolean') {
+            contactConfig.collect_on_start = remote.collect_contact_on_start;
+        }
+
+        renderContactForm({});
     }
 
     async function post(path, body) {
@@ -437,7 +537,17 @@ function formatMarkdown(text) {
             headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
             body: JSON.stringify({ bot_public_key: botKey, ...body }),
         });
-        if (!response.ok) throw new Error('Request failed');
+
+        if (!response.ok) {
+            const error = new Error('Request failed');
+            try {
+                error.data = await response.json();
+            } catch {
+                error.data = null;
+            }
+            throw error;
+        }
+
         return response.json();
     }
 
@@ -482,7 +592,7 @@ function formatMarkdown(text) {
                 }
 
                 if (payload.type === 'meta' && shouldPromptContact(payload)) {
-                    showContact();
+                    showContact('fallback');
                 }
             }
         }
@@ -575,14 +685,94 @@ function formatMarkdown(text) {
 
     function setLoading(loading) {
         isLoading = loading;
-        sendBtn.disabled = loading || isStarting;
-        input.disabled = loading || isStarting;
+        updateChatAvailability();
     }
 
-    function showContact() {
+    function chatBlockedByContact() {
+        return (
+            contact.classList.contains('is-visible') &&
+            contactConfig.collect_on_start &&
+            !contactConfig.has_contact
+        );
+    }
+
+    function updateChatAvailability() {
+        const blocked = chatBlockedByContact();
+        const disabled = isLoading || isStarting || blocked;
+        sendBtn.disabled = disabled;
+        input.disabled = disabled;
+        form.classList.toggle('is-blocked', blocked);
+        panel.classList.toggle('crm-ai-panel--contact', contact.classList.contains('is-visible'));
+    }
+
+    function showContact(reason) {
         if (contactConfig.has_contact || !contactConfig.fields.length) return;
+
+        contactConfig.reason = reason === 'start' ? 'start' : 'fallback';
+        contactErrors = {};
         contact.classList.add('is-visible');
+        renderContactForm(getContactFormValues());
+        updateChatAvailability();
         scrollToBottom();
+
+        const firstInput = contact.querySelector('input:not([disabled])');
+        if (firstInput) {
+            requestAnimationFrame(() => firstInput.focus());
+        }
+    }
+
+    function hideContact() {
+        contact.classList.remove('is-visible');
+        contactConfig.reason = null;
+        contactErrors = {};
+        updateChatAvailability();
+    }
+
+    function completeContactSubmission() {
+        contactConfig.has_contact = true;
+        state.has_contact = true;
+        localStorage.setItem(storageKey, JSON.stringify(state));
+        updateChatAvailability();
+
+        const card = contact.querySelector('.crm-ai-contact-card');
+        if (card) {
+            card.classList.add('is-success');
+            card.innerHTML =
+                '<div class="crm-ai-contact-success">' +
+                '<span class="crm-ai-contact-success-icon" aria-hidden="true">' +
+                '<svg viewBox="0 0 24 24"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>' +
+                '</span>' +
+                '<p class="crm-ai-contact-success-title">Details saved</p>' +
+                '<p class="crm-ai-contact-success-text">Thanks — our team can follow up when needed.</p>' +
+                '</div>';
+        }
+
+        window.setTimeout(() => {
+            hideContact();
+            requestAnimationFrame(() => input.focus());
+        }, 1400);
+    }
+
+    function setContactSubmitting(submitting) {
+        contact.classList.toggle('is-submitting', submitting);
+        const submitBtn = contact.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.disabled = submitting;
+        contact.querySelectorAll('input').forEach((field) => {
+            field.disabled = submitting;
+        });
+        setLoading(submitting);
+    }
+
+    function getContactFormValues() {
+        const values = {};
+        contactConfig.fields.forEach((field) => {
+            const key = field === 'name' ? 'visitor_name' : field === 'email' ? 'visitor_email' : 'visitor_phone';
+            const input = contact.querySelector('[name="' + key + '"]');
+            if (input && input.value) {
+                values[field] = input.value;
+            }
+        });
+        return values;
     }
 
     function shouldPromptContact(payload) {
@@ -595,45 +785,127 @@ function formatMarkdown(text) {
         contactConfig.required = Array.isArray(res.contact_required) ? res.contact_required : ['email'];
         contactConfig.has_contact = Boolean(res.has_contact);
         contactConfig.collect_on_start = Boolean(res.collect_contact_on_start);
+
+        if (res.has_contact) {
+            state.has_contact = true;
+            localStorage.setItem(storageKey, JSON.stringify(state));
+            hideContact();
+        }
+
         renderContactForm(res.contact || {});
+        updateChatAvailability();
     }
 
     function renderContactForm(values) {
+        if (contactConfig.has_contact) {
+            contact.innerHTML = '';
+            return;
+        }
+
+        const copy = contactCopy(contactConfig.reason || 'fallback');
         const fieldDefs = {
-            name: { name: 'visitor_name', type: 'text', placeholder: 'Name', autocomplete: 'name' },
-            email: { name: 'visitor_email', type: 'email', placeholder: 'Email', autocomplete: 'email' },
-            phone: { name: 'visitor_phone', type: 'tel', placeholder: 'Phone', autocomplete: 'tel' },
+            name: {
+                name: 'visitor_name',
+                type: 'text',
+                label: 'Name',
+                placeholder: 'Jane Smith',
+                autocomplete: 'name',
+            },
+            email: {
+                name: 'visitor_email',
+                type: 'email',
+                label: 'Email',
+                placeholder: 'you@company.com',
+                autocomplete: 'email',
+            },
+            phone: {
+                name: 'visitor_phone',
+                type: 'tel',
+                label: 'Phone',
+                placeholder: '+1 555 0100',
+                autocomplete: 'tel',
+            },
         };
 
-        const inputs = contactConfig.fields
+        const fields = contactConfig.fields
             .filter((field) => fieldDefs[field])
             .map((field) => {
                 const def = fieldDefs[field];
-                const required = contactConfig.required.includes(field) ? ' required' : '';
-                const value = values[field] ? ' value="' + escapeAttr(values[field]) + '"' : '';
+                const isRequired = contactConfig.required.includes(field);
+                const stored = values[field] || '';
+                const error = contactErrors[def.name] || '';
+                const invalid = error ? ' aria-invalid="true"' : '';
+                const describedBy = error ? ' aria-describedby="crm-ai-error-' + def.name + '"' : '';
+
                 return (
+                    '<label class="crm-ai-field">' +
+                    '<span class="crm-ai-field-label">' +
+                    def.label +
+                    (isRequired ? ' <span class="crm-ai-required">*</span>' : '') +
+                    '</span>' +
                     '<input name="' +
                     def.name +
                     '" type="' +
                     def.type +
                     '" placeholder="' +
                     def.placeholder +
-                    (contactConfig.required.includes(field) ? ' *' : '') +
                     '" autocomplete="' +
                     def.autocomplete +
                     '"' +
-                    required +
-                    value +
-                    ' />'
+                    (isRequired ? ' required' : '') +
+                    (stored ? ' value="' + escapeAttr(stored) + '"' : '') +
+                    invalid +
+                    describedBy +
+                    ' />' +
+                    (error
+                        ? '<span id="crm-ai-error-' +
+                          def.name +
+                          '" class="crm-ai-field-error" role="alert">' +
+                          escapeHtml(error) +
+                          '</span>'
+                        : '') +
+                    '</label>'
                 );
             })
             .join('');
 
+        const formError = contactErrors._form
+            ? '<p class="crm-ai-contact-form-error" role="alert">' + escapeHtml(contactErrors._form) + '</p>'
+            : '';
+        const canSkip = contactConfig.required.length === 0;
+        const skipBtn = canSkip
+            ? '<button type="button" class="crm-ai-contact-skip" data-contact-skip>Not now</button>'
+            : '';
+
         contact.innerHTML =
-            '<p class="crm-ai-contact-title">Leave your details</p>' +
-            '<p class="crm-ai-contact-hint">So our team can follow up with you.</p>' +
-            inputs +
-            '<button type="submit">Submit</button>';
+            '<div class="crm-ai-contact-card">' +
+            '<div class="crm-ai-contact-header">' +
+            '<span class="crm-ai-contact-icon" aria-hidden="true">' +
+            '<svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>' +
+            '</span>' +
+            '<div class="crm-ai-contact-headings">' +
+            '<p class="crm-ai-contact-title">' +
+            escapeHtml(copy.title) +
+            '</p>' +
+            '<p class="crm-ai-contact-hint">' +
+            escapeHtml(copy.hint) +
+            '</p>' +
+            '</div>' +
+            '</div>' +
+            '<div class="crm-ai-contact-fields">' +
+            fields +
+            '</div>' +
+            formError +
+            '<div class="crm-ai-contact-actions">' +
+            '<button type="submit">' +
+            escapeHtml(copy.submit) +
+            '</button>' +
+            skipBtn +
+            '</div>' +
+            '<p class="crm-ai-contact-privacy">' +
+            escapeHtml(copy.privacy) +
+            '</p>' +
+            '</div>';
     }
 
     function escapeAttr(value) {
@@ -1055,18 +1327,154 @@ function formatMarkdown(text) {
                 opacity: 0.55;
                 cursor: not-allowed;
             }
-            .crm-ai-contact { display: none; }
-            .crm-ai-contact.is-visible { display: flex; }
+            .crm-ai-contact {
+                display: none;
+                padding: 0 12px 12px;
+                border-top: 0;
+                background: transparent;
+            }
+            .crm-ai-contact.is-visible { display: block; }
+            .crm-ai-panel--contact .crm-ai-msgs {
+                padding-bottom: 8px;
+            }
+            .crm-ai-form.is-blocked {
+                opacity: 0.55;
+                pointer-events: none;
+            }
+            .crm-ai-contact-card {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                padding: 14px;
+                border: 1px solid color-mix(in srgb, var(--crm-accent) 28%, var(--crm-border));
+                border-radius: 12px;
+                background: var(--crm-surface);
+                box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+            }
+            .crm-ai-contact-card.is-success {
+                border-color: color-mix(in srgb, #059669 35%, var(--crm-border));
+            }
+            .crm-ai-contact-header {
+                display: flex;
+                gap: 10px;
+                align-items: flex-start;
+            }
+            .crm-ai-contact-icon {
+                flex-shrink: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 36px;
+                height: 36px;
+                border-radius: 10px;
+                background: color-mix(in srgb, var(--crm-accent) 12%, var(--crm-surface));
+                color: var(--crm-accent);
+            }
+            .crm-ai-contact-icon svg { width: 20px; height: 20px; fill: currentColor; }
+            .crm-ai-contact-headings { min-width: 0; }
             .crm-ai-contact-title {
-                font-size: 13px;
+                font-size: 14px;
                 font-weight: 600;
                 color: var(--crm-text);
-                margin: 0 0 2px;
+                margin: 0;
+                line-height: 1.35;
             }
             .crm-ai-contact-hint {
                 font-size: 12px;
                 color: var(--crm-muted);
-                margin: 0 0 4px;
+                margin: 4px 0 0;
+                line-height: 1.45;
+            }
+            .crm-ai-contact-fields {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+            .crm-ai-field {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+            .crm-ai-field-label {
+                font-size: 12px;
+                font-weight: 500;
+                color: var(--crm-text);
+            }
+            .crm-ai-required { color: var(--crm-accent); }
+            .crm-ai-field input[aria-invalid="true"] {
+                border-color: #dc2626;
+                box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+            }
+            .crm-ai-field-error,
+            .crm-ai-contact-form-error {
+                font-size: 11px;
+                line-height: 1.4;
+                color: #dc2626;
+                margin: 0;
+            }
+            .crm-ai-contact-actions {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                align-items: center;
+            }
+            .crm-ai-contact-actions button[type="submit"] {
+                flex: 1;
+                min-width: 120px;
+            }
+            .crm-ai-contact-skip {
+                border: 0;
+                background: transparent;
+                color: var(--crm-muted);
+                padding: 8px 4px;
+                font: inherit;
+                font-size: 12px;
+                font-weight: 500;
+                cursor: pointer;
+                text-decoration: underline;
+                text-underline-offset: 2px;
+            }
+            .crm-ai-contact-skip:hover { color: var(--crm-text); }
+            .crm-ai-contact-privacy {
+                font-size: 11px;
+                color: var(--crm-muted);
+                margin: 0;
+                line-height: 1.4;
+            }
+            .crm-ai-contact.is-submitting button[type="submit"] {
+                opacity: 0.7;
+                cursor: wait;
+            }
+            .crm-ai-contact-success {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+                gap: 6px;
+                padding: 8px 4px;
+            }
+            .crm-ai-contact-success-icon {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 40px;
+                height: 40px;
+                border-radius: 999px;
+                background: color-mix(in srgb, #059669 14%, var(--crm-surface));
+                color: #059669;
+            }
+            .crm-ai-contact-success-icon svg { width: 22px; height: 22px; fill: currentColor; }
+            .crm-ai-contact-success-title {
+                margin: 0;
+                font-size: 14px;
+                font-weight: 600;
+                color: var(--crm-text);
+            }
+            .crm-ai-contact-success-text {
+                margin: 0;
+                font-size: 12px;
+                color: var(--crm-muted);
+                line-height: 1.45;
             }
             .crm-ai-starting {
                 display: flex;
@@ -1152,13 +1560,13 @@ function formatMarkdown(text) {
                     </button>
                 </header>
                 <div class="crm-ai-msgs" role="log" aria-live="polite" aria-relevant="additions"></div>
+                <form class="crm-ai-contact" aria-label="Contact details"></form>
                 <form class="crm-ai-form">
                     <div class="crm-ai-form-row">
                         <input type="text" maxlength="2000" placeholder="Type your message…" autocomplete="off" />
                         <button type="submit">Send</button>
                     </div>
                 </form>
-                <form class="crm-ai-contact"></form>
             </section>
         </div>`;
     }
