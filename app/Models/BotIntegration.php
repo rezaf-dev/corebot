@@ -29,6 +29,13 @@ class BotIntegration extends Model
     /**
      * @var list<string>
      */
+    protected $hidden = [
+        'credentials',
+    ];
+
+    /**
+     * @var list<string>
+     */
     protected $appends = ['tool_name'];
 
     protected static function booted(): void

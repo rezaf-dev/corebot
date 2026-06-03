@@ -11,13 +11,14 @@ it('allows tenant admin to create bot integrations', function () {
     $bot = Bot::create(['tenant_id' => $tenant->id, 'name' => 'Support']);
 
     $this->actingAs($user)
+        ->from(route('bots.edit', $bot))
         ->post(route('bots.integrations.store', $bot), [
             'type' => 'create_lead',
             'name' => 'Capture lead',
             'description' => 'Save visitor contact details.',
             'enabled' => true,
         ])
-        ->assertRedirect();
+        ->assertRedirect(route('bots.edit', $bot));
 
     $integration = BotIntegration::query()->where('bot_id', $bot->id)->first();
 

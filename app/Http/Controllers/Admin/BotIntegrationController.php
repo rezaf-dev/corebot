@@ -27,7 +27,9 @@ class BotIntegrationController extends Controller
             ...$request->integrationAttributes(),
         ]);
 
-        return back()->with('success', 'Integration added.');
+        return redirect()
+            ->route('bots.edit', $bot)
+            ->with('success', 'Integration added.');
     }
 
     public function update(
@@ -48,7 +50,9 @@ class BotIntegrationController extends Controller
 
         $integration->update($attributes);
 
-        return back()->with('success', 'Integration updated.');
+        return redirect()
+            ->route('bots.edit', $bot)
+            ->with('success', 'Integration updated.');
     }
 
     public function destroy(
@@ -63,7 +67,9 @@ class BotIntegrationController extends Controller
 
         $integration->delete();
 
-        return back()->with('success', 'Integration removed.');
+        return redirect()
+            ->route('bots.edit', $bot)
+            ->with('success', 'Integration removed.');
     }
 
     public function test(
@@ -80,9 +86,13 @@ class BotIntegrationController extends Controller
         try {
             $result = $executor->test($integration, $bot);
 
-            return back()->with('success', $result['message'] ?? 'Connection test succeeded.');
+            return redirect()
+                ->route('bots.edit', $bot)
+                ->with('success', $result['message'] ?? 'Connection test succeeded.');
         } catch (\Throwable $e) {
-            return back()->withErrors(['integration_test' => $e->getMessage()]);
+            return redirect()
+                ->route('bots.edit', $bot)
+                ->withErrors(['integration_test' => $e->getMessage()]);
         }
     }
 }

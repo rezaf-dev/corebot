@@ -65,7 +65,8 @@ export default function Form({ bot, widgetSnippet = null, integrationTypes = [] 
         >
             <Head title={isEditing ? `Edit ${bot.name}` : 'New bot'} />
 
-            <form onSubmit={submit} className="mx-auto max-w-4xl space-y-6 p-6">
+            <div className="mx-auto max-w-4xl space-y-6 p-6">
+            <form onSubmit={submit} className="space-y-6">
                 {isEditing && embedSnippet && (
                     <EmbedSnippetCard snippet={embedSnippet} publicKey={bot.public_key} />
                 )}
@@ -239,10 +240,6 @@ export default function Form({ bot, widgetSnippet = null, integrationTypes = [] 
                     </div>
                 </section>
 
-                {isEditing && (
-                    <BotIntegrationsSection bot={bot} integrationTypes={integrationTypes} />
-                )}
-
                 <div className="flex flex-wrap items-center gap-3">
                     <PrimaryButton disabled={processing}>
                         {processing ? 'Saving…' : isEditing ? 'Save changes' : 'Create bot'}
@@ -258,6 +255,11 @@ export default function Form({ bot, widgetSnippet = null, integrationTypes = [] 
                     )}
                 </div>
             </form>
+
+            {isEditing && (
+                <BotIntegrationsSection integrationTypes={integrationTypes} />
+            )}
+            </div>
         </AuthenticatedLayout>
     );
 }

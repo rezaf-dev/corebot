@@ -17,8 +17,8 @@ const EMPTY_INTEGRATION = {
     credentials: { bearer_token: '' },
 };
 
-export default function BotIntegrationsSection({ bot, integrationTypes }) {
-    const { errors } = usePage().props;
+export default function BotIntegrationsSection({ integrationTypes }) {
+    const { errors, bot } = usePage().props;
     const integrations = bot?.integrations ?? [];
     const [editingId, setEditingId] = useState(null);
 
@@ -105,6 +105,12 @@ export default function BotIntegrationsSection({ bot, integrationTypes }) {
             </div>
 
             <InputError message={errors?.integration_test} className="mt-4" />
+
+            {integrations.length === 0 && editingId === null && (
+                <p className="mt-5 text-sm text-gray-500 dark:text-gray-400">
+                    No integrations yet. Add a webhook, lead capture, email, or API action for the chatbot to use.
+                </p>
+            )}
 
             {integrations.length > 0 && (
                 <ul className="mt-5 divide-y divide-gray-100 rounded-lg border border-gray-100 dark:divide-gray-700 dark:border-gray-700">
