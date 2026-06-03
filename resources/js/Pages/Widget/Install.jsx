@@ -208,6 +208,56 @@ export default function Install({ bots, widgetUrl, defaults, positions, icons })
                         </section>
 
                         <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Conversation starters</h3>
+                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                Short prompt buttons shown before the visitor sends their first message. Leave empty to use defaults.
+                            </p>
+                            <div className="mt-5 space-y-3">
+                                {((data.suggested_prompts?.length ? data.suggested_prompts : ['']).slice(0, 4)).map((prompt, index, rows) => (
+                                    <div key={index} className="flex gap-2">
+                                        <TextInput
+                                            id={`suggested_prompt_${index}`}
+                                            value={prompt}
+                                            onChange={(e) => {
+                                                const next = [...rows];
+                                                next[index] = e.target.value;
+                                                setData('suggested_prompts', next);
+                                            }}
+                                            className="block w-full"
+                                            placeholder={index === 0 ? 'How do I get started?' : 'Optional prompt'}
+                                        />
+                                        {rows.length > 1 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setData(
+                                                        'suggested_prompts',
+                                                        rows.filter((_, i) => i !== index),
+                                                    );
+                                                }}
+                                                className="shrink-0 rounded-md border border-gray-200 px-3 text-sm text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                            >
+                                                Remove
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                                {(data.suggested_prompts?.length || 0) < 4 && (
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setData('suggested_prompts', [...(data.suggested_prompts || []), ''])
+                                        }
+                                        className="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+                                    >
+                                        Add prompt
+                                    </button>
+                                )}
+                                <InputError message={errors['suggested_prompts.0'] || errors.suggested_prompts} className="mt-1" />
+                            </div>
+                        </section>
+
+                        <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
                             <h3 className="text-base font-semibold text-gray-900 dark:text-white">Labels</h3>
                             <div className="mt-5 grid gap-5 sm:grid-cols-2">
                                 <TextField
@@ -276,58 +326,96 @@ function WidgetPreview({ config, initialOpen }) {
         'top-left': 'items-start justify-start',
     }[config.position] || 'items-end justify-end';
 
+    const prompts = (config.suggested_prompts || []).filter((item) => item && item.trim());
+    const previewPrompts = prompts.length
+        ? prompts.slice(0, 3)
+        : ['How do I get started?', 'What can you help with?'];
+    const initial = (config.title || 'S').trim().charAt(0).toUpperCase() || 'S';
+
     return (
         <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white">Preview</h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Approximate look on your site (desktop).</p>
             <div
-                className={`relative mt-4 flex h-80 overflow-hidden rounded-xl border border-gray-200 bg-gradient-to-br from-slate-100 to-slate-200 p-4 dark:border-gray-700 dark:from-gray-900 dark:to-gray-800 ${positionClass}`}
+                className={`relative mt-4 flex h-96 overflow-hidden rounded-xl border border-gray-200 bg-gradient-to-br from-slate-100 to-slate-200 p-4 dark:border-gray-700 dark:from-gray-900 dark:to-gray-800 ${positionClass}`}
             >
                 {initialOpen && (
                 <div
-                    className="flex w-[min(100%,280px)] flex-col overflow-hidden shadow-lg"
+                    className="flex w-[min(100%,280px)] flex-col overflow-hidden shadow-xl"
                     style={{
                         borderRadius: config.border_radius + 'px',
                         background: config.surface_color,
                         color: config.text_color,
+                        border: `1px solid ${config.text_color}18`,
                     }}
                 >
-                    <div className="px-3 py-2.5 text-white" style={{ background: config.primary_color }}>
-                        <div className="text-sm font-semibold">{config.title}</div>
-                        {config.subtitle && <div className="text-xs opacity-75">{config.subtitle}</div>}
+                    <div className="flex items-center gap-2 border-b px-3 py-2.5" style={{ borderColor: config.text_color + '18' }}>
+                        <div
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                            style={{
+                                background: config.accent_color + '22',
+                                color: config.primary_color,
+                                border: `2px solid ${config.primary_color}22`,
+                            }}
+                        >
+                            {initial}
+                        </div>
+                        <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold">{config.title}</div>
+                            <div className="flex items-center gap-1.5 text-[11px]" style={{ color: config.text_color + '88' }}>
+                                <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                {config.subtitle || 'Online'}
+                            </div>
+                        </div>
                     </div>
                     <div className="space-y-2 p-3" style={{ background: config.background_color }}>
-                        <div
-                            className="ml-auto max-w-[85%] rounded-xl px-3 py-2 text-xs text-white"
-                            style={{ background: config.accent_color }}
-                        >
-                            Sample question
+                        <div className="flex items-end gap-1.5">
+                            <div
+                                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
+                                style={{ background: config.accent_color + '22', color: config.primary_color }}
+                            >
+                                {initial}
+                            </div>
+                            <div
+                                className="max-w-[85%] rounded-2xl border px-3 py-2 text-xs"
+                                style={{ background: config.surface_color, borderColor: config.text_color + '22', color: config.text_color }}
+                            >
+                                Welcome! How can I help?
+                            </div>
                         </div>
-                        <div
-                            className="max-w-[85%] rounded-xl border px-3 py-2 text-xs"
-                            style={{ background: config.surface_color, borderColor: config.text_color + '22', color: config.text_color }}
-                        >
-                            Sample reply
+                        <div className="ml-7 flex flex-wrap gap-1.5">
+                            {previewPrompts.map((prompt) => (
+                                <span
+                                    key={prompt}
+                                    className="rounded-full border px-2 py-1 text-[10px]"
+                                    style={{ borderColor: config.text_color + '22', color: config.text_color }}
+                                >
+                                    {prompt}
+                                </span>
+                            ))}
                         </div>
                     </div>
-                    <div className="flex gap-2 border-t p-2" style={{ borderColor: config.text_color + '18' }}>
+                    <div className="border-t p-2" style={{ borderColor: config.text_color + '18' }}>
                         <div
-                            className="h-8 flex-1 rounded-lg border text-xs leading-8 text-gray-400 px-2 truncate"
-                            style={{ borderColor: config.text_color + '22' }}
+                            className="flex items-center gap-1 rounded-full border px-2 py-1"
+                            style={{ borderColor: config.text_color + '22', background: config.background_color }}
                         >
-                            {config.input_placeholder}
-                        </div>
-                        <div
-                            className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white"
-                            style={{ background: config.primary_color }}
-                        >
-                            {config.send_button_label}
+                            <div className="h-7 flex-1 truncate px-2 text-[11px] leading-7 text-gray-400">
+                                {config.input_placeholder}
+                            </div>
+                            <div
+                                className="flex h-7 w-7 items-center justify-center rounded-full text-[10px] text-white"
+                                style={{ background: config.accent_color }}
+                                title={config.send_button_label}
+                            >
+                                ➤
+                            </div>
                         </div>
                     </div>
                 </div>
                 )}
                 <div
-                    className={`absolute flex items-center justify-center rounded-full text-white shadow-lg ${initialOpen ? 'opacity-0 pointer-events-none' : ''}`}
+                    className={`absolute flex items-center justify-center rounded-full text-white shadow-lg ${initialOpen ? 'pointer-events-none opacity-0' : ''}`}
                     style={{
                         width: config.launcher_size,
                         height: config.launcher_size,
@@ -416,6 +504,7 @@ function buildEmbedSnippet(widgetUrl, publicKey, config) {
         'data-input-placeholder': config.input_placeholder,
         'data-launcher-icon': config.launcher_icon,
         'data-initial-open': config.initial_open ? 'true' : 'false',
+        'data-suggested-prompts': JSON.stringify((config.suggested_prompts || []).filter((item) => item && item.trim())),
     };
 
     return (

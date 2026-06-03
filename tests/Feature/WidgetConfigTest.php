@@ -14,6 +14,7 @@ it('returns widget config for an active bot', function () {
         'widget_config' => [
             'title' => 'Help Desk',
             'primary_color' => '#ff0000',
+            'suggested_prompts' => ['What are your hours?', 'Talk to support'],
         ],
     ]);
 
@@ -23,7 +24,8 @@ it('returns widget config for an active bot', function () {
         ->assertJsonPath('widget.primary_color', '#ff0000')
         ->assertJsonPath('widget.position', 'bottom-right')
         ->assertJsonPath('widget.initial_open', false)
-        ->assertJsonPath('widget.welcome_message', 'Welcome to our CRM help chat.');
+        ->assertJsonPath('widget.welcome_message', 'Welcome to our CRM help chat.')
+        ->assertJsonPath('widget.suggested_prompts', ['What are your hours?', 'Talk to support']);
 });
 
 it('includes widget config when starting a conversation', function () {
@@ -72,6 +74,22 @@ it('resolves api base from widget script url', function (string $widgetUrl, stri
     'nested subfolder' => ['https://app.test/apps/crm/widget.js', 'https://app.test/apps/crm/api/public/chat'],
 ]);
 
+it('saves suggested prompts for tenant admins', function () {
+    $tenant = Tenant::create(['name' => 'Demo', 'slug' => 'widget-prompts', 'status' => 'active']);
+    $user = User::factory()->create(['tenant_id' => $tenant->id, 'role' => 'tenant_admin']);
+    $bot = Bot::create(['tenant_id' => $tenant->id, 'name' => 'Bot']);
+
+    $payload = WidgetConfig::DEFAULTS;
+    $payload['suggested_prompts'] = ['Pricing plans', 'Book a demo'];
+
+    $this->actingAs($user)
+        ->put(route('widget.install.update', $bot), $payload)
+        ->assertRedirect();
+
+    expect($bot->fresh()->resolvedWidgetConfig()['suggested_prompts'])
+        ->toBe(['Pricing plans', 'Book a demo']);
+});
+
 it('builds embed snippets with data attributes', function () {
     $snippet = WidgetConfig::embedSnippet(
         'https://app.test/widget.js',
@@ -84,7 +102,18 @@ it('builds embed snippets with data attributes', function () {
         ->toContain('data-bot-key="bot_testkey"')
         ->toContain('data-title="Help"')
         ->toContain('data-primary-color="#112233"')
-        ->toContain('data-initial-open="false"');
+        ->toContain('data-initial-open="false"')
+        ->toContain('data-suggested-prompts="[]"');
+});
+
+it('includes suggested prompts in embed snippets', function () {
+    $snippet = WidgetConfig::embedSnippet(
+        'https://app.test/widget.js',
+        'bot_testkey',
+        ['suggested_prompts' => ['Need help?', 'Pricing']],
+    );
+
+    expect($snippet)->toContain('data-suggested-prompts="[&quot;Need help?&quot;,&quot;Pricing&quot;]"');
 });
 
 it('includes initial open in embed snippets when enabled', function () {

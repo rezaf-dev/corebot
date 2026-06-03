@@ -249,6 +249,79 @@ function mapContactFieldErrors(apiErrors) {
 }
 /* CONTACT_HELPERS_END */
 
+/* PROMPT_HELPERS_START */
+const DEFAULT_SUGGESTED_PROMPTS = [
+    'How do I get started?',
+    'What can you help with?',
+    'Contact support',
+];
+
+function parseSuggestedPrompts(value) {
+    if (Array.isArray(value)) {
+        return normalizeSuggestedPrompts(value);
+    }
+
+    if (typeof value === 'string' && value.trim()) {
+        try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) {
+                return normalizeSuggestedPrompts(parsed);
+            }
+        } catch {
+            return [];
+        }
+    }
+
+    return [];
+}
+
+function normalizeSuggestedPrompts(prompts) {
+    if (!Array.isArray(prompts)) {
+        return [];
+    }
+
+    const result = [];
+
+    for (const item of prompts) {
+        if (typeof item !== 'string') {
+            continue;
+        }
+
+        const trimmed = item.trim();
+
+        if (!trimmed) {
+            continue;
+        }
+
+        result.push(trimmed.slice(0, 80));
+
+        if (result.length >= 4) {
+            break;
+        }
+    }
+
+    return result;
+}
+
+function resolvedSuggestedPrompts(configPrompts) {
+    const custom = normalizeSuggestedPrompts(configPrompts);
+
+    return custom.length ? custom : DEFAULT_SUGGESTED_PROMPTS.slice();
+}
+
+function titleInitial(title) {
+    const trimmed = String(title || '').trim();
+
+    if (!trimmed) {
+        return 'S';
+    }
+
+    const match = trimmed.match(/[A-Za-z0-9]/);
+
+    return match ? match[0].toUpperCase() : 'S';
+}
+/* PROMPT_HELPERS_END */
+
 (function () {
     const script = document.currentScript;
     const botKey = script && script.dataset.botKey;
@@ -278,6 +351,7 @@ function mapContactFieldErrors(apiErrors) {
         input_placeholder: 'Type your message…',
         launcher_icon: 'chat',
         initial_open: false,
+        suggested_prompts: [],
     };
 
     let config = parseDatasetConfig(script.dataset);
@@ -312,10 +386,11 @@ function mapContactFieldErrors(apiErrors) {
     const closeBtn = root.querySelector('.crm-ai-close');
     const headTitle = root.querySelector('.crm-ai-head-title');
     const headSub = root.querySelector('.crm-ai-head-sub');
+    const headInitial = root.querySelector('.crm-ai-head-initial');
     const messages = root.querySelector('.crm-ai-msgs');
     const form = root.querySelector('.crm-ai-form');
     const input = form.querySelector('input');
-    const sendBtn = form.querySelector('button');
+    const sendBtn = form.querySelector('.crm-ai-send');
     const contact = root.querySelector('.crm-ai-contact');
     const isMobile = () => window.matchMedia('(max-width: 480px)').matches;
 
@@ -340,6 +415,13 @@ function mapContactFieldErrors(apiErrors) {
     button.addEventListener('click', () => togglePanel());
     closeBtn.addEventListener('click', () => togglePanel(false));
 
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && isOpen) {
+            event.preventDefault();
+            togglePanel(false);
+        }
+    });
+
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
         if (isLoading || isStarting) return;
@@ -353,6 +435,7 @@ function mapContactFieldErrors(apiErrors) {
         }
 
         input.value = '';
+        hideSuggestedPrompts();
         add('user', text);
 
         const assistant = add('assistant', '', { loading: true });
@@ -433,6 +516,8 @@ function mapContactFieldErrors(apiErrors) {
             }
 
             requestAnimationFrame(() => input.focus());
+        } else {
+            button.focus();
         }
     }
 
@@ -457,6 +542,7 @@ function mapContactFieldErrors(apiErrors) {
     function showWelcomeMessage(text) {
         messages.innerHTML = '';
         add('assistant', text || welcomeText());
+        renderSuggestedPrompts();
     }
 
     function showConnectingState() {
@@ -628,13 +714,25 @@ function mapContactFieldErrors(apiErrors) {
         crmRoot.style.setProperty('--crm-launcher-gap', '16px');
         crmRoot.style.setProperty('--crm-focus-ring', hexToRgba(next.accent_color, 0.15));
 
-        headTitle.textContent = next.title || DEFAULT_CONFIG.title;
-        headSub.textContent = next.subtitle || '';
-        headSub.style.display = next.subtitle ? 'block' : 'none';
+        const usesDefaultTheme =
+            next.background_color === DEFAULT_CONFIG.background_color &&
+            next.surface_color === DEFAULT_CONFIG.surface_color &&
+            next.text_color === DEFAULT_CONFIG.text_color;
+        crmRoot.dataset.themeDefaults = usesDefaultTheme ? 'true' : 'false';
+
+        const title = next.title || DEFAULT_CONFIG.title;
+        headTitle.textContent = title;
+        headInitial.textContent = titleInitial(title);
+        headSub.textContent = next.subtitle || DEFAULT_CONFIG.subtitle || 'Online';
         input.placeholder = next.input_placeholder || DEFAULT_CONFIG.input_placeholder;
-        sendBtn.textContent = next.send_button_label || DEFAULT_CONFIG.send_button_label;
+        sendBtn.setAttribute('aria-label', next.send_button_label || DEFAULT_CONFIG.send_button_label);
+        config.suggested_prompts = parseSuggestedPrompts(next.suggested_prompts);
 
         iconChat.innerHTML = LAUNCHER_ICONS[next.launcher_icon] || LAUNCHER_ICONS.chat;
+
+        if (isOpen && !hasUserMessages()) {
+            renderSuggestedPrompts();
+        }
     }
 
     function resolveApiBase(script) {
@@ -662,6 +760,7 @@ function mapContactFieldErrors(apiErrors) {
             input_placeholder: dataset.inputPlaceholder,
             launcher_icon: dataset.launcherIcon,
             initial_open: parseBoolean(dataset.initialOpen),
+            suggested_prompts: parseSuggestedPrompts(dataset.suggestedPrompts),
         });
     }
 
@@ -673,11 +772,24 @@ function mapContactFieldErrors(apiErrors) {
     function mergeConfig(base, patch) {
         const merged = { ...base };
         Object.keys(patch || {}).forEach((key) => {
-            if (patch[key] === undefined || patch[key] === null || patch[key] === '') return;
+            if (patch[key] === undefined || patch[key] === null) {
+                return;
+            }
+
+            if (key === 'suggested_prompts') {
+                merged[key] = parseSuggestedPrompts(patch[key]);
+                return;
+            }
+
             if (key === 'initial_open') {
                 merged[key] = parseBoolean(patch[key]) ?? false;
                 return;
             }
+
+            if (patch[key] === '') {
+                return;
+            }
+
             merged[key] = patch[key];
         });
         return merged;
@@ -948,6 +1060,52 @@ function mapContactFieldErrors(apiErrors) {
         }
     }
 
+    function hasUserMessages() {
+        return messages.querySelector('.crm-ai-user') !== null;
+    }
+
+    function hideSuggestedPrompts() {
+        messages.querySelectorAll('.crm-ai-prompts').forEach((element) => element.remove());
+    }
+
+    function renderSuggestedPrompts() {
+        hideSuggestedPrompts();
+
+        if (hasUserMessages()) {
+            return;
+        }
+
+        const prompts = resolvedSuggestedPrompts(config.suggested_prompts);
+
+        if (!prompts.length) {
+            return;
+        }
+
+        const container = document.createElement('div');
+        container.className = 'crm-ai-prompts';
+
+        prompts.forEach((text) => {
+            const promptButton = document.createElement('button');
+            promptButton.type = 'button';
+            promptButton.className = 'crm-ai-prompt';
+            promptButton.textContent = text;
+            promptButton.addEventListener('click', () => handlePromptClick(text));
+            container.appendChild(promptButton);
+        });
+
+        messages.appendChild(container);
+        scrollToBottom();
+    }
+
+    async function handlePromptClick(text) {
+        if (isLoading || isStarting || chatBlockedByContact()) {
+            return;
+        }
+
+        input.value = text;
+        form.requestSubmit();
+    }
+
     function scrollToBottom() {
         messages.scrollTop = messages.scrollHeight;
     }
@@ -955,6 +1113,14 @@ function mapContactFieldErrors(apiErrors) {
     function add(role, text, options = {}) {
         const wrap = document.createElement('div');
         wrap.className = 'crm-ai-msg crm-ai-' + role;
+
+        if (role === 'assistant') {
+            const avatar = document.createElement('div');
+            avatar.className = 'crm-ai-avatar';
+            avatar.setAttribute('aria-hidden', 'true');
+            avatar.textContent = titleInitial(config.title);
+            wrap.appendChild(avatar);
+        }
 
         const bubble = document.createElement('div');
         bubble.className = 'crm-ai-bubble';
@@ -1050,15 +1216,26 @@ function mapContactFieldErrors(apiErrors) {
                 --crm-muted: #6b7280;
                 --crm-text: #111827;
                 --crm-radius: 16px;
-                --crm-shadow: 0 20px 50px rgba(15, 23, 42, 0.18);
+                --crm-shadow: 0 24px 64px rgba(15, 23, 42, 0.16), 0 8px 20px rgba(15, 23, 42, 0.08);
                 --crm-offset-x: 16px;
                 --crm-offset-y: 16px;
                 --crm-panel-width: 400px;
                 --crm-launcher-size: 56px;
                 --crm-launcher-gap: 16px;
                 --crm-focus-ring: rgba(37, 99, 235, 0.15);
+                --crm-online: #22c55e;
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
                 -webkit-font-smoothing: antialiased;
+            }
+            @media (prefers-color-scheme: dark) {
+                .crm-ai-root[data-theme-defaults="true"] {
+                    --crm-bg: #0f172a;
+                    --crm-surface: #1e293b;
+                    --crm-border: rgba(148, 163, 184, 0.18);
+                    --crm-text: #f1f5f9;
+                    --crm-muted: #94a3b8;
+                    --crm-shadow: 0 24px 64px rgba(0, 0, 0, 0.45), 0 8px 20px rgba(0, 0, 0, 0.25);
+                }
             }
             .crm-ai-btn {
                 position: fixed;
@@ -1072,8 +1249,9 @@ function mapContactFieldErrors(apiErrors) {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                box-shadow: 0 10px 28px rgba(17, 24, 39, 0.28);
+                box-shadow: 0 12px 32px rgba(15, 23, 42, 0.28);
                 cursor: pointer;
+                animation: crm-ai-launcher-in 0.45s ease both;
                 transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
             }
             .crm-ai-root[data-position="bottom-right"] .crm-ai-btn {
@@ -1092,15 +1270,20 @@ function mapContactFieldErrors(apiErrors) {
                 left: max(var(--crm-offset-x), env(safe-area-inset-left));
                 top: max(var(--crm-offset-y), env(safe-area-inset-top));
             }
-            .crm-ai-btn:hover { background: var(--crm-primary-hover); transform: scale(1.04); }
-            .crm-ai-btn:active { transform: scale(0.98); }
+            .crm-ai-btn:hover { background: var(--crm-primary-hover); transform: scale(1.05); box-shadow: 0 14px 36px rgba(15, 23, 42, 0.32); }
+            .crm-ai-btn:active { transform: scale(0.97); }
+            .crm-ai-btn:focus-visible { outline: 3px solid var(--crm-focus-ring); outline-offset: 3px; }
             .crm-ai-btn svg { width: calc(var(--crm-launcher-size) * 0.46); height: calc(var(--crm-launcher-size) * 0.46); fill: currentColor; }
             .crm-ai-btn.is-open { background: var(--crm-muted); }
+            @keyframes crm-ai-launcher-in {
+                from { opacity: 0; transform: scale(0.82) translateY(8px); }
+                to { opacity: 1; transform: scale(1) translateY(0); }
+            }
             .crm-ai-panel {
                 position: fixed;
                 z-index: 2147483647;
                 width: min(var(--crm-panel-width), calc(100vw - 32px));
-                height: min(560px, calc(100dvh - 120px));
+                height: min(580px, calc(100dvh - 120px));
                 display: none;
                 flex-direction: column;
                 background: var(--crm-surface);
@@ -1134,24 +1317,74 @@ function mapContactFieldErrors(apiErrors) {
                 opacity: 1;
                 transform: translateY(0) scale(1);
             }
+            .crm-ai-sheet-handle {
+                display: none;
+                flex-shrink: 0;
+                padding: 10px 0 2px;
+                background: var(--crm-surface);
+            }
+            .crm-ai-sheet-handle::before {
+                content: "";
+                display: block;
+                width: 36px;
+                height: 4px;
+                margin: 0 auto;
+                border-radius: 999px;
+                background: var(--crm-border);
+            }
             .crm-ai-head {
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
                 gap: 12px;
                 padding: 14px 16px;
-                background: var(--crm-primary);
-                color: #fff;
+                background: var(--crm-surface);
+                border-bottom: 1px solid var(--crm-border);
+                color: var(--crm-text);
                 flex-shrink: 0;
             }
+            .crm-ai-head-brand {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                min-width: 0;
+            }
+            .crm-ai-head-avatar {
+                flex-shrink: 0;
+                width: 40px;
+                height: 40px;
+                border-radius: 999px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: color-mix(in srgb, var(--crm-accent) 14%, var(--crm-surface));
+                border: 2px solid color-mix(in srgb, var(--crm-primary) 18%, transparent);
+                color: var(--crm-primary);
+                font-size: 15px;
+                font-weight: 700;
+            }
             .crm-ai-head-info { min-width: 0; }
-            .crm-ai-head-title { font-size: 15px; font-weight: 600; line-height: 1.3; }
-            .crm-ai-head-sub { font-size: 12px; opacity: 0.75; margin-top: 2px; }
+            .crm-ai-head-title { font-size: 15px; font-weight: 600; line-height: 1.3; color: var(--crm-text); }
+            .crm-ai-head-status {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                margin-top: 2px;
+            }
+            .crm-ai-online-dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 999px;
+                background: var(--crm-online);
+                box-shadow: 0 0 0 2px color-mix(in srgb, var(--crm-online) 25%, transparent);
+                flex-shrink: 0;
+            }
+            .crm-ai-head-sub { font-size: 12px; color: var(--crm-muted); line-height: 1.3; }
             .crm-ai-close {
                 flex-shrink: 0;
                 border: 0;
-                background: rgba(255,255,255,0.12);
-                color: #fff;
+                background: color-mix(in srgb, var(--crm-text) 6%, transparent);
+                color: var(--crm-muted);
                 width: 32px;
                 height: 32px;
                 border-radius: 8px;
@@ -1159,9 +1392,10 @@ function mapContactFieldErrors(apiErrors) {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                transition: background 0.15s ease;
+                transition: background 0.15s ease, color 0.15s ease;
             }
-            .crm-ai-close:hover { background: rgba(255,255,255,0.2); }
+            .crm-ai-close:hover { background: color-mix(in srgb, var(--crm-text) 10%, transparent); color: var(--crm-text); }
+            .crm-ai-close:focus-visible { outline: 3px solid var(--crm-focus-ring); outline-offset: 2px; }
             .crm-ai-close svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; }
             .crm-ai-msgs {
                 flex: 1;
@@ -1174,18 +1408,44 @@ function mapContactFieldErrors(apiErrors) {
                 -webkit-overflow-scrolling: touch;
             }
             .crm-ai-msg {
-                margin: 0 0 12px;
+                margin: 0 0 14px;
                 display: flex;
-                flex-direction: column;
-                max-width: 88%;
+                max-width: 92%;
+                animation: crm-ai-msg-in 0.22s ease both;
             }
             .crm-ai-msg:last-child { margin-bottom: 0; }
-            .crm-ai-user { margin-left: auto; align-items: flex-end; }
-            .crm-ai-assistant { align-items: flex-start; }
+            .crm-ai-user {
+                margin-left: auto;
+                flex-direction: column;
+                align-items: flex-end;
+            }
+            .crm-ai-assistant {
+                flex-direction: row;
+                align-items: flex-end;
+                gap: 8px;
+            }
+            @keyframes crm-ai-msg-in {
+                from { opacity: 0; transform: translateY(6px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .crm-ai-avatar {
+                flex-shrink: 0;
+                width: 28px;
+                height: 28px;
+                border-radius: 999px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: color-mix(in srgb, var(--crm-accent) 14%, var(--crm-surface));
+                border: 1px solid var(--crm-border);
+                color: var(--crm-primary);
+                font-size: 11px;
+                font-weight: 700;
+            }
             .crm-ai-bubble {
                 padding: 10px 14px;
-                border-radius: 14px;
-                line-height: 1.45;
+                border-radius: 18px;
+                line-height: 1.5;
                 font-size: 14px;
                 word-wrap: break-word;
                 overflow-wrap: anywhere;
@@ -1193,14 +1453,46 @@ function mapContactFieldErrors(apiErrors) {
             .crm-ai-user .crm-ai-bubble {
                 background: var(--crm-accent);
                 color: #fff;
-                border-bottom-right-radius: 4px;
+                border-bottom-right-radius: 6px;
+                box-shadow: 0 4px 14px color-mix(in srgb, var(--crm-accent) 28%, transparent);
             }
             .crm-ai-assistant .crm-ai-bubble {
                 background: var(--crm-surface);
                 border: 1px solid var(--crm-border);
                 color: var(--crm-text);
-                border-bottom-left-radius: 4px;
+                border-bottom-left-radius: 6px;
+                box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
             }
+            .crm-ai-prompts {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                margin: 4px 0 0 36px;
+                max-width: calc(100% - 36px);
+            }
+            .crm-ai-prompt {
+                font: inherit;
+                font-size: 13px;
+                line-height: 1.35;
+                text-align: left;
+                color: var(--crm-text);
+                background: var(--crm-surface);
+                border: 1px solid var(--crm-border);
+                border-radius: 999px;
+                padding: 8px 14px;
+                cursor: pointer;
+                transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+            }
+            .crm-ai-prompt:hover:not(:disabled) {
+                border-color: color-mix(in srgb, var(--crm-accent) 45%, var(--crm-border));
+                background: color-mix(in srgb, var(--crm-accent) 8%, var(--crm-surface));
+                box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+            }
+            .crm-ai-prompt:focus-visible {
+                outline: 3px solid var(--crm-focus-ring);
+                outline-offset: 2px;
+            }
+            .crm-ai-prompt:disabled { opacity: 0.45; cursor: not-allowed; }
             .crm-ai-bubble.crm-ai-formatted > :first-child { margin-top: 0; }
             .crm-ai-bubble.crm-ai-formatted > :last-child { margin-bottom: 0; }
             .crm-ai-bubble.crm-ai-formatted p,
@@ -1284,30 +1576,59 @@ function mapContactFieldErrors(apiErrors) {
                 display: flex;
                 flex-direction: column;
                 gap: 8px;
-                padding: 12px;
+                padding: 12px 14px;
                 border-top: 1px solid var(--crm-border);
                 background: var(--crm-surface);
                 flex-shrink: 0;
             }
-            .crm-ai-form-row { display: flex; gap: 8px; align-items: flex-end; }
+            .crm-ai-form-row {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+                padding: 4px;
+                border: 1px solid var(--crm-border);
+                border-radius: 999px;
+                background: var(--crm-bg);
+            }
             .crm-ai-form input, .crm-ai-contact input {
                 width: 100%;
-                border: 1px solid var(--crm-border);
-                border-radius: 10px;
-                padding: 11px 12px;
+                border: 0;
+                border-radius: 999px;
+                padding: 10px 14px;
                 font: inherit;
                 font-size: 16px;
                 color: var(--crm-text);
-                background: var(--crm-surface);
+                background: transparent;
                 outline: none;
-                transition: border-color 0.15s ease, box-shadow 0.15s ease;
             }
             .crm-ai-form input:focus, .crm-ai-contact input:focus {
-                border-color: var(--crm-accent);
+                outline: none;
+            }
+            .crm-ai-form-row:focus-within {
+                border-color: color-mix(in srgb, var(--crm-accent) 55%, var(--crm-border));
                 box-shadow: 0 0 0 3px var(--crm-focus-ring);
             }
             .crm-ai-form input { flex: 1; min-width: 0; }
-            .crm-ai-form button, .crm-ai-contact button {
+            .crm-ai-send {
+                flex-shrink: 0;
+                border: 0;
+                border-radius: 999px;
+                background: var(--crm-accent);
+                color: #fff;
+                width: 40px;
+                height: 40px;
+                padding: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: background 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
+            }
+            .crm-ai-send svg { width: 18px; height: 18px; fill: currentColor; }
+            .crm-ai-send:hover:not(:disabled) { background: var(--crm-accent-hover); transform: scale(1.04); }
+            .crm-ai-send:disabled { opacity: 0.55; cursor: not-allowed; }
+            .crm-ai-send:focus-visible { outline: 3px solid var(--crm-focus-ring); outline-offset: 2px; }
+            .crm-ai-contact button[type="submit"] {
                 border: 0;
                 border-radius: 10px;
                 background: var(--crm-primary);
@@ -1317,19 +1638,13 @@ function mapContactFieldErrors(apiErrors) {
                 font-size: 14px;
                 font-weight: 600;
                 cursor: pointer;
-                flex-shrink: 0;
                 transition: background 0.15s ease, opacity 0.15s ease;
             }
-            .crm-ai-form button:hover:not(:disabled), .crm-ai-contact button:hover:not(:disabled) {
-                background: var(--crm-primary-hover);
-            }
-            .crm-ai-form button:disabled, .crm-ai-contact button:disabled {
-                opacity: 0.55;
-                cursor: not-allowed;
-            }
+            .crm-ai-contact button[type="submit"]:hover:not(:disabled) { background: var(--crm-primary-hover); }
+            .crm-ai-contact button[type="submit"]:disabled { opacity: 0.55; cursor: not-allowed; }
             .crm-ai-contact {
                 display: none;
-                padding: 0 12px 12px;
+                padding: 0 14px 12px;
                 border-top: 0;
                 background: transparent;
             }
@@ -1401,6 +1716,11 @@ function mapContactFieldErrors(apiErrors) {
                 color: var(--crm-text);
             }
             .crm-ai-required { color: var(--crm-accent); }
+            .crm-ai-contact-fields input {
+                border: 1px solid var(--crm-border);
+                border-radius: 10px;
+                background: var(--crm-surface);
+            }
             .crm-ai-field input[aria-invalid="true"] {
                 border-color: #dc2626;
                 box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
@@ -1486,41 +1806,6 @@ function mapContactFieldErrors(apiErrors) {
                 font-size: 13px;
             }
             .crm-ai-starting .crm-ai-typing span { width: 6px; height: 6px; }
-            .crm-ai-empty {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                gap: 8px;
-                min-height: 180px;
-                padding: 24px 16px;
-                text-align: center;
-            }
-            .crm-ai-empty-icon {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                width: 48px;
-                height: 48px;
-                border-radius: 999px;
-                background: var(--crm-surface);
-                border: 1px solid var(--crm-border);
-                color: var(--crm-primary);
-            }
-            .crm-ai-empty-icon svg { width: 24px; height: 24px; fill: currentColor; }
-            .crm-ai-empty-title {
-                margin: 0;
-                font-size: 15px;
-                font-weight: 600;
-                color: var(--crm-text);
-            }
-            .crm-ai-empty-text {
-                margin: 0;
-                max-width: 260px;
-                font-size: 13px;
-                line-height: 1.5;
-                color: var(--crm-muted);
-            }
             @media (max-width: 480px) {
                 .crm-ai-panel {
                     left: 0 !important;
@@ -1537,23 +1822,31 @@ function mapContactFieldErrors(apiErrors) {
                 .crm-ai-panel.is-open {
                     transform: translateY(0);
                 }
+                .crm-ai-sheet-handle { display: block; }
                 .crm-ai-btn.is-hidden { opacity: 0; pointer-events: none; transform: scale(0.8); }
-                .crm-ai-head { padding-top: max(14px, env(safe-area-inset-top)); }
+                .crm-ai-head { padding-top: max(8px, env(safe-area-inset-top)); }
                 .crm-ai-form, .crm-ai-contact {
                     padding-bottom: max(12px, env(safe-area-inset-bottom));
                 }
             }
         </style>
-        <div class="crm-ai-root" data-position="bottom-right">
+        <div class="crm-ai-root" data-position="bottom-right" data-theme-defaults="true">
             <button class="crm-ai-btn" type="button" aria-label="Open support chat" aria-expanded="false">
                 <svg class="crm-ai-icon-chat" viewBox="0 0 24 24" aria-hidden="true"></svg>
                 <svg class="crm-ai-icon-close" viewBox="0 0 24 24" aria-hidden="true" style="display:none"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
             </button>
             <section class="crm-ai-panel" role="dialog" aria-label="Support chat" aria-modal="true">
+                <div class="crm-ai-sheet-handle" aria-hidden="true"></div>
                 <header class="crm-ai-head">
-                    <div class="crm-ai-head-info">
-                        <div class="crm-ai-head-title">Support</div>
-                        <div class="crm-ai-head-sub">We typically reply instantly</div>
+                    <div class="crm-ai-head-brand">
+                        <div class="crm-ai-head-avatar"><span class="crm-ai-head-initial">S</span></div>
+                        <div class="crm-ai-head-info">
+                            <div class="crm-ai-head-title">Support</div>
+                            <div class="crm-ai-head-status">
+                                <span class="crm-ai-online-dot" aria-hidden="true"></span>
+                                <span class="crm-ai-head-sub">We typically reply instantly</span>
+                            </div>
+                        </div>
                     </div>
                     <button type="button" class="crm-ai-close" aria-label="Close chat">
                         <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
@@ -1564,7 +1857,9 @@ function mapContactFieldErrors(apiErrors) {
                 <form class="crm-ai-form">
                     <div class="crm-ai-form-row">
                         <input type="text" maxlength="2000" placeholder="Type your message…" autocomplete="off" />
-                        <button type="submit">Send</button>
+                        <button type="submit" class="crm-ai-send" aria-label="Send">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                        </button>
                     </div>
                 </form>
             </section>

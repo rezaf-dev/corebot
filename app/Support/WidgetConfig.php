@@ -22,6 +22,7 @@ class WidgetConfig
         'input_placeholder' => 'Type your message…',
         'launcher_icon' => 'chat',
         'initial_open' => false,
+        'suggested_prompts' => [],
     ];
 
     /**
@@ -51,6 +52,8 @@ class WidgetConfig
             $config[$key] = self::normalizeColor((string) $config[$key], self::DEFAULTS[$key]);
         }
 
+        $config['suggested_prompts'] = self::normalizeSuggestedPrompts($config['suggested_prompts'] ?? []);
+
         return $config;
     }
 
@@ -77,6 +80,8 @@ class WidgetConfig
             'input_placeholder' => ['required', 'string', 'max:120'],
             'launcher_icon' => ['required', 'in:'.implode(',', self::icons())],
             'initial_open' => ['required', 'boolean'],
+            'suggested_prompts' => ['nullable', 'array', 'max:4'],
+            'suggested_prompts.*' => ['string', 'max:80'],
         ];
     }
 
@@ -105,6 +110,7 @@ class WidgetConfig
             'data-input-placeholder' => (string) $config['input_placeholder'],
             'data-launcher-icon' => (string) $config['launcher_icon'],
             'data-initial-open' => $config['initial_open'] ? 'true' : 'false',
+            'data-suggested-prompts' => json_encode($config['suggested_prompts'], JSON_UNESCAPED_UNICODE),
         ];
     }
 
@@ -163,5 +169,37 @@ class WidgetConfig
     private static function normalizeColor(string $color, string $fallback): string
     {
         return preg_match('/^#([A-Fa-f0-9]{6})$/', $color) ? strtolower($color) : $fallback;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function normalizeSuggestedPrompts(mixed $prompts): array
+    {
+        if (! is_array($prompts)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($prompts as $prompt) {
+            if (! is_string($prompt)) {
+                continue;
+            }
+
+            $trimmed = trim($prompt);
+
+            if ($trimmed === '') {
+                continue;
+            }
+
+            $normalized[] = mb_substr($trimmed, 0, 80);
+
+            if (count($normalized) >= 4) {
+                break;
+            }
+        }
+
+        return $normalized;
     }
 }
