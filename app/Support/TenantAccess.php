@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Bot;
+use App\Models\BotIntegration;
 use App\Models\ChatConversation;
 use App\Models\KnowledgeSource;
 use App\Models\Tenant;
@@ -58,5 +59,10 @@ class TenantAccess
     public function conversationForTenant(User $user, int|string $conversationId): ChatConversation
     {
         return $this->scope(ChatConversation::query(), $user)->findOrFail($conversationId);
+    }
+
+    public function integrationForTenant(User $user, int|string $integrationId): BotIntegration
+    {
+        return $this->scope(BotIntegration::query(), $user)->findOrFail($integrationId);
     }
 }

@@ -143,6 +143,40 @@ export default function Show({ conversation }) {
 
                     <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
                         <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                            Integration actions ({(conversation.integration_action_logs || []).length})
+                        </h3>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            Tool calls made during this conversation.
+                        </p>
+
+                        {(conversation.integration_action_logs || []).length === 0 ? (
+                            <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">No integration actions recorded.</p>
+                        ) : (
+                            <ul className="mt-4 space-y-3">
+                                {(conversation.integration_action_logs || []).map((log) => (
+                                    <li
+                                        key={log.id}
+                                        className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-sm dark:border-gray-700 dark:bg-gray-900/50"
+                                    >
+                                        <p className="font-medium text-gray-900 dark:text-white">
+                                            {log.integration?.name || log.tool_name}
+                                        </p>
+                                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                            {log.tool_name}
+                                            {log.response_status ? ` · HTTP ${log.response_status}` : ''}
+                                            {log.error ? ' · Failed' : ' · OK'}
+                                        </p>
+                                        {log.error && (
+                                            <p className="mt-2 text-xs text-red-600 dark:text-red-400">{log.error}</p>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </section>
+
+                    <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                             Retrieval logs ({conversation.retrieval_logs.length})
                         </h3>
                         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">

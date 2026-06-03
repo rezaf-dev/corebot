@@ -2,16 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Mail\LeadCapturedMail;
 use App\Models\Bot;
 use App\Models\ChatConversation;
 use App\Services\GeoIp\MaxMindGeoIpService;
+use App\Services\Leads\LeadCaptureService;
 use App\Services\Rag\ChatAnswerService;
 use App\Support\BotContactConfig;
 use Generator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Mail;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PublicChatController extends Controller
@@ -90,7 +89,7 @@ class PublicChatController extends Controller
     {
         [$bot, $conversation, $message] = $this->messageContext($request);
 
-        return response()->json($answerService->answer($bot->load('tenant.aiSetting'), $conversation, $message));
+        return response()->json($answerService->answer($bot->load(['tenant.aiSetting', 'integrations']), $conversation, $message));
     }
 
     public function stream(Request $request, ChatAnswerService $answerService): StreamedResponse
@@ -99,7 +98,7 @@ class PublicChatController extends Controller
 
         return response()->stream(
             function () use ($answerService, $bot, $conversation, $message): Generator {
-                yield from $answerService->stream($bot->load('tenant.aiSetting'), $conversation, $message);
+                yield from $answerService->stream($bot->load(['tenant.aiSetting', 'integrations']), $conversation, $message);
             },
             headers: [
                 'Content-Type' => 'text/event-stream',
@@ -109,7 +108,7 @@ class PublicChatController extends Controller
         );
     }
 
-    public function contact(Request $request): JsonResponse
+    public function contact(Request $request, LeadCaptureService $leadCapture): JsonResponse
     {
         $data = $request->validate([
             'bot_public_key' => ['required', 'string'],
@@ -126,11 +125,7 @@ class PublicChatController extends Controller
             ->where('bot_id', $bot->id)
             ->firstOrFail();
 
-        $this->validateContactFields($bot, $data);
-
-        $conversation->update(collect($data)->only(['visitor_name', 'visitor_email', 'visitor_phone'])->all());
-
-        $this->notifyLeadCaptured($bot, $conversation->fresh());
+        $leadCapture->capture($bot, $conversation, $data);
 
         return response()->json(['ok' => true]);
     }
@@ -212,50 +207,6 @@ class PublicChatController extends Controller
         }
 
         return BotContactConfig::contactPayload($prior);
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    private function validateContactFields(Bot $bot, array $data): void
-    {
-        $rules = [];
-
-        foreach (BotContactConfig::required($bot) as $field) {
-            $column = BotContactConfig::FIELD_MAP[$field];
-            $rules[$column] = ['required', 'string', 'max:255'];
-        }
-
-        if ($rules !== []) {
-            validator($data, $rules)->validate();
-        }
-
-        $hasValue = collect(BotContactConfig::fields($bot))
-            ->contains(fn (string $field): bool => filled($data[BotContactConfig::FIELD_MAP[$field]] ?? null));
-
-        abort_unless($hasValue, 422, 'At least one contact field is required.');
-    }
-
-    private function notifyLeadCaptured(Bot $bot, ChatConversation $conversation): void
-    {
-        if ($conversation->contact_notified_at !== null) {
-            return;
-        }
-
-        $recipient = $bot->notification_email;
-
-        if (! is_string($recipient) || $recipient === '') {
-            return;
-        }
-
-        $lastUserMessage = $conversation->messages()
-            ->where('role', 'user')
-            ->latest()
-            ->value('content');
-
-        Mail::to($recipient)->queue(new LeadCapturedMail($bot, $conversation, $lastUserMessage));
-
-        $conversation->update(['contact_notified_at' => now()]);
     }
 
     private function preferredLanguage(Request $request): ?string

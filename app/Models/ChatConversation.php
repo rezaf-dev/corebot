@@ -36,6 +36,11 @@ class ChatConversation extends Model
         return $this->belongsTo(Bot::class);
     }
 
+    public function integrationActionLogs(): HasMany
+    {
+        return $this->hasMany(IntegrationActionLog::class, 'conversation_id');
+    }
+
     public function messages(): HasMany
     {
         return $this->hasMany(ChatMessage::class, 'conversation_id');

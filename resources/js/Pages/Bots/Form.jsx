@@ -4,11 +4,12 @@ import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import SecondaryButton from '@/Components/SecondaryButton';
 import TextInput from '@/Components/TextInput';
+import BotIntegrationsSection from '@/Components/BotIntegrationsSection';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 
-export default function Form({ bot, widgetSnippet = null }) {
+export default function Form({ bot, widgetSnippet = null, integrationTypes = [] }) {
     const isEditing = Boolean(bot);
 
     const { data, setData, post, put, processing, errors, recentlySuccessful } = useForm({
@@ -237,6 +238,10 @@ export default function Form({ bot, widgetSnippet = null }) {
                         </label>
                     </div>
                 </section>
+
+                {isEditing && (
+                    <BotIntegrationsSection bot={bot} integrationTypes={integrationTypes} />
+                )}
 
                 <div className="flex flex-wrap items-center gap-3">
                     <PrimaryButton disabled={processing}>

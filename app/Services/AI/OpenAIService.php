@@ -44,7 +44,7 @@ class OpenAIService
         $this->configureOpenAiProvider($settings);
 
         try {
-            $response = $this->prompt($messages, (float) ($options['temperature'] ?? 0.2))
+            $response = $this->prompt($messages, $options)
                 ->prompt(
                     $this->currentPrompt($messages),
                     provider: 'openai',
@@ -78,7 +78,7 @@ class OpenAIService
         $this->configureOpenAiProvider($settings);
 
         try {
-            return $this->prompt($messages, (float) ($options['temperature'] ?? 0.2))
+            return $this->prompt($messages, $options)
                 ->stream(
                     $this->currentPrompt($messages),
                     provider: 'openai',
@@ -109,12 +109,16 @@ class OpenAIService
         return true;
     }
 
-    private function prompt(array $messages, float $temperature): TenantChatAgent
+    /**
+     * @param  array<string, mixed>  $options
+     */
+    private function prompt(array $messages, array $options): TenantChatAgent
     {
         return new TenantChatAgent(
             instructions: $this->instructions($messages),
             messages: $this->contextMessages($messages),
-            temperature: $temperature,
+            tools: $options['tools'] ?? [],
+            temperature: (float) ($options['temperature'] ?? 0.2),
         );
     }
 

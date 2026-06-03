@@ -6,6 +6,7 @@ use App\Models\Bot;
 use App\Models\ChatConversation;
 use App\Models\RetrievalLog;
 use App\Services\AI\OpenAIService;
+use App\Services\Integrations\IntegrationToolFactory;
 use App\Support\BotContactConfig;
 use Generator;
 use Laravel\Ai\Streaming\Events\TextDelta;
@@ -16,6 +17,7 @@ class ChatAnswerService
     public function __construct(
         private readonly SemanticSearchService $search,
         private readonly OpenAIService $openAI,
+        private readonly IntegrationToolFactory $integrationTools,
     ) {}
 
     public function answer(Bot $bot, ChatConversation $conversation, string $userMessage): array
@@ -35,18 +37,10 @@ class ChatAnswerService
 
         $chunks = $retrieval->chunks;
         $context = $this->context($chunks);
-
-        $messages = [
-            ['role' => 'system', 'content' => $this->prompt($bot, $context)],
-            ['role' => 'user', 'content' => $userMessage],
-        ];
+        $messages = $this->buildMessages($bot, $conversation, $userMessage, $context);
 
         try {
-            $response = $this->openAI->createChatCompletion($bot->tenant, $messages, [
-                'bot_id' => $bot->id,
-                'conversation_id' => $conversation->id,
-                'temperature' => (float) $bot->temperature,
-            ]);
+            $response = $this->openAI->createChatCompletion($bot->tenant, $messages, $this->chatOptions($bot, $conversation));
 
             $answer = trim($response['choices'][0]['message']['content'] ?? '') ?: $bot->fallback_message;
         } catch (Throwable) {
@@ -108,17 +102,10 @@ class ChatAnswerService
 
         $chunks = $retrieval->chunks;
         $context = $this->context($chunks);
-        $messages = [
-            ['role' => 'system', 'content' => $this->prompt($bot, $context)],
-            ['role' => 'user', 'content' => $userMessage],
-        ];
+        $messages = $this->buildMessages($bot, $conversation, $userMessage, $context);
 
         try {
-            $stream = $this->openAI->streamChatCompletion($bot->tenant, $messages, [
-                'bot_id' => $bot->id,
-                'conversation_id' => $conversation->id,
-                'temperature' => (float) $bot->temperature,
-            ]);
+            $stream = $this->openAI->streamChatCompletion($bot->tenant, $messages, $this->chatOptions($bot, $conversation));
 
             foreach ($stream as $event) {
                 if ($event instanceof TextDelta) {
@@ -175,6 +162,49 @@ class ChatAnswerService
             'sources' => $meta['sources'],
         ]);
         yield $this->streamEvent('done');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function chatOptions(Bot $bot, ChatConversation $conversation): array
+    {
+        return [
+            'bot_id' => $bot->id,
+            'conversation_id' => $conversation->id,
+            'temperature' => (float) $bot->temperature,
+            'tools' => $this->integrationTools->forConversation($bot, $conversation),
+        ];
+    }
+
+    /**
+     * @return list<array{role: string, content: string}>
+     */
+    private function buildMessages(Bot $bot, ChatConversation $conversation, string $userMessage, ?string $context): array
+    {
+        $messages = [
+            ['role' => 'system', 'content' => $this->prompt($bot, $context)],
+        ];
+
+        $history = $conversation->messages()
+            ->orderBy('id')
+            ->get()
+            ->slice(0, -1);
+
+        foreach ($history as $message) {
+            if (! in_array($message->role, ['user', 'assistant'], true)) {
+                continue;
+            }
+
+            $messages[] = [
+                'role' => $message->role,
+                'content' => $message->content,
+            ];
+        }
+
+        $messages[] = ['role' => 'user', 'content' => $userMessage];
+
+        return $messages;
     }
 
     private function retrieve(Bot $bot, ChatConversation $conversation, string $userMessage): array|SearchResult
@@ -262,30 +292,53 @@ class ChatAnswerService
 
     private function prompt(Bot $bot, ?string $context): string
     {
-        if ($context === null) {
-            return <<<PROMPT
-You are a CRM support assistant for {$bot->name}.
+        $base = trim((string) $bot->system_prompt) ?: Bot::DEFAULT_SYSTEM_PROMPT;
+        $toolInstructions = $this->integrationToolInstructions($bot);
 
-Rules:
+        if ($context === null) {
+            return trim(<<<PROMPT
+{$base}
+
+Additional rules for this turn:
 - No matching knowledge base context was found for this message.
 - You may answer greetings, thanks, short conversational replies, and general product-neutral questions.
 - For business-specific questions, pricing, policies, workflows, payment rules, legal/medical advice, or account-specific facts, say you do not have enough information and suggest contacting support.
-- Keep the answer clear and practical.
-PROMPT;
+{$toolInstructions}
+PROMPT);
         }
 
-        return <<<PROMPT
-You are a CRM support assistant for {$bot->name}.
+        return trim(<<<PROMPT
+{$base}
 
-Rules:
-- Use only the provided knowledge base context.
+Additional rules for this turn:
+- Use only the provided knowledge base context below.
 - If the context does not contain the answer, say you do not know.
-- Do not invent CRM workflows, policies, pricing, payment rules, legal/medical advice, or account-specific facts.
-- Keep the answer clear and practical.
 - If the user needs help from staff, suggest contacting support.
 
 CONTEXT:
 {$context}
+{$toolInstructions}
+PROMPT);
+    }
+
+    private function integrationToolInstructions(Bot $bot): string
+    {
+        $bot->loadMissing('integrations');
+
+        $enabled = $bot->integrations->where('enabled', true);
+
+        if ($enabled->isEmpty()) {
+            return '';
+        }
+
+        $lines = $enabled->map(fn ($integration) => "- {$integration->toolName()}: {$integration->description}")->implode("\n");
+
+        return <<<PROMPT
+
+Integration tools (call only when the visitor clearly wants an action performed):
+{$lines}
+- Never invent contact details for lead capture; ask the visitor for missing required fields first.
+- Prefer suggesting the contact form when unsure instead of calling tools.
 PROMPT;
     }
 }

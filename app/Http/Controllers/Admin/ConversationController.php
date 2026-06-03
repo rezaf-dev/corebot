@@ -30,6 +30,7 @@ class ConversationController extends Controller
                 'bot:id,name',
                 'messages' => fn ($query) => $query->orderBy('created_at'),
                 'retrievalLogs' => fn ($query) => $query->latest(),
+                'integrationActionLogs' => fn ($query) => $query->with('integration:id,name,type')->latest(),
             ]),
         ]);
     }

@@ -68,6 +68,11 @@ PROMPT;
         return $this->hasMany(ChatConversation::class);
     }
 
+    public function integrations(): HasMany
+    {
+        return $this->hasMany(BotIntegration::class);
+    }
+
     public function isActive(): bool
     {
         return $this->status === 'active';

@@ -37,8 +37,16 @@ class BotController extends Controller
     {
         $access->ensureCanAccess(auth()->user(), $bot);
 
+        $bot->load('integrations');
+
         return Inertia::render('Bots/Form', [
             'bot' => $bot,
+            'integrationTypes' => [
+                ['value' => 'webhook', 'label' => 'Webhook'],
+                ['value' => 'create_lead', 'label' => 'Create lead'],
+                ['value' => 'send_email', 'label' => 'Send email'],
+                ['value' => 'http_get', 'label' => 'HTTP GET query'],
+            ],
             'widgetUrl' => url('/widget.js'),
             'widgetSnippet' => WidgetConfig::embedSnippet(
                 url('/widget.js'),

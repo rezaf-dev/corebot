@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AiSettingsController;
 use App\Http\Controllers\Admin\BotController;
+use App\Http\Controllers\Admin\BotIntegrationController;
 use App\Http\Controllers\Admin\ConversationController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\KnowledgeResearchController;
@@ -33,6 +34,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/ai-settings/test', [AiSettingsController::class, 'test'])->name('ai-settings.test');
 
     Route::resource('bots', BotController::class)->except(['show']);
+    Route::post('bots/{bot}/integrations', [BotIntegrationController::class, 'store'])->name('bots.integrations.store');
+    Route::put('bots/{bot}/integrations/{integration}', [BotIntegrationController::class, 'update'])->name('bots.integrations.update');
+    Route::delete('bots/{bot}/integrations/{integration}', [BotIntegrationController::class, 'destroy'])->name('bots.integrations.destroy');
+    Route::post('bots/{bot}/integrations/{integration}/test', [BotIntegrationController::class, 'test'])->name('bots.integrations.test');
 
     Route::resource('knowledge-sources', KnowledgeSourceController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
     Route::post('/knowledge-sources/research', [KnowledgeResearchController::class, 'store'])
