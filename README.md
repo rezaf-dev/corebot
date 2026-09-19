@@ -17,7 +17,7 @@ Professional services: [corefixlab.com/corebot](https://corefixlab.com/corebot)
 | Requirement | Notes |
 |-------------|--------|
 | PHP 8.3+ | |
-| PostgreSQL 15+ | with `pgvector` extension |
+| PostgreSQL 15+ | with `pgvector` 0.5.0+ (HNSW support) |
 | Redis | queues + Horizon |
 | Node.js 20+ | frontend build |
 | `pdftotext` | PDF knowledge (Poppler) |
@@ -139,6 +139,8 @@ DEMO_BOT_PUBLIC_KEY=bot_xxxxxxxx
 | `APP_KEY` | Required; decrypts stored tenant API keys |
 | `QUEUE_CONNECTION` | Use `redis` and run Horizon |
 | `REDIS_QUEUE_RETRY_AFTER` | Must exceed job timeout (default 330) |
+| `RAG_QUERY_EMBEDDING_CACHE_TTL` | Seconds to cache normalized query embeddings; set to `0` to disable (default 3600) |
+| `RAG_HISTORY_MESSAGE_LIMIT` | Maximum prior chat messages included in each AI request (default 20) |
 | `DOCX_PYTHON` | Optional path to Python 3 for DOCX indexing |
 | `GEOIP_DATABASE_PATH` | Optional `GeoLite2-City.mmdb` for visitor geo |
 | `TAVILY_API_KEY` | Optional; better web search in Knowledge → Research web |
@@ -218,6 +220,30 @@ Cron (Horizon metrics + scheduler):
 ```bash
 * * * * * cd /path/to/corebot && php artisan schedule:run >> /dev/null 2>&1
 ```
+
+### Laravel Forge and Nginx streaming
+
+The chat endpoint uses Server-Sent Events and sends `X-Accel-Buffering: no` plus `Cache-Control: no-cache, no-transform`. A standard Laravel Forge Nginx site honors this header, so no global Nginx change should normally be required.
+
+After each deployment, restart PHP-FPM from Forge and verify that chunks arrive progressively rather than all at once:
+
+```bash
+curl -N -H 'Accept: text/event-stream' \
+  -H 'Content-Type: application/json' \
+  --data '{"bot_public_key":"BOT_PUBLIC_KEY","conversation_id":1,"message":"Hello"}' \
+  https://YOUR_DOMAIN/api/public/chat/message/stream
+```
+
+If output is still buffered, add this exact-location block to the Forge site's Nginx configuration, before the main `location /` block, then test and reload Nginx:
+
+```nginx
+location = /api/public/chat/message/stream {
+    gzip off;
+    try_files $uri $uri/ /index.php?$query_string;
+}
+```
+
+Do not disable FastCGI buffering globally. If the site is behind an additional reverse proxy, ensure it honors `X-Accel-Buffering: no`; otherwise disable response buffering only for this endpoint. The embedding cache should use Redis in production (`CACHE_STORE=redis`) for consistent results across PHP-FPM workers.
 
 After deploy: `php artisan horizon:terminate`
 

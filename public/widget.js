@@ -666,6 +666,16 @@ function titleInitial(title) {
         const decoder = new TextDecoder();
         let buffer = '';
         let hasContent = false;
+        let pendingDelta = '';
+        let renderFrame = null;
+
+        const flushPendingDelta = () => {
+            renderFrame = null;
+            if (!pendingDelta) return;
+            appendStreamingBubbleText(node, pendingDelta);
+            pendingDelta = '';
+            scrollToBottom();
+        };
 
         while (true) {
             const { value, done } = await reader.read();
@@ -685,14 +695,25 @@ function titleInitial(title) {
                         clearLoading(node);
                         hasContent = true;
                     }
-                    appendBubbleText(node, payload.delta);
-                    scrollToBottom();
+                    pendingDelta += payload.delta;
+                    if (renderFrame === null) {
+                        renderFrame = requestAnimationFrame(flushPendingDelta);
+                    }
                 }
 
                 if (payload.type === 'meta' && shouldPromptContact(payload)) {
                     showContact('fallback');
                 }
             }
+        }
+
+        if (renderFrame !== null) {
+            cancelAnimationFrame(renderFrame);
+        }
+        flushPendingDelta();
+
+        if (hasContent) {
+            setBubbleText(node, getBubble(node)?.dataset.rawText || '');
         }
 
         if (!hasContent) {
@@ -1192,12 +1213,13 @@ function titleInitial(title) {
         scrollToBottom();
     }
 
-    function appendBubbleText(node, delta) {
+    function appendStreamingBubbleText(node, delta) {
         const bubble = getBubble(node);
         if (!bubble) return;
-        const role = messageRole(node);
         const raw = (bubble.dataset.rawText || bubble.textContent || '') + delta;
-        setBubbleContent(bubble, raw, role);
+        bubble.dataset.rawText = raw;
+        bubble.classList.remove('crm-ai-formatted');
+        bubble.textContent = raw;
     }
 
     function clamp(value, min, max) {

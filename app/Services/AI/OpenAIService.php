@@ -26,10 +26,28 @@ class OpenAIService
                 ->timeout(45)
                 ->generate($provider, $settings->embedding_model);
 
-            $this->logUsage($tenant, 'embedding', $response->meta->model ?? $settings->embedding_model, [
+            $usage = [
                 'prompt_tokens' => $response->tokens,
                 'total_tokens' => $response->tokens,
-            ], $context);
+            ];
+
+            if ($context['defer_usage_log'] ?? false) {
+                defer(fn () => $this->logUsage(
+                    $tenant,
+                    'embedding',
+                    $response->meta->model ?? $settings->embedding_model,
+                    $usage,
+                    $context,
+                ));
+            } else {
+                $this->logUsage(
+                    $tenant,
+                    'embedding',
+                    $response->meta->model ?? $settings->embedding_model,
+                    $usage,
+                    $context,
+                );
+            }
 
             return $response->first();
         } catch (Throwable $e) {
@@ -86,7 +104,9 @@ class OpenAIService
                     model: $model,
                     timeout: 60,
                 )
-                ->then(fn ($response) => $this->logAgentUsage($tenant, 'chat', $response, $options));
+                ->then(function ($response) use ($tenant, $options): void {
+                    defer(fn () => $this->logAgentUsage($tenant, 'chat', $response, $options));
+                });
         } catch (Throwable $e) {
             $this->logUsage($tenant, 'chat', $model, [], $options, $e->getMessage());
             throw new RuntimeException('Chat completion failed.');

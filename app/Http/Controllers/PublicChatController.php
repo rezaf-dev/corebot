@@ -89,7 +89,7 @@ class PublicChatController extends Controller
     {
         [$bot, $conversation, $message] = $this->messageContext($request);
 
-        return response()->json($answerService->answer($bot->load(['tenant.aiSetting', 'integrations']), $conversation, $message));
+        return response()->json($answerService->answer($bot->loadMissing('integrations'), $conversation, $message));
     }
 
     public function stream(Request $request, ChatAnswerService $answerService): StreamedResponse
@@ -98,11 +98,11 @@ class PublicChatController extends Controller
 
         return response()->stream(
             function () use ($answerService, $bot, $conversation, $message): Generator {
-                yield from $answerService->stream($bot->load(['tenant.aiSetting', 'integrations']), $conversation, $message);
+                yield from $answerService->stream($bot->loadMissing('integrations'), $conversation, $message);
             },
             headers: [
                 'Content-Type' => 'text/event-stream',
-                'Cache-Control' => 'no-cache',
+                'Cache-Control' => 'no-cache, no-transform',
                 'X-Accel-Buffering' => 'no',
             ],
         );
@@ -130,9 +130,10 @@ class PublicChatController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    private function activeBot(string $key): Bot
+    private function activeBot(string $key, bool $withAiSettings = false): Bot
     {
-        $bot = Bot::query()->with('tenant.aiSetting')->where('public_key', $key)->firstOrFail();
+        $tenantRelation = $withAiSettings ? 'tenant.aiSetting' : 'tenant';
+        $bot = Bot::query()->with($tenantRelation)->where('public_key', $key)->firstOrFail();
 
         abort_unless($bot->isActive() && $bot->tenant->isActive(), 404);
 
@@ -147,7 +148,7 @@ class PublicChatController extends Controller
             'message' => ['required', 'string', 'max:2000'],
         ]);
 
-        $bot = $this->activeBot($data['bot_public_key']);
+        $bot = $this->activeBot($data['bot_public_key'], withAiSettings: true);
         $conversation = ChatConversation::query()
             ->where('id', $data['conversation_id'])
             ->where('tenant_id', $bot->tenant_id)

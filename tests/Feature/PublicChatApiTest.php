@@ -50,5 +50,7 @@ it('streams public chat messages', function () {
         'conversation_id' => $conversation->id,
         'message' => 'Hello',
     ])->assertStreamed()
+        ->assertHeader('Cache-Control', 'no-cache, no-transform')
+        ->assertHeader('X-Accel-Buffering', 'no')
         ->assertStreamedContent('data: {"type":"text_delta","delta":"Hello"}'."\n\n".'data: {"type":"done"}'."\n\n");
 });

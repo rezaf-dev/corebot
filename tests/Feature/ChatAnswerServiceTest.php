@@ -151,3 +151,66 @@ it('does not request contact when required fields are already present', function
 
     expect($response['needs_contact'])->toBeFalse();
 });
+
+it('limits conversation history sent to the model', function () {
+    config(['rag.history_message_limit' => 2]);
+
+    $tenant = Tenant::create(['name' => 'Demo', 'slug' => 'history-limit', 'status' => 'active']);
+    $tenant->aiSetting()->create([
+        'provider' => 'openai',
+        'api_key' => 'sk-test',
+        'base_url' => 'https://api.openai.com/v1',
+        'chat_model' => 'gpt-4o-mini',
+        'embedding_model' => 'text-embedding-3-small',
+        'is_active' => true,
+    ]);
+    $bot = Bot::create(['tenant_id' => $tenant->id, 'name' => 'Support']);
+    $conversation = ChatConversation::create([
+        'tenant_id' => $tenant->id,
+        'bot_id' => $bot->id,
+        'status' => 'open',
+    ]);
+
+    foreach ([
+        ['user', 'old question'],
+        ['assistant', 'old answer'],
+        ['user', 'recent question'],
+        ['assistant', 'recent answer'],
+    ] as [$role, $content]) {
+        $conversation->messages()->create([
+            'tenant_id' => $tenant->id,
+            'bot_id' => $bot->id,
+            'role' => $role,
+            'content' => $content,
+        ]);
+    }
+
+    $this->mock(SemanticSearchService::class)
+        ->shouldReceive('searchWithMeta')
+        ->once()
+        ->andReturn(new SearchResult(collect(), confident: false));
+
+    $this->mock(OpenAIService::class)
+        ->shouldReceive('createChatCompletion')
+        ->once()
+        ->withArgs(function ($tenant, array $messages): bool {
+            $contents = collect($messages)->pluck('content');
+
+            return $contents->contains('recent question')
+                && $contents->contains('recent answer')
+                && $contents->contains('current question')
+                && ! $contents->contains('old question')
+                && ! $contents->contains('old answer');
+        })
+        ->andReturn([
+            'choices' => [
+                ['message' => ['content' => 'Current answer']],
+            ],
+        ]);
+
+    app(ChatAnswerService::class)->answer(
+        $bot->load('tenant.aiSetting'),
+        $conversation,
+        'current question',
+    );
+});

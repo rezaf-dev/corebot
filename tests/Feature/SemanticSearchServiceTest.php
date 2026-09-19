@@ -6,6 +6,7 @@ use App\Models\KnowledgeSource;
 use App\Models\Tenant;
 use App\Services\AI\OpenAIService;
 use App\Services\Rag\SemanticSearchService;
+use Illuminate\Support\Facades\Cache;
 
 it('returns the nearest chunks when the similarity threshold is too strict', function () {
     $tenant = Tenant::query()->create([
@@ -58,4 +59,30 @@ it('returns the nearest chunks when the similarity threshold is too strict', fun
 
     expect($chunks)->toHaveCount(1)
         ->and($chunks->first()->content)->toContain('Duplicate patients');
+});
+
+it('reuses cached query embeddings', function () {
+    Cache::flush();
+
+    $tenant = Tenant::query()->create([
+        'name' => 'Cache Demo',
+        'slug' => 'cache-demo',
+        'status' => 'active',
+    ]);
+    $bot = Bot::query()->create([
+        'tenant_id' => $tenant->id,
+        'name' => 'Support',
+        'status' => 'active',
+    ]);
+    $queryEmbedding = array_fill(0, 1536, 0.0);
+    $queryEmbedding[0] = 1.0;
+
+    $this->mock(OpenAIService::class)
+        ->shouldReceive('createEmbedding')
+        ->once()
+        ->andReturn($queryEmbedding);
+
+    $search = app(SemanticSearchService::class);
+    $search->search($bot, 'How do I reset my password?');
+    $search->search($bot, '  HOW DO I RESET MY PASSWORD? ');
 });

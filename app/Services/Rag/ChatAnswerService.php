@@ -137,7 +137,7 @@ class ChatAnswerService
             'metadata' => ['source_chunk_ids' => $chunks->pluck('id')->all()],
         ]);
 
-        RetrievalLog::create([
+        $retrievalLog = [
             'tenant_id' => $bot->tenant_id,
             'bot_id' => $bot->id,
             'conversation_id' => $conversation->id,
@@ -146,7 +146,9 @@ class ChatAnswerService
             'selected_chunk_ids' => $chunks->pluck('id')->all(),
             'distances' => $chunks->mapWithKeys(fn ($chunk) => [$chunk->id => $chunk->distance])->all(),
             'context_text' => $context,
-        ]);
+        ];
+
+        defer(fn () => RetrievalLog::create($retrievalLog));
 
         $meta = $this->withContactMeta($bot, $conversation, [
             'fallback' => false,
@@ -189,9 +191,13 @@ class ChatAnswerService
         ];
 
         $history = $conversation->messages()
-            ->orderBy('id')
+            ->select(['role', 'content'])
+            ->orderByDesc('id')
+            ->limit(max(0, (int) config('rag.history_message_limit')) + 1)
             ->get()
-            ->slice(0, -1);
+            ->slice(1)
+            ->reverse()
+            ->values();
 
         foreach ($history as $message) {
             if (! in_array($message->role, ['user', 'assistant'], true)) {
