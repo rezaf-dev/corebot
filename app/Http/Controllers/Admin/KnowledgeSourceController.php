@@ -67,6 +67,10 @@ class KnowledgeSourceController extends Controller
             'research' => [
                 'search_provider' => filled(config('corebot.knowledge_research.tavily_api_key')) ? 'tavily' : 'duckduckgo',
             ],
+            'crawler' => [
+                'default_page_limit' => (int) config('corebot.website_crawler.default_page_limit'),
+                'max_page_limit' => (int) config('corebot.website_crawler.max_page_limit'),
+            ],
         ]);
     }
 
@@ -75,12 +79,14 @@ class KnowledgeSourceController extends Controller
         $tenant = $access->ensureTenantAdmin(auth()->user());
         $data = $request->validate([
             'bot_id' => ['required', 'integer'],
-            'type' => ['required', 'in:text,faq,pdf,docx'],
+            'type' => ['required', 'in:text,faq,pdf,docx,website'],
             'title' => ['required', 'string', 'max:255'],
             'raw_text' => ['nullable', 'string'],
             'question' => ['nullable', 'string'],
             'answer' => ['nullable', 'string'],
             'file' => ['nullable', 'file', 'max:10240', 'mimetypes:application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+            'source_url' => ['nullable', 'required_if:type,website', 'url:http,https', 'max:2048'],
+            'crawl_page_limit' => ['nullable', 'required_if:type,website', 'integer', 'min:1', 'max:'.config('corebot.website_crawler.max_page_limit')],
         ]);
 
         $bot = $access->botForTenant(auth()->user(), $data['bot_id']);
@@ -92,7 +98,10 @@ class KnowledgeSourceController extends Controller
             'status' => KnowledgeSourceStatus::Queued->value,
         ];
 
-        if ($data['type'] === 'faq') {
+        if ($data['type'] === 'website') {
+            $attributes['source_url'] = $data['source_url'];
+            $attributes['crawl_page_limit'] = $data['crawl_page_limit'];
+        } elseif ($data['type'] === 'faq') {
             $attributes['raw_text'] = "Question: {$data['question']}\nAnswer: {$data['answer']}";
         } elseif ($data['type'] === 'text') {
             $attributes['raw_text'] = $data['raw_text'];

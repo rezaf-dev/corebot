@@ -24,9 +24,10 @@ const SOURCE_TYPES = [
     { value: 'faq', label: 'FAQ', description: 'Add a question and answer pair.' },
     { value: 'pdf', label: 'PDF', description: 'Upload a PDF up to 10 MB.' },
     { value: 'docx', label: 'Word', description: 'Upload a .docx file up to 10 MB.' },
+    { value: 'website', label: 'Website', description: 'Crawl and index pages from one website.' },
 ];
 
-export default function Index({ sources, bots, filters, stats, hasActiveSources, research }) {
+export default function Index({ sources, bots, filters, stats, hasActiveSources, research, crawler }) {
     const sourceItems = sources.data ?? [];
     const [showAddModal, setShowAddModal] = useState(false);
     const [showResearchModal, setShowResearchModal] = useState(false);
@@ -103,6 +104,7 @@ export default function Index({ sources, bots, filters, stats, hasActiveSources,
                     show={showAddModal}
                     onClose={() => setShowAddModal(false)}
                     bots={bots}
+                    crawler={crawler}
                 />
 
                 <ResearchKnowledgeModal
@@ -126,7 +128,7 @@ function StatCard({ label, value, hint }) {
     );
 }
 
-function AddSourceModal({ show, onClose, bots }) {
+function AddSourceModal({ show, onClose, bots, crawler }) {
     const { data, setData, post, processing, errors, reset, clearErrors } = useForm({
         bot_id: bots[0]?.id || '',
         type: 'text',
@@ -135,6 +137,8 @@ function AddSourceModal({ show, onClose, bots }) {
         question: '',
         answer: '',
         file: null,
+        source_url: '',
+        crawl_page_limit: crawler.default_page_limit,
     });
 
     const selectedType = SOURCE_TYPES.find((t) => t.value === data.type);
@@ -151,7 +155,7 @@ function AddSourceModal({ show, onClose, bots }) {
             forceFormData: true,
             preserveScroll: true,
             onSuccess: () => {
-                reset('title', 'raw_text', 'question', 'answer', 'file');
+                reset('title', 'raw_text', 'question', 'answer', 'file', 'source_url', 'crawl_page_limit');
                 onClose();
             },
         });
@@ -257,6 +261,37 @@ function AddSourceModal({ show, onClose, bots }) {
                                 rows={4}
                             />
                         </>
+                    )}
+
+                    {data.type === 'website' && (
+                        <div className="grid gap-4 sm:grid-cols-[1fr_10rem]">
+                            <div>
+                                <InputLabel htmlFor="add-source_url" value="Website URL" />
+                                <TextInput
+                                    id="add-source_url"
+                                    type="url"
+                                    value={data.source_url}
+                                    onChange={(e) => setData('source_url', e.target.value)}
+                                    className="mt-1 block w-full"
+                                    placeholder="https://example.com/docs"
+                                />
+                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Only pages on the same website are followed.</p>
+                                <InputError message={errors.source_url} className="mt-1" />
+                            </div>
+                            <div>
+                                <InputLabel htmlFor="add-crawl_page_limit" value="Max pages" />
+                                <TextInput
+                                    id="add-crawl_page_limit"
+                                    type="number"
+                                    min="1"
+                                    max={crawler.max_page_limit}
+                                    value={data.crawl_page_limit}
+                                    onChange={(e) => setData('crawl_page_limit', e.target.value)}
+                                    className="mt-1 block w-full"
+                                />
+                                <InputError message={errors.crawl_page_limit} className="mt-1" />
+                            </div>
+                        </div>
                     )}
 
                     {(data.type === 'pdf' || data.type === 'docx') && (
@@ -767,7 +802,7 @@ function ProcessingProgress({ status, className = '' }) {
 }
 
 function TypeBadge({ type }) {
-    const labels = { text: 'Text', faq: 'FAQ', pdf: 'PDF', docx: 'Word' };
+    const labels = { text: 'Text', faq: 'FAQ', pdf: 'PDF', docx: 'Word', website: 'Website' };
 
     return (
         <span className="inline-flex rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300">

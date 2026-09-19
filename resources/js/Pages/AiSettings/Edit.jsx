@@ -7,13 +7,32 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 
-const CHAT_MODELS = ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini', 'gpt-4.1'];
-const EMBEDDING_MODELS = ['text-embedding-3-small', 'text-embedding-3-large'];
+const PROVIDERS = {
+    openai: {
+        label: 'OpenAI',
+        baseUrl: 'https://api.openai.com/v1',
+        chatModel: 'gpt-4o-mini',
+        embeddingModel: 'text-embedding-3-small',
+        keyPlaceholder: 'sk-...',
+        chatModels: ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini', 'gpt-4.1'],
+        embeddingModels: ['text-embedding-3-small', 'text-embedding-3-large'],
+    },
+    openrouter: {
+        label: 'OpenRouter',
+        baseUrl: 'https://openrouter.ai/api/v1',
+        chatModel: 'openai/gpt-4o-mini',
+        embeddingModel: 'openai/text-embedding-3-small',
+        keyPlaceholder: 'sk-or-v1-...',
+        chatModels: ['openai/gpt-4o-mini', 'anthropic/claude-sonnet-4.6', 'google/gemini-2.5-flash'],
+        embeddingModels: ['openai/text-embedding-3-small', 'openai/text-embedding-3-large'],
+    },
+};
 
 export default function Edit({ settings }) {
     const [testing, setTesting] = useState(false);
 
     const { data, setData, put, processing, errors, recentlySuccessful } = useForm({
+        provider: settings.provider ?? 'openai',
         api_key: '',
         base_url: settings.base_url,
         chat_model: settings.chat_model,
@@ -24,6 +43,21 @@ export default function Edit({ settings }) {
         e.preventDefault();
         put(route('ai-settings.update'), { preserveScroll: true });
     };
+
+    const changeProvider = (provider) => {
+        const defaults = PROVIDERS[provider];
+
+        setData({
+            ...data,
+            provider,
+            api_key: '',
+            base_url: defaults.baseUrl,
+            chat_model: defaults.chatModel,
+            embedding_model: defaults.embeddingModel,
+        });
+    };
+
+    const provider = PROVIDERS[data.provider] ?? PROVIDERS.openai;
 
     const testConnection = () => {
         router.post(route('ai-settings.test'), {}, {
@@ -39,7 +73,7 @@ export default function Edit({ settings }) {
                 <div>
                     <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">AI Settings</h2>
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Configure OpenAI credentials and models used for chat and knowledge embeddings.
+                        Configure OpenAI or OpenRouter credentials and models used for chat and knowledge embeddings.
                     </p>
                 </div>
             }
@@ -59,6 +93,24 @@ export default function Edit({ settings }) {
 
                         <div className="mt-5 space-y-5">
                             <div>
+                                <InputLabel htmlFor="provider" value="Provider" />
+                                <select
+                                    id="provider"
+                                    value={data.provider}
+                                    onChange={(e) => changeProvider(e.target.value)}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-indigo-600 dark:focus:ring-indigo-600"
+                                >
+                                    {Object.entries(PROVIDERS).map(([value, option]) => (
+                                        <option key={value} value={value}>{option.label}</option>
+                                    ))}
+                                </select>
+                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    Changing providers requires a new API key and a successful connection test.
+                                </p>
+                                <InputError message={errors.provider} className="mt-1" />
+                            </div>
+
+                            <div>
                                 <InputLabel htmlFor="api_key" value="API key" />
                                 <TextInput
                                     id="api_key"
@@ -66,13 +118,13 @@ export default function Edit({ settings }) {
                                     value={data.api_key}
                                     onChange={(e) => setData('api_key', e.target.value)}
                                     className="mt-1 block w-full"
-                                    placeholder={settings.masked_api_key ? 'Leave blank to keep current key' : 'sk-...'}
+                                    placeholder={settings.masked_api_key && data.provider === settings.provider ? 'Leave blank to keep current key' : provider.keyPlaceholder}
                                     autoComplete="off"
                                 />
                                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                    {settings.masked_api_key
+                                    {settings.masked_api_key && data.provider === settings.provider
                                         ? `Current key: ${settings.masked_api_key}`
-                                        : 'No API key stored yet.'}
+                                        : `Enter an API key for ${provider.label}.`}
                                 </p>
                                 <InputError message={errors.api_key} className="mt-1" />
                             </div>
@@ -85,10 +137,13 @@ export default function Edit({ settings }) {
                                     value={data.base_url}
                                     onChange={(e) => setData('base_url', e.target.value)}
                                     className="mt-1 block w-full"
-                                    placeholder="https://api.openai.com/v1"
+                                    placeholder={provider.baseUrl}
+                                    readOnly={data.provider === 'openrouter'}
                                 />
                                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                    Use a compatible OpenAI API endpoint (e.g. Azure OpenAI or a proxy).
+                                    {data.provider === 'openrouter'
+                                        ? 'OpenRouter requests use its official API endpoint.'
+                                        : 'Use OpenAI or a compatible OpenAI API endpoint.'}
                                 </p>
                                 <InputError message={errors.base_url} className="mt-1" />
                             </div>
@@ -106,7 +161,7 @@ export default function Edit({ settings }) {
                                 id="chat_model"
                                 label="Chat model"
                                 value={data.chat_model}
-                                options={CHAT_MODELS}
+                                options={provider.chatModels}
                                 onChange={(value) => setData('chat_model', value)}
                                 error={errors.chat_model}
                             />
@@ -114,7 +169,7 @@ export default function Edit({ settings }) {
                                 id="embedding_model"
                                 label="Embedding model"
                                 value={data.embedding_model}
-                                options={EMBEDDING_MODELS}
+                                options={provider.embeddingModels}
                                 onChange={(value) => setData('embedding_model', value)}
                                 error={errors.embedding_model}
                             />

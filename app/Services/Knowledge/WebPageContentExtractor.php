@@ -13,7 +13,7 @@ class WebPageContentExtractor
     public function __construct(private UrlSafety $urlSafety) {}
 
     /**
-     * @return array{url: string, title: string, content: string}
+     * @return array{url: string, title: string, content: string, links: list<string>}
      */
     public function fetch(string $url): array
     {
@@ -23,8 +23,14 @@ class WebPageContentExtractor
             'User-Agent' => config('corebot.knowledge_research.user_agent'),
             'Accept' => 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8',
         ])
+            ->connectTimeout(min(10, (int) config('corebot.knowledge_research.fetch_timeout')))
             ->timeout((int) config('corebot.knowledge_research.fetch_timeout'))
+            ->withoutRedirecting()
             ->get($url);
+
+        if ($response->redirect()) {
+            throw new RuntimeException('Page redirects are not followed for security. Use the final URL instead.');
+        }
 
         if (! $response->successful()) {
             throw new RuntimeException('Could not fetch the page (HTTP '.$response->status().').');
@@ -39,6 +45,7 @@ class WebPageContentExtractor
                 'url' => $url,
                 'title' => $this->titleFromUrl($url),
                 'content' => $this->truncate($text),
+                'links' => [],
             ];
         }
 
@@ -46,7 +53,7 @@ class WebPageContentExtractor
     }
 
     /**
-     * @return array{url: string, title: string, content: string}
+     * @return array{url: string, title: string, content: string, links: list<string>}
      */
     public function extractFromHtml(string $url, string $html): array
     {
@@ -61,7 +68,84 @@ class WebPageContentExtractor
             'url' => $url,
             'title' => $title,
             'content' => $content,
+            'links' => $this->extractLinks($url, $html),
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function extractLinks(string $pageUrl, string $html): array
+    {
+        libxml_use_internal_errors(true);
+        $document = new DOMDocument;
+        $loaded = $document->loadHTML('<?xml encoding="UTF-8">'.$html, LIBXML_NOERROR | LIBXML_NOWARNING);
+        libxml_clear_errors();
+
+        if (! $loaded) {
+            return [];
+        }
+
+        $links = [];
+
+        foreach ($document->getElementsByTagName('a') as $anchor) {
+            $href = trim($anchor->getAttribute('href'));
+            $resolved = $this->resolveUrl($pageUrl, $href);
+
+            if ($resolved !== null) {
+                $links[$resolved] = true;
+            }
+        }
+
+        return array_keys($links);
+    }
+
+    private function resolveUrl(string $pageUrl, string $href): ?string
+    {
+        if ($href === '' || str_starts_with($href, '#') || preg_match('/^(mailto|tel|javascript|data):/i', $href)) {
+            return null;
+        }
+
+        $base = parse_url($pageUrl);
+
+        if (! is_array($base) || ! isset($base['scheme'], $base['host'])) {
+            return null;
+        }
+
+        if (str_starts_with($href, '//')) {
+            $href = $base['scheme'].':'.$href;
+        } elseif (! preg_match('#^https?://#i', $href)) {
+            if (str_starts_with($href, '?')) {
+                $path = ($base['path'] ?? '/').$href;
+            } else {
+                $path = str_starts_with($href, '/')
+                    ? $href
+                    : rtrim(dirname($base['path'] ?? '/'), '/').'/'.$href;
+            }
+            $href = $base['scheme'].'://'.$base['host'].(isset($base['port']) ? ':'.$base['port'] : '').$path;
+        }
+
+        $parts = parse_url($href);
+
+        if (! is_array($parts) || ! isset($parts['scheme'], $parts['host'])) {
+            return null;
+        }
+
+        $path = preg_replace('#/+#', '/', $parts['path'] ?? '/') ?: '/';
+        $segments = [];
+
+        foreach (explode('/', $path) as $segment) {
+            if ($segment === '..') {
+                array_pop($segments);
+            } elseif ($segment !== '' && $segment !== '.') {
+                $segments[] = $segment;
+            }
+        }
+
+        return strtolower($parts['scheme']).'://'.strtolower($parts['host'])
+            .(isset($parts['port']) ? ':'.$parts['port'] : '')
+            .'/'.implode('/', $segments)
+            .(isset($parts['query']) ? '?'.$parts['query'] : '');
     }
 
     private function extractTitle(string $html): ?string

@@ -293,11 +293,22 @@ class ChatAnswerService
     private function prompt(Bot $bot, ?string $context): string
     {
         $base = trim((string) $bot->system_prompt) ?: Bot::DEFAULT_SYSTEM_PROMPT;
+        $companyName = trim((string) $bot->tenant->name);
         $toolInstructions = $this->integrationToolInstructions($bot);
+
+        $identityInstructions = <<<PROMPT
+
+Identity and voice:
+- You are a customer support representative for {$companyName}. Speak as a member of {$companyName}, not as an outside observer.
+- Refer to {$companyName} with first-person language such as "we", "our", and "us" when appropriate.
+- Never describe {$companyName} as "this company" or refer to it as "they" or "them".
+- Answer the visitor directly. Do not begin with phrases such as "Based on the provided context" or mention the knowledge base, sources, or supplied context.
+PROMPT;
 
         if ($context === null) {
             return trim(<<<PROMPT
 {$base}
+{$identityInstructions}
 
 Additional rules for this turn:
 - No matching knowledge base context was found for this message.
@@ -309,6 +320,7 @@ PROMPT);
 
         return trim(<<<PROMPT
 {$base}
+{$identityInstructions}
 
 Additional rules for this turn:
 - Use only the provided knowledge base context below.

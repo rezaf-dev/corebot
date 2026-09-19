@@ -52,4 +52,10 @@ return [
         'tavily_api_key' => env('TAVILY_API_KEY'),
     ],
 
+    'website_crawler' => [
+        'default_page_limit' => (int) env('WEBSITE_CRAWL_DEFAULT_PAGE_LIMIT', 10),
+        'max_page_limit' => (int) env('WEBSITE_CRAWL_MAX_PAGE_LIMIT', 50),
+        'max_total_content_length' => (int) env('WEBSITE_CRAWL_MAX_TOTAL_CONTENT_LENGTH', 500000),
+    ],
+
 ];

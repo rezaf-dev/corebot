@@ -30,6 +30,8 @@ it('renders the knowledge index for tenant admins', function () {
             ->has('sources.data', 1)
             ->where('sources.data.0.title', 'Policy')
             ->where('stats.total', 1)
+            ->where('crawler.default_page_limit', 10)
+            ->where('crawler.max_page_limit', 50)
             ->where('research.search_provider', 'duckduckgo'));
 });
 
@@ -126,6 +128,49 @@ it('queues a text source with queued status on create', function () {
     Queue::assertPushed(ProcessKnowledgeSourceJob::class, fn (ProcessKnowledgeSourceJob $job) => $job->knowledgeSourceId === $source->id);
 });
 
+it('queues a bounded website crawl source', function () {
+    Queue::fake();
+
+    [$tenant, $user] = tenantAdmin();
+    $bot = Bot::create(['tenant_id' => $tenant->id, 'name' => 'Support', 'status' => 'active']);
+
+    $this->actingAs($user)->post(route('knowledge-sources.store'), [
+        'bot_id' => $bot->id,
+        'type' => 'website',
+        'title' => 'Documentation website',
+        'source_url' => 'https://example.com/docs',
+        'crawl_page_limit' => 12,
+    ])->assertRedirect();
+
+    $source = KnowledgeSource::query()->firstOrFail();
+
+    expect($source->type)->toBe('website')
+        ->and($source->source_url)->toBe('https://example.com/docs')
+        ->and($source->crawl_page_limit)->toBe(12)
+        ->and($source->status)->toBe(KnowledgeSourceStatus::Queued->value);
+
+    Queue::assertPushed(ProcessKnowledgeSourceJob::class, fn (ProcessKnowledgeSourceJob $job) => $job->knowledgeSourceId === $source->id);
+});
+
+it('rejects website crawls above the configured page limit', function () {
+    Queue::fake();
+    config()->set('corebot.website_crawler.max_page_limit', 25);
+
+    [$tenant, $user] = tenantAdmin();
+    $bot = Bot::create(['tenant_id' => $tenant->id, 'name' => 'Support', 'status' => 'active']);
+
+    $this->actingAs($user)->post(route('knowledge-sources.store'), [
+        'bot_id' => $bot->id,
+        'type' => 'website',
+        'title' => 'Too many pages',
+        'source_url' => 'https://example.com',
+        'crawl_page_limit' => 26,
+    ])->assertSessionHasErrors('crawl_page_limit');
+
+    expect(KnowledgeSource::query()->count())->toBe(0);
+    Queue::assertNothingPushed();
+});
+
 it('prevents reprocessing while a source is queued', function () {
     Queue::fake();
 
@@ -220,13 +265,15 @@ it('rejects edits while a source is processing', function () {
         ->assertSessionHasErrors('title');
 });
 
-/**
- * @return array{0: Tenant, 1: User}
- */
-function tenantAdmin(): array
-{
-    $tenant = Tenant::create(['name' => 'Demo', 'slug' => 'demo-'.uniqid(), 'status' => 'active']);
-    $user = User::factory()->create(['tenant_id' => $tenant->id, 'role' => 'tenant_admin']);
+if (! function_exists('tenantAdmin')) {
+    /**
+     * @return array{0: Tenant, 1: User}
+     */
+    function tenantAdmin(): array
+    {
+        $tenant = Tenant::create(['name' => 'Demo', 'slug' => 'demo-'.uniqid(), 'status' => 'active']);
+        $user = User::factory()->create(['tenant_id' => $tenant->id, 'role' => 'tenant_admin']);
 
-    return [$tenant, $user];
+        return [$tenant, $user];
+    }
 }

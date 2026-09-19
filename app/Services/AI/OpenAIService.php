@@ -5,6 +5,7 @@ namespace App\Services\AI;
 use App\Ai\Agents\TenantChatAgent;
 use App\Models\AiUsageLog;
 use App\Models\Tenant;
+use App\Models\TenantAiSetting;
 use Laravel\Ai\Ai;
 use Laravel\Ai\Embeddings;
 use Laravel\Ai\Messages\Message;
@@ -18,12 +19,12 @@ class OpenAIService
     public function createEmbedding(Tenant $tenant, string $text, array $context = []): array
     {
         $settings = $this->usableSettings($tenant);
-        $this->configureOpenAiProvider($settings);
+        $provider = $this->configureProvider($settings);
 
         try {
             $response = Embeddings::for([$text])
                 ->timeout(45)
-                ->generate('openai', $settings->embedding_model);
+                ->generate($provider, $settings->embedding_model);
 
             $this->logUsage($tenant, 'embedding', $response->meta->model ?? $settings->embedding_model, [
                 'prompt_tokens' => $response->tokens,
@@ -41,13 +42,13 @@ class OpenAIService
     {
         $settings = $this->usableSettings($tenant);
         $model = $options['model'] ?? $settings->chat_model;
-        $this->configureOpenAiProvider($settings);
+        $provider = $this->configureProvider($settings);
 
         try {
             $response = $this->prompt($messages, $options)
                 ->prompt(
                     $this->currentPrompt($messages),
-                    provider: 'openai',
+                    provider: $provider,
                     model: $model,
                     timeout: 60,
                 );
@@ -75,13 +76,13 @@ class OpenAIService
     {
         $settings = $this->usableSettings($tenant);
         $model = $options['model'] ?? $settings->chat_model;
-        $this->configureOpenAiProvider($settings);
+        $provider = $this->configureProvider($settings);
 
         try {
             return $this->prompt($messages, $options)
                 ->stream(
                     $this->currentPrompt($messages),
-                    provider: 'openai',
+                    provider: $provider,
                     model: $model,
                     timeout: 60,
                 )
@@ -100,11 +101,19 @@ class OpenAIService
             throw new RuntimeException('API key is missing.');
         }
 
-        $this->configureOpenAiProvider($settings);
+        $provider = $this->configureProvider($settings);
 
         Embeddings::for(['connection test'])
             ->timeout(20)
-            ->generate('openai', $settings->embedding_model);
+            ->generate($provider, $settings->embedding_model);
+
+        $this->prompt([], [])
+            ->prompt(
+                'Reply with OK.',
+                provider: $provider,
+                model: $settings->chat_model,
+                timeout: 20,
+            );
 
         return true;
     }
@@ -154,7 +163,7 @@ class OpenAIService
             ->all();
     }
 
-    private function usableSettings(Tenant $tenant)
+    private function usableSettings(Tenant $tenant): TenantAiSetting
     {
         $settings = $tenant->aiSetting;
 
@@ -165,16 +174,28 @@ class OpenAIService
         return $settings;
     }
 
-    private function configureOpenAiProvider($settings): void
+    private function configureProvider(TenantAiSetting $settings): string
     {
+        $provider = $settings->provider;
+
         config([
-            'ai.providers.openai.key' => $settings->api_key,
-            'ai.providers.openai.url' => rtrim($settings->base_url, '/'),
-            'ai.providers.openai.models.text.default' => $settings->chat_model,
-            'ai.providers.openai.models.embeddings.default' => $settings->embedding_model,
+            "ai.providers.{$provider}.key" => $settings->api_key,
+            "ai.providers.{$provider}.url" => rtrim($settings->base_url, '/'),
+            "ai.providers.{$provider}.models.text.default" => $settings->chat_model,
+            "ai.providers.{$provider}.models.embeddings.default" => $settings->embedding_model,
+            "ai.providers.{$provider}.models.embeddings.dimensions" => $settings->embedding_dimensions,
         ]);
 
-        Ai::forgetInstance('openai');
+        if ($provider === 'openrouter') {
+            config([
+                'ai.providers.openrouter.http_referer' => config('app.url'),
+                'ai.providers.openrouter.x_title' => config('app.name'),
+            ]);
+        }
+
+        Ai::forgetInstance($provider);
+
+        return $provider;
     }
 
     private function logAgentUsage(Tenant $tenant, string $type, AgentResponse $response, array $context = []): void
@@ -193,7 +214,7 @@ class OpenAIService
             'conversation_id' => $context['conversation_id'] ?? null,
             'knowledge_source_id' => $context['knowledge_source_id'] ?? null,
             'type' => $type,
-            'provider' => 'openai',
+            'provider' => $tenant->aiSetting?->provider ?? 'openai',
             'model' => $model,
             'input_tokens' => $usage['prompt_tokens'] ?? null,
             'output_tokens' => $usage['completion_tokens'] ?? null,

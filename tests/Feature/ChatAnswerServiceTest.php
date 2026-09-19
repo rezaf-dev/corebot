@@ -10,7 +10,7 @@ use App\Services\Rag\SemanticSearchService;
 use Illuminate\Support\Collection;
 
 it('uses the llm for general replies when no chunks are available', function () {
-    $tenant = Tenant::create(['name' => 'Demo', 'slug' => 'demo-chat-answer', 'status' => 'active']);
+    $tenant = Tenant::create(['name' => 'NTR Chemical', 'slug' => 'demo-chat-answer', 'status' => 'active']);
     $tenant->aiSetting()->create([
         'provider' => 'openai',
         'api_key' => 'sk-test',
@@ -36,6 +36,9 @@ it('uses the llm for general replies when no chunks are available', function () 
         ->once()
         ->withArgs(fn ($tenant, array $messages) => $tenant->is($bot->tenant)
             && str_contains($messages[0]['content'], 'No matching knowledge base context was found')
+            && str_contains($messages[0]['content'], 'You are a customer support representative for NTR Chemical')
+            && str_contains($messages[0]['content'], 'first-person language such as "we", "our", and "us"')
+            && str_contains($messages[0]['content'], 'Do not begin with phrases such as "Based on the provided context"')
             && $messages[1]['content'] === 'hello')
         ->andReturn([
             'choices' => [
@@ -85,6 +88,10 @@ it('does not request contact when retrieval is confident', function () {
     $this->mock(OpenAIService::class)
         ->shouldReceive('createChatCompletion')
         ->once()
+        ->withArgs(fn ($tenant, array $messages) => str_contains(
+            $messages[0]['content'],
+            'Speak as a member of Demo, not as an outside observer.',
+        ))
         ->andReturn([
             'choices' => [
                 ['message' => ['content' => 'Here is the answer.']],

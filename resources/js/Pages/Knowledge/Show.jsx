@@ -159,6 +159,10 @@ export default function Show({ source, faq, chunks }) {
                                 <MetaItem label="File size" value={formatFileSize(source.file_size)} />
                             )}
                             {source.mime_type && <MetaItem label="MIME type" value={source.mime_type} />}
+                            {source.source_url && <MetaItem label="Website" value={source.source_url} />}
+                            {source.type === 'website' && (
+                                <MetaItem label="Pages crawled" value={`${source.crawled_pages_count ?? 0} / ${source.crawl_page_limit}`} />
+                            )}
                         </dl>
                     )}
 
@@ -380,7 +384,7 @@ function ProcessingProgress({ status }) {
 }
 
 function TypeBadge({ type }) {
-    const labels = { text: 'Text', faq: 'FAQ', pdf: 'PDF', docx: 'Word' };
+    const labels = { text: 'Text', faq: 'FAQ', pdf: 'PDF', docx: 'Word', website: 'Website' };
 
     return (
         <span className="inline-flex rounded-md bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300">

@@ -37,6 +37,7 @@ it('stores api keys encrypted and exposes only masked keys', function () {
     [$tenant, $user] = tenantAdmin();
 
     $this->actingAs($user)->put(route('ai-settings.update'), [
+        'provider' => 'openai',
         'api_key' => 'sk-testabcd',
         'base_url' => 'https://api.openai.com/v1',
         'chat_model' => 'gpt-4o-mini',
@@ -53,7 +54,7 @@ it('stores api keys encrypted and exposes only masked keys', function () {
         ->and($settings->last_test_status)->toBeNull();
 });
 
-it('keeps the existing api key when the update leaves api_key blank', function () {
+it('keeps the existing api key and requires retesting when models change', function () {
     [$tenant, $user] = tenantAdmin();
 
     $tenant->aiSetting()->create([
@@ -67,6 +68,7 @@ it('keeps the existing api key when the update leaves api_key blank', function (
     ]);
 
     $this->actingAs($user)->put(route('ai-settings.update'), [
+        'provider' => 'openai',
         'api_key' => '',
         'base_url' => 'https://api.openai.com/v1',
         'chat_model' => 'gpt-4.1-mini',
@@ -78,7 +80,8 @@ it('keeps the existing api key when the update leaves api_key blank', function (
     expect($settings->api_key)->toBe('sk-existing-key')
         ->and($settings->chat_model)->toBe('gpt-4.1-mini')
         ->and($settings->embedding_model)->toBe('text-embedding-3-large')
-        ->and($settings->is_active)->toBeTrue();
+        ->and($settings->is_active)->toBeFalse()
+        ->and($settings->last_test_status)->toBeNull();
 });
 
 it('validates ai settings fields', function () {
@@ -86,11 +89,65 @@ it('validates ai settings fields', function () {
 
     $this->actingAs($user)
         ->put(route('ai-settings.update'), [
+            'provider' => 'unsupported',
             'base_url' => 'not-a-url',
             'chat_model' => '',
             'embedding_model' => '',
         ])
-        ->assertSessionHasErrors(['base_url', 'chat_model', 'embedding_model']);
+        ->assertSessionHasErrors(['provider', 'base_url', 'chat_model', 'embedding_model']);
+});
+
+it('stores openrouter settings and requires a replacement key when switching providers', function () {
+    [$tenant, $user] = tenantAdmin();
+
+    $tenant->aiSetting()->create([
+        'provider' => 'openai',
+        'api_key_encrypted' => Crypt::encryptString('sk-existing-key'),
+        'base_url' => 'https://api.openai.com/v1',
+        'chat_model' => 'gpt-4o-mini',
+        'embedding_model' => 'text-embedding-3-small',
+        'embedding_dimensions' => 1536,
+        'is_active' => true,
+    ]);
+
+    $payload = [
+        'provider' => 'openrouter',
+        'api_key' => '',
+        'base_url' => 'https://openrouter.ai/api/v1',
+        'chat_model' => 'openai/gpt-4o-mini',
+        'embedding_model' => 'openai/text-embedding-3-small',
+    ];
+
+    $this->actingAs($user)
+        ->put(route('ai-settings.update'), $payload)
+        ->assertSessionHasErrors('api_key');
+
+    $this->actingAs($user)
+        ->put(route('ai-settings.update'), [...$payload, 'api_key' => 'sk-or-v1-test'])
+        ->assertSessionHasNoErrors();
+
+    $settings = $tenant->aiSetting()->first();
+
+    expect($settings->provider)->toBe('openrouter')
+        ->and($settings->api_key)->toBe('sk-or-v1-test')
+        ->and($settings->base_url)->toBe('https://openrouter.ai/api/v1')
+        ->and($settings->chat_model)->toBe('openai/gpt-4o-mini')
+        ->and($settings->embedding_model)->toBe('openai/text-embedding-3-small')
+        ->and($settings->is_active)->toBeFalse();
+});
+
+it('rejects a custom openrouter base url', function () {
+    [, $user] = tenantAdmin();
+
+    $this->actingAs($user)
+        ->put(route('ai-settings.update'), [
+            'provider' => 'openrouter',
+            'api_key' => 'sk-or-v1-test',
+            'base_url' => 'https://example.com/api/v1',
+            'chat_model' => 'openai/gpt-4o-mini',
+            'embedding_model' => 'openai/text-embedding-3-small',
+        ])
+        ->assertSessionHasErrors('base_url');
 });
 
 it('marks settings active when the connection test passes', function () {

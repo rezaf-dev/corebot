@@ -7,6 +7,7 @@ use App\Models\KnowledgeChunk;
 use App\Models\KnowledgeSource;
 use App\Services\AI\OpenAIService;
 use App\Services\Documents\DocumentTextExtractor;
+use App\Services\Knowledge\WebsiteCrawler;
 use App\Services\Rag\TextChunker;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -21,7 +22,7 @@ class ProcessKnowledgeSourceJob implements ShouldQueue
 
     public function __construct(public int $knowledgeSourceId) {}
 
-    public function handle(DocumentTextExtractor $extractor, TextChunker $chunker, OpenAIService $openAI): void
+    public function handle(DocumentTextExtractor $extractor, TextChunker $chunker, OpenAIService $openAI, WebsiteCrawler $crawler): void
     {
         $source = KnowledgeSource::query()->with(['tenant.aiSetting', 'bot'])->findOrFail($this->knowledgeSourceId);
 
@@ -38,6 +39,14 @@ class ProcessKnowledgeSourceJob implements ShouldQueue
 
             if ($this->wasCancelled($source)) {
                 return;
+            }
+
+            if ($source->type === 'website') {
+                $crawl = $crawler->crawl((string) $source->source_url, (int) $source->crawl_page_limit);
+                $source->update([
+                    'raw_text' => $crawl['content'],
+                    'crawled_pages_count' => count($crawl['pages']),
+                ]);
             }
 
             $text = $extractor->extract($source);
@@ -70,6 +79,7 @@ class ProcessKnowledgeSourceJob implements ShouldQueue
                     'metadata' => json_encode([
                         'source_title' => $source->title,
                         'source_type' => $source->type,
+                        'source_url' => $source->source_url,
                         'chunk_index' => $index,
                     ]),
                     'created_at' => now(),
@@ -102,7 +112,7 @@ class ProcessKnowledgeSourceJob implements ShouldQueue
 
                 $source->update([
                     'status' => KnowledgeSourceStatus::Ready->value,
-                    'raw_text' => $source->type === 'text' || $source->type === 'faq' ? $source->raw_text : null,
+                    'raw_text' => in_array($source->type, ['text', 'faq', 'website'], true) ? $source->raw_text : null,
                     'chunks_count' => count($newChunks),
                     'last_indexed_at' => now(),
                 ]);

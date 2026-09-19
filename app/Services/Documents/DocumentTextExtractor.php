@@ -15,7 +15,7 @@ class DocumentTextExtractor
     public function extract(KnowledgeSource $source): string
     {
         $text = match ($source->type) {
-            'text', 'faq' => (string) $source->raw_text,
+            'text', 'faq', 'website' => (string) $source->raw_text,
             'pdf' => $this->pdfs->extract(Storage::path($source->original_file_path)),
             'docx' => $this->docx->extract(Storage::path($source->original_file_path)),
             default => throw new \RuntimeException('Unsupported knowledge source type.'),

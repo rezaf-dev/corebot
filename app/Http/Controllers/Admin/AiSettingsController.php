@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\UpdateAiSettingsRequest;
 use App\Services\AI\OpenAIService;
 use App\Support\TenantAccess;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use Throwable;
@@ -40,19 +40,14 @@ class AiSettingsController extends Controller
         ]);
     }
 
-    public function update(Request $request, TenantAccess $access): RedirectResponse
+    public function update(UpdateAiSettingsRequest $request, TenantAccess $access): RedirectResponse
     {
         $tenant = $access->ensureTenantAdmin(auth()->user());
-        $data = $request->validate([
-            'api_key' => ['nullable', 'string', 'max:500'],
-            'base_url' => ['required', 'url', 'max:255'],
-            'chat_model' => ['required', 'string', 'max:100'],
-            'embedding_model' => ['required', 'string', 'max:100'],
-        ]);
+        $data = $request->validated();
 
         $settings = $tenant->aiSetting()->firstOrNew();
         $settings->fill([
-            'provider' => 'openai',
+            'provider' => $data['provider'],
             'base_url' => $data['base_url'],
             'chat_model' => $data['chat_model'],
             'embedding_model' => $data['embedding_model'],
@@ -61,6 +56,9 @@ class AiSettingsController extends Controller
 
         if (filled($data['api_key'] ?? null)) {
             $settings->api_key = $data['api_key'];
+        }
+
+        if ($settings->isDirty(['provider', 'api_key_encrypted', 'base_url', 'chat_model', 'embedding_model'])) {
             $settings->is_active = false;
             $settings->last_test_status = null;
             $settings->last_test_error = null;
