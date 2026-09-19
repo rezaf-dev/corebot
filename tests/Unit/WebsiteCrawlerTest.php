@@ -9,7 +9,7 @@ it('crawls same origin pages up to the page limit', function () {
     Http::preventStrayRequests();
     Http::fake([
         'https://example.com/docs' => Http::response(
-            '<html><head><title>Docs</title></head><body><main>Documentation home with enough useful words for indexing.</main><a href="/docs/install">Install</a><a href="https://other.test/page">Other</a></body></html>',
+            '<html><head><title>Docs</title></head><body><main>Documentation home with enough useful words for indexing.</main><a href="/docs/install">Install guide</a><a href="/downloads/manual.pdf" download>Download manual</a><a href="https://other.test/page">Community forum</a></body></html>',
             200,
             ['Content-Type' => 'text/html'],
         ),
@@ -28,7 +28,10 @@ it('crawls same origin pages up to the page limit', function () {
         ->and($result['pages'][0]['url'])->toBe('https://example.com/docs')
         ->and($result['pages'][1]['url'])->toBe('https://example.com/docs/install')
         ->and($result['content'])->toContain('Documentation home')
-        ->and($result['content'])->toContain('Installation instructions');
+        ->and($result['content'])->toContain('Installation instructions')
+        ->and($result['content'])->toContain('[Install guide](https://example.com/docs/install)')
+        ->and($result['content'])->toContain('Download: [Download manual](https://example.com/downloads/manual.pdf)')
+        ->and($result['content'])->toContain('[Community forum](https://other.test/page)');
 
     Http::assertNotSent(fn ($request) => str_contains($request->url(), 'other.test'));
 });

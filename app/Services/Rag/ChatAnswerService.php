@@ -72,6 +72,7 @@ class ChatAnswerService
             'sources' => $chunks->map(fn ($chunk) => [
                 'id' => $chunk->id,
                 'title' => $chunk->metadata['source_title'] ?? 'Knowledge source',
+                'url' => $chunk->metadata['source_url'] ?? null,
                 'distance' => $chunk->distance,
             ])->values(),
         ], $retrieval->confident);
@@ -152,6 +153,7 @@ class ChatAnswerService
             'sources' => $chunks->map(fn ($chunk) => [
                 'id' => $chunk->id,
                 'title' => $chunk->metadata['source_title'] ?? 'Knowledge source',
+                'url' => $chunk->metadata['source_url'] ?? null,
                 'distance' => $chunk->distance,
             ])->values(),
         ], $retrieval->confident);
@@ -222,7 +224,13 @@ class ChatAnswerService
             return null;
         }
 
-        return $chunks->map(fn ($chunk) => "[Source: {$chunk->metadata['source_title']}, Chunk ID: {$chunk->id}]\n{$chunk->content}")->implode("\n\n");
+        return $chunks->map(function ($chunk): string {
+            $sourceUrl = filled($chunk->metadata['source_url'] ?? null)
+                ? ", Source URL: {$chunk->metadata['source_url']}"
+                : '';
+
+            return "[Source: {$chunk->metadata['source_title']}, Chunk ID: {$chunk->id}{$sourceUrl}]\n{$chunk->content}";
+        })->implode("\n\n");
     }
 
     private function streamEvent(string $type, array $payload = []): string
@@ -325,6 +333,8 @@ PROMPT);
 Additional rules for this turn:
 - Use only the provided knowledge base context below.
 - If the context does not contain the answer, say you do not know.
+- When the context includes a relevant page or download URL, include a descriptive clickable Markdown link to help the visitor complete their task.
+- Never invent or alter a URL. Only use URLs that appear in the context.
 - If the user needs help from staff, suggest contacting support.
 
 CONTEXT:

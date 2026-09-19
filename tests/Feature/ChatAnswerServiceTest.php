@@ -78,7 +78,12 @@ it('does not request contact when retrieval is confident', function () {
         'status' => 'open',
     ]);
 
-    $chunk = (object) ['id' => 1, 'distance' => 0.1, 'metadata' => ['source_title' => 'FAQ'], 'content' => 'Answer'];
+    $chunk = (object) [
+        'id' => 1,
+        'distance' => 0.1,
+        'metadata' => ['source_title' => 'Website help', 'source_url' => 'https://example.com/help'],
+        'content' => 'Download the guide: [Guide](https://example.com/guide.pdf)',
+    ];
 
     $this->mock(SemanticSearchService::class)
         ->shouldReceive('searchWithMeta')
@@ -88,10 +93,10 @@ it('does not request contact when retrieval is confident', function () {
     $this->mock(OpenAIService::class)
         ->shouldReceive('createChatCompletion')
         ->once()
-        ->withArgs(fn ($tenant, array $messages) => str_contains(
-            $messages[0]['content'],
-            'Speak as a member of Demo, not as an outside observer.',
-        ))
+        ->withArgs(fn ($tenant, array $messages) => str_contains($messages[0]['content'], 'Speak as a member of Demo, not as an outside observer.')
+            && str_contains($messages[0]['content'], 'Source URL: https://example.com/help')
+            && str_contains($messages[0]['content'], '[Guide](https://example.com/guide.pdf)')
+            && str_contains($messages[0]['content'], 'include a descriptive clickable Markdown link'))
         ->andReturn([
             'choices' => [
                 ['message' => ['content' => 'Here is the answer.']],
@@ -101,6 +106,7 @@ it('does not request contact when retrieval is confident', function () {
     $response = app(ChatAnswerService::class)->answer($bot->load('tenant.aiSetting'), $conversation, 'pricing?');
 
     expect($response['needs_contact'])->toBeFalse()
+        ->and($response['sources'][0]['url'])->toBe('https://example.com/help')
         ->and($conversation->fresh()->status)->toBe('open');
 });
 

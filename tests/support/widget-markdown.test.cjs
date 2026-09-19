@@ -24,6 +24,8 @@ function assertIncludes(actual, expected, label) {
 
 assertIncludes(formatMarkdown('**Hello** world'), '<strong>Hello</strong>', 'bold');
 assertIncludes(formatMarkdown('Visit [Docs](https://example.com/docs)'), 'href="https://example.com/docs"', 'safe link');
+assertIncludes(formatMarkdown('Get [the guide](https://example.com/files/guide.pdf)'), 'download data-download-link="true"', 'download link');
+assertIncludes(formatMarkdown('Get [the archive](https://example.com/files/export.zip?version=2)'), 'download data-download-link="true"', 'download link with query');
 assertIncludes(formatMarkdown('Visit [X](javascript:alert(1))'), 'Visit X', 'blocked javascript link');
 assertIncludes(formatMarkdown('`code`'), '<code>code</code>', 'inline code');
 assertIncludes(formatMarkdown('- one\n- two'), '<ul><li>one</li><li>two</li></ul>', 'unordered list');

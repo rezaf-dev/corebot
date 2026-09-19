@@ -40,18 +40,20 @@ class WebsiteCrawler
             }
 
             $remaining = $contentLimit - $contentLength;
-            $content = mb_substr($page['content'], 0, $remaining);
-            $sections[] = "## {$page['title']}\nSource: {$page['url']}\n\n{$content}";
-            $contentLength += mb_strlen($content);
+            $linkIndex = $this->formatLinkIndex($page['links']);
+            $section = "## {$page['title']}\nSource: {$page['url']}\n\n{$page['content']}".$linkIndex;
+            $section = mb_substr($section, 0, $remaining);
+            $sections[] = $section;
+            $contentLength += mb_strlen($section);
             $pages[] = ['url' => $page['url'], 'title' => $page['title']];
 
             foreach ($page['links'] as $link) {
-                if (count($queue) + count($pages) >= $limit || isset($queued[$link])) {
+                if (count($queue) + count($pages) >= $limit || isset($queued[$link['url']])) {
                     continue;
                 }
 
                 try {
-                    $normalized = $this->normalizeUrl($link);
+                    $normalized = $this->normalizeUrl($link['url']);
                 } catch (Throwable) {
                     continue;
                 }
@@ -74,6 +76,23 @@ class WebsiteCrawler
             'pages' => $pages,
             'skipped' => $skipped,
         ];
+    }
+
+    /**
+     * @param  list<array{url: string, label: string, is_download: bool}>  $links
+     */
+    private function formatLinkIndex(array $links): string
+    {
+        if ($links === []) {
+            return '';
+        }
+
+        $items = array_map(
+            fn (array $link): string => '- '.($link['is_download'] ? 'Download: ' : '')."[{$link['label']}]({$link['url']})",
+            $links,
+        );
+
+        return "\n\nUseful links:\n".implode("\n", $items);
     }
 
     private function normalizeUrl(string $url): string

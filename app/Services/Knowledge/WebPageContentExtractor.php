@@ -13,7 +13,7 @@ class WebPageContentExtractor
     public function __construct(private UrlSafety $urlSafety) {}
 
     /**
-     * @return array{url: string, title: string, content: string, links: list<string>}
+     * @return array{url: string, title: string, content: string, links: list<array{url: string, label: string, is_download: bool}>}
      */
     public function fetch(string $url): array
     {
@@ -53,7 +53,7 @@ class WebPageContentExtractor
     }
 
     /**
-     * @return array{url: string, title: string, content: string, links: list<string>}
+     * @return array{url: string, title: string, content: string, links: list<array{url: string, label: string, is_download: bool}>}
      */
     public function extractFromHtml(string $url, string $html): array
     {
@@ -73,7 +73,7 @@ class WebPageContentExtractor
     }
 
     /**
-     * @return list<string>
+     * @return list<array{url: string, label: string, is_download: bool}>
      */
     private function extractLinks(string $pageUrl, string $html): array
     {
@@ -93,11 +93,34 @@ class WebPageContentExtractor
             $resolved = $this->resolveUrl($pageUrl, $href);
 
             if ($resolved !== null) {
-                $links[$resolved] = true;
+                $label = $this->cleanText($anchor->textContent);
+                $links[$resolved] = [
+                    'url' => $resolved,
+                    'label' => mb_substr($label !== '' ? $label : $this->linkLabelFromUrl($resolved), 0, 200),
+                    'is_download' => $anchor->hasAttribute('download') || $this->looksLikeDownload($resolved),
+                ];
+            }
+
+            if (count($links) >= (int) config('corebot.website_crawler.max_links_per_page')) {
+                break;
             }
         }
 
-        return array_keys($links);
+        return array_values($links);
+    }
+
+    private function looksLikeDownload(string $url): bool
+    {
+        $path = strtolower((string) parse_url($url, PHP_URL_PATH));
+
+        return preg_match('/\.(pdf|docx?|xlsx?|pptx?|csv|zip|rar|7z|dmg|exe|msi|apk|pkg|tar|gz)$/', $path) === 1;
+    }
+
+    private function linkLabelFromUrl(string $url): string
+    {
+        $path = trim((string) parse_url($url, PHP_URL_PATH), '/');
+
+        return $path !== '' ? basename($path) : (string) parse_url($url, PHP_URL_HOST);
     }
 
     private function resolveUrl(string $pageUrl, string $href): ?string

@@ -24,7 +24,7 @@ const SOURCE_TYPES = [
     { value: 'faq', label: 'FAQ', description: 'Add a question and answer pair.' },
     { value: 'pdf', label: 'PDF', description: 'Upload a PDF up to 10 MB.' },
     { value: 'docx', label: 'Word', description: 'Upload a .docx file up to 10 MB.' },
-    { value: 'website', label: 'Website', description: 'Crawl and index pages from one website.' },
+    { value: 'website', label: 'Website', description: 'Index page content, navigation, and download links.' },
 ];
 
 export default function Index({ sources, bots, filters, stats, hasActiveSources, research, crawler }) {
@@ -275,7 +275,9 @@ function AddSourceModal({ show, onClose, bots, crawler }) {
                                     className="mt-1 block w-full"
                                     placeholder="https://example.com/docs"
                                 />
-                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Only pages on the same website are followed.</p>
+                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    Same-site pages are crawled. Useful external and download links are preserved for bot answers.
+                                </p>
                                 <InputError message={errors.source_url} className="mt-1" />
                             </div>
                             <div>

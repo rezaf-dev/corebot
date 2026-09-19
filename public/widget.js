@@ -21,6 +21,15 @@ function sanitizeUrl(url) {
     return null;
 }
 
+function isDownloadUrl(url) {
+    try {
+        const parsed = new URL(url);
+        return /\.(pdf|docx?|xlsx?|pptx?|csv|zip|rar|7z|dmg|exe|msi|apk|pkg|tar|gz)$/i.test(parsed.pathname);
+    } catch {
+        return false;
+    }
+}
+
 function applyInlineMarkdown(text) {
     let html = text;
 
@@ -34,10 +43,13 @@ function applyInlineMarkdown(text) {
         if (!safeUrl) {
             return label;
         }
+        const downloadAttributes = isDownloadUrl(safeUrl) ? ' download data-download-link="true"' : '';
         return (
             '<a href="' +
             safeUrl.replace(/"/g, '&quot;') +
-            '" target="_blank" rel="noopener noreferrer">' +
+            '" target="_blank" rel="noopener noreferrer"' +
+            downloadAttributes +
+            '>' +
             label +
             '</a>'
         );
