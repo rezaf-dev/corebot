@@ -12,6 +12,8 @@ use Generator;
 use Laravel\Ai\Streaming\Events\TextDelta;
 use Throwable;
 
+use function Illuminate\Support\defer;
+
 class ChatAnswerService
 {
     public function __construct(

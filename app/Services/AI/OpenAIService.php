@@ -14,6 +14,8 @@ use Laravel\Ai\Responses\StreamableAgentResponse;
 use RuntimeException;
 use Throwable;
 
+use function Illuminate\Support\defer;
+
 class OpenAIService
 {
     public function createEmbedding(Tenant $tenant, string $text, array $context = []): array

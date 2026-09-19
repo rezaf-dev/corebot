@@ -245,6 +245,22 @@ location = /api/public/chat/message/stream {
 
 Do not disable FastCGI buffering globally. If the site is behind an additional reverse proxy, ensure it honors `X-Accel-Buffering: no`; otherwise disable response buffering only for this endpoint. The embedding cache should use Redis in production (`CACHE_STORE=redis`) for consistent results across PHP-FPM workers.
 
+For an installation exposed below a prefix through a second Nginx site, such as `/corebot/`, add the following inside that proxy location:
+
+```nginx
+proxy_http_version 1.1;
+proxy_set_header Connection "";
+proxy_buffering off;
+proxy_request_buffering off;
+proxy_cache off;
+gzip off;
+proxy_read_timeout 120s;
+proxy_send_timeout 120s;
+add_header X-Accel-Buffering "no" always;
+```
+
+Some Forge servers load the Swoole PHP extension, which defines its own global `defer()` function. Application code must import Laravel's helper with `use function Illuminate\Support\defer;` instead of relying on the global helper.
+
 After deploy: `php artisan horizon:terminate`
 
 Install on the server: Poppler (`pdftotext`), Python + `python-docx` if you use DOCX sources.
