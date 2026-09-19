@@ -9,4 +9,5 @@ Route::middleware('throttle:public-chat')->prefix('public/chat')->group(function
     Route::post('/message', [PublicChatController::class, 'message']);
     Route::post('/message/stream', [PublicChatController::class, 'stream']);
     Route::post('/contact', [PublicChatController::class, 'contact']);
+    Route::post('/manual-messages', [PublicChatController::class, 'manualMessages']);
 });

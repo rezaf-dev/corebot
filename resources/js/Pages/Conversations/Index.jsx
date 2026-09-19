@@ -3,16 +3,16 @@ import { Head, Link } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
 export default function Index({ conversations }) {
-    const [filter, setFilter] = useState('all');
+    const [filter, setFilter] = useState('needs_reply');
 
     const stats = useMemo(() => {
         const open = conversations.filter((c) => c.status === 'open').length;
         const escalated = conversations.filter((c) => c.status === 'escalated').length;
         const messages = conversations.reduce((sum, c) => sum + (c.messages_count || 0), 0);
         const withContact = conversations.filter((c) => hasContact(c)).length;
-        const needsFollowUp = conversations.filter((c) => c.status === 'escalated' && !hasContact(c)).length;
+        const needsReply = conversations.filter((c) => c.status === 'escalated').length;
 
-        return { total: conversations.length, open, escalated, messages, withContact, needsFollowUp };
+        return { total: conversations.length, open, escalated, messages, withContact, needsReply };
     }, [conversations]);
 
     const filtered = useMemo(() => {
@@ -24,8 +24,8 @@ export default function Index({ conversations }) {
             return conversations.filter((c) => hasContact(c));
         }
 
-        if (filter === 'needs_follow_up') {
-            return conversations.filter((c) => c.status === 'escalated' && !hasContact(c));
+        if (filter === 'needs_reply') {
+            return conversations.filter((c) => c.status === 'escalated');
         }
 
         return conversations;
@@ -48,11 +48,14 @@ export default function Index({ conversations }) {
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <StatCard label="Total conversations" value={stats.total} />
                     <StatCard label="Open" value={stats.open} />
-                    <StatCard label="Escalated" value={stats.escalated} />
+                    <StatCard label="Needs your reply" value={stats.needsReply} accent="amber" />
                     <StatCard label="Total messages" value={stats.messages} hint={`${stats.withContact} leads`} />
                 </div>
 
                 <div className="flex flex-wrap gap-2">
+                    <FilterButton active={filter === 'needs_reply'} onClick={() => setFilter('needs_reply')} priority>
+                        Needs your reply ({stats.needsReply})
+                    </FilterButton>
                     <FilterButton active={filter === 'all'} onClick={() => setFilter('all')}>
                         All ({stats.total})
                     </FilterButton>
@@ -61,9 +64,6 @@ export default function Index({ conversations }) {
                     </FilterButton>
                     <FilterButton active={filter === 'leads'} onClick={() => setFilter('leads')}>
                         Has contact ({stats.withContact})
-                    </FilterButton>
-                    <FilterButton active={filter === 'needs_follow_up'} onClick={() => setFilter('needs_follow_up')}>
-                        Needs follow-up ({stats.needsFollowUp})
                     </FilterButton>
                 </div>
 
@@ -113,7 +113,7 @@ function hasContact(conversation) {
     return Boolean(conversation.visitor_email || conversation.visitor_phone || conversation.visitor_name);
 }
 
-function FilterButton({ active, onClick, children }) {
+function FilterButton({ active, onClick, children, priority = false }) {
     return (
         <button
             type="button"
@@ -121,8 +121,12 @@ function FilterButton({ active, onClick, children }) {
             className={
                 'rounded-full px-3 py-1.5 text-xs font-semibold transition ' +
                 (active
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-white text-gray-700 shadow-sm hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700')
+                    ? priority
+                        ? 'bg-amber-500 text-white hover:bg-amber-600'
+                        : 'bg-indigo-600 text-white'
+                    : priority
+                      ? 'border border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-950/60'
+                      : 'bg-white text-gray-700 shadow-sm hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700')
             }
         >
             {children}
@@ -130,9 +134,9 @@ function FilterButton({ active, onClick, children }) {
     );
 }
 
-function StatCard({ label, value, hint }) {
+function StatCard({ label, value, hint, accent }) {
     return (
-        <div className="rounded-lg bg-white p-5 shadow dark:bg-gray-800">
+        <div className={`rounded-lg bg-white p-5 shadow dark:bg-gray-800 ${accent === 'amber' ? 'ring-1 ring-amber-200 dark:ring-amber-900' : ''}`}>
             <div className="text-sm text-gray-500 dark:text-gray-400">{label}</div>
             <div className="mt-2 text-3xl font-semibold text-gray-900 dark:text-white">{value}</div>
             {hint && <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{hint}</div>}
@@ -159,10 +163,11 @@ function EmptyState() {
 
 function ConversationRow({ conversation, layout }) {
     const visitor = formatVisitor(conversation);
+    const needsReply = conversation.status === 'escalated';
 
     if (layout === 'card') {
         return (
-            <article className="rounded-lg bg-white p-5 shadow dark:bg-gray-800">
+            <article className={`rounded-lg bg-white p-5 shadow dark:bg-gray-800 ${needsReply ? 'ring-1 ring-amber-200 dark:ring-amber-900' : ''}`}>
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <Link
@@ -201,13 +206,14 @@ function ConversationRow({ conversation, layout }) {
     }
 
     return (
-        <tr className="hover:bg-gray-50/80 dark:hover:bg-gray-900/40">
+        <tr className={`hover:bg-gray-50/80 dark:hover:bg-gray-900/40 ${needsReply ? 'bg-amber-50/70 dark:bg-amber-950/10' : ''}`}>
             <td className="px-5 py-4">
                 <Link
                     href={route('conversations.show', conversation.id)}
                     className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
                 >
-                    #{conversation.id}
+                    <span className="block">#{conversation.id}</span>
+                    {needsReply && <span className="mt-1 block text-xs font-semibold text-amber-700 dark:text-amber-300">Reply needed</span>}
                 </Link>
             </td>
             <td className="px-5 py-4 text-gray-700 dark:text-gray-300">{conversation.bot?.name || '—'}</td>

@@ -56,6 +56,44 @@ it('uses the llm for general replies when no chunks are available', function () 
     expect($conversation->fresh()->status)->toBe('escalated');
 });
 
+it('uses the current page context to retrieve related knowledge', function () {
+    $tenant = Tenant::create(['name' => 'Demo', 'slug' => 'demo-page-context', 'status' => 'active']);
+    $tenant->aiSetting()->create([
+        'provider' => 'openai',
+        'api_key' => 'sk-test',
+        'base_url' => 'https://api.openai.com/v1',
+        'chat_model' => 'gpt-4o-mini',
+        'embedding_model' => 'text-embedding-3-small',
+        'is_active' => true,
+    ]);
+    $bot = Bot::create(['tenant_id' => $tenant->id, 'name' => 'Support']);
+    $conversation = ChatConversation::create([
+        'tenant_id' => $tenant->id,
+        'bot_id' => $bot->id,
+        'status' => 'open',
+    ]);
+
+    $this->mock(SemanticSearchService::class)
+        ->shouldReceive('searchWithMeta')
+        ->once()
+        ->with($bot, "Can I upgrade?\n\nCurrent page URL: https://example.com/pricing\nPage title: Pricing")
+        ->andReturn(new SearchResult(collect(), confident: false));
+
+    $this->mock(OpenAIService::class)
+        ->shouldReceive('createChatCompletion')
+        ->once()
+        ->andReturn(['choices' => [['message' => ['content' => 'Yes.']]]]);
+
+    $response = app(ChatAnswerService::class)->answer(
+        $bot->load('tenant.aiSetting'),
+        $conversation,
+        'Can I upgrade?',
+        ['url' => 'https://example.com/pricing', 'title' => 'Pricing'],
+    );
+
+    expect($response['message'])->toBe('Yes.');
+});
+
 it('does not request contact when retrieval is confident', function () {
     $tenant = Tenant::create(['name' => 'Demo', 'slug' => 'demo-chat-confident', 'status' => 'active']);
     $tenant->aiSetting()->create([

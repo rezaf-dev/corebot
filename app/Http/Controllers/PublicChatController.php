@@ -87,18 +87,18 @@ class PublicChatController extends Controller
 
     public function message(Request $request, ChatAnswerService $answerService): JsonResponse
     {
-        [$bot, $conversation, $message] = $this->messageContext($request);
+        [$bot, $conversation, $message, $pageContext] = $this->messageContext($request);
 
-        return response()->json($answerService->answer($bot->loadMissing('integrations'), $conversation, $message));
+        return response()->json($answerService->answer($bot->loadMissing('integrations'), $conversation, $message, $pageContext));
     }
 
     public function stream(Request $request, ChatAnswerService $answerService): StreamedResponse
     {
-        [$bot, $conversation, $message] = $this->messageContext($request);
+        [$bot, $conversation, $message, $pageContext] = $this->messageContext($request);
 
         return response()->stream(
-            function () use ($answerService, $bot, $conversation, $message): Generator {
-                yield from $answerService->stream($bot->loadMissing('integrations'), $conversation, $message);
+            function () use ($answerService, $bot, $conversation, $message, $pageContext): Generator {
+                yield from $answerService->stream($bot->loadMissing('integrations'), $conversation, $message, $pageContext);
             },
             headers: [
                 'Content-Type' => 'text/event-stream',
@@ -130,6 +130,30 @@ class PublicChatController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    public function manualMessages(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'bot_public_key' => ['required', 'string'],
+            'conversation_id' => ['required', 'integer'],
+            'after_id' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $bot = $this->activeBot($data['bot_public_key']);
+        $conversation = ChatConversation::query()
+            ->where('id', $data['conversation_id'])
+            ->where('tenant_id', $bot->tenant_id)
+            ->where('bot_id', $bot->id)
+            ->firstOrFail();
+
+        return response()->json([
+            'messages' => $conversation->messages()
+                ->where('role', 'admin')
+                ->where('id', '>', $data['after_id'] ?? 0)
+                ->orderBy('id')
+                ->get(['id', 'content', 'created_at']),
+        ]);
+    }
+
     private function activeBot(string $key, bool $withAiSettings = false): Bot
     {
         $tenantRelation = $withAiSettings ? 'tenant.aiSetting' : 'tenant';
@@ -146,6 +170,8 @@ class PublicChatController extends Controller
             'bot_public_key' => ['required', 'string'],
             'conversation_id' => ['required', 'integer'],
             'message' => ['required', 'string', 'max:2000'],
+            'page.url' => ['nullable', 'url:http,https', 'max:2000'],
+            'page.title' => ['nullable', 'string', 'max:255'],
         ]);
 
         $bot = $this->activeBot($data['bot_public_key'], withAiSettings: true);
@@ -155,7 +181,17 @@ class PublicChatController extends Controller
             ->where('bot_id', $bot->id)
             ->firstOrFail();
 
-        return [$bot, $conversation, $data['message']];
+        $pageContext = array_filter([
+            'url' => $data['page']['url'] ?? null,
+            'title' => $data['page']['title'] ?? null,
+        ]);
+
+        if (isset($pageContext['url'])) {
+            $this->ensureAllowedDomain($bot, $pageContext['url']);
+            $conversation->update(['source_url' => $pageContext['url']]);
+        }
+
+        return [$bot, $conversation, $data['message'], $pageContext];
     }
 
     private function ensureAllowedDomain(Bot $bot, ?string $sourceUrl): void

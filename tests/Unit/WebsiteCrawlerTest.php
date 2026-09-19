@@ -27,6 +27,8 @@ it('crawls same origin pages up to the page limit', function () {
     expect($result['pages'])->toHaveCount(2)
         ->and($result['pages'][0]['url'])->toBe('https://example.com/docs')
         ->and($result['pages'][1]['url'])->toBe('https://example.com/docs/install')
+        ->and($result['pages'][0]['title'])->toBe('Docs')
+        ->and($result['pages'][1]['content'])->toContain('Installation instructions')
         ->and($result['content'])->toContain('Documentation home')
         ->and($result['content'])->toContain('Installation instructions')
         ->and($result['content'])->toContain('[Install guide](https://example.com/docs/install)')

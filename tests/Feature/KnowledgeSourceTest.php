@@ -6,6 +6,11 @@ use App\Models\Bot;
 use App\Models\KnowledgeSource;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\AI\OpenAIService;
+use App\Services\Documents\DocumentTextExtractor;
+use App\Services\Knowledge\WebsiteCrawler;
+use App\Services\Rag\TextChunker;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Queue;
 
 it('renders the knowledge index for tenant admins', function () {
@@ -150,6 +155,58 @@ it('queues a bounded website crawl source', function () {
         ->and($source->status)->toBe(KnowledgeSourceStatus::Queued->value);
 
     Queue::assertPushed(ProcessKnowledgeSourceJob::class, fn (ProcessKnowledgeSourceJob $job) => $job->knowledgeSourceId === $source->id);
+});
+
+it('indexes website chunks with their crawled page provenance', function () {
+    [$tenant] = tenantAdmin();
+    $tenant->aiSetting()->create([
+        'provider' => 'openai',
+        'api_key_encrypted' => Crypt::encryptString('sk-test'),
+        'base_url' => 'https://api.openai.com/v1',
+        'chat_model' => 'gpt-4o-mini',
+        'embedding_model' => 'text-embedding-3-small',
+        'is_active' => true,
+    ]);
+    $bot = Bot::create(['tenant_id' => $tenant->id, 'name' => 'Support']);
+    $source = KnowledgeSource::create([
+        'tenant_id' => $tenant->id,
+        'bot_id' => $bot->id,
+        'type' => 'website',
+        'title' => 'Documentation',
+        'source_url' => 'https://example.com/docs',
+        'status' => KnowledgeSourceStatus::Queued->value,
+    ]);
+
+    $crawler = Mockery::mock(WebsiteCrawler::class);
+    $crawler->shouldReceive('crawl')->once()->andReturn([
+        'content' => 'Combined website text',
+        'pages' => [
+            ['url' => 'https://example.com/docs', 'title' => 'Docs', 'content' => 'Documentation overview'],
+            ['url' => 'https://example.com/pricing', 'title' => 'Pricing', 'content' => 'Pricing and upgrade details'],
+        ],
+        'skipped' => 0,
+    ]);
+    $openAI = Mockery::mock(OpenAIService::class);
+    $openAI->shouldReceive('createEmbedding')->twice()->andReturn([0.1, 0.2]);
+    $extractor = Mockery::mock(DocumentTextExtractor::class);
+    $extractor->shouldNotReceive('extract');
+
+    (new ProcessKnowledgeSourceJob($source->id))->handle($extractor, new TextChunker, $openAI, $crawler);
+
+    $source->refresh();
+    expect($source->status)->toBe(KnowledgeSourceStatus::Ready->value);
+
+    $chunks = $source->chunks()->orderBy('chunk_index')->get();
+
+    expect($chunks)->toHaveCount(2)
+        ->and($chunks[0]->metadata)->toMatchArray([
+            'source_title' => 'Docs',
+            'source_url' => 'https://example.com/docs',
+        ])
+        ->and($chunks[1]->metadata)->toMatchArray([
+            'source_title' => 'Pricing',
+            'source_url' => 'https://example.com/pricing',
+        ]);
 });
 
 it('rejects website crawls above the configured page limit', function () {

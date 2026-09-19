@@ -28,6 +28,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'utm_medium',
     'utm_campaign',
     'contact_notified_at',
+    'manual_handoff_notified_at',
 ])]
 class ChatConversation extends Model
 {
@@ -55,6 +56,7 @@ class ChatConversation extends Model
     {
         return [
             'contact_notified_at' => 'datetime',
+            'manual_handoff_notified_at' => 'datetime',
         ];
     }
 }

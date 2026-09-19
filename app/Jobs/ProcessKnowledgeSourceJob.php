@@ -47,10 +47,25 @@ class ProcessKnowledgeSourceJob implements ShouldQueue
                     'raw_text' => $crawl['content'],
                     'crawled_pages_count' => count($crawl['pages']),
                 ]);
-            }
 
-            $text = $extractor->extract($source);
-            $chunks = $chunker->chunk($text);
+                $chunks = collect($crawl['pages'])
+                    ->flatMap(function (array $page) use ($chunker): array {
+                        return array_map(fn (string $content): array => [
+                            'content' => $content,
+                            'source_title' => $page['title'],
+                            'source_url' => $page['url'],
+                        ], $chunker->chunk($page['content']));
+                    })
+                    ->values()
+                    ->all();
+            } else {
+                $text = $extractor->extract($source);
+                $chunks = array_map(fn (string $content): array => [
+                    'content' => $content,
+                    'source_title' => $source->title,
+                    'source_url' => $source->source_url,
+                ], $chunker->chunk($text));
+            }
 
             if ($chunks === []) {
                 throw new \RuntimeException('No useful chunks were generated.');
@@ -58,12 +73,12 @@ class ProcessKnowledgeSourceJob implements ShouldQueue
 
             $newChunks = [];
 
-            foreach ($chunks as $index => $content) {
+            foreach ($chunks as $index => $chunk) {
                 if ($this->wasCancelled($source)) {
                     return;
                 }
 
-                $embedding = $openAI->createEmbedding($source->tenant, $content, [
+                $embedding = $openAI->createEmbedding($source->tenant, $chunk['content'], [
                     'bot_id' => $source->bot_id,
                     'knowledge_source_id' => $source->id,
                 ]);
@@ -72,14 +87,14 @@ class ProcessKnowledgeSourceJob implements ShouldQueue
                     'tenant_id' => $source->tenant_id,
                     'bot_id' => $source->bot_id,
                     'knowledge_source_id' => $source->id,
-                    'content' => $content,
+                    'content' => $chunk['content'],
                     'embedding_json' => json_encode($embedding),
-                    'token_count' => str_word_count($content),
+                    'token_count' => str_word_count($chunk['content']),
                     'chunk_index' => $index,
                     'metadata' => json_encode([
-                        'source_title' => $source->title,
+                        'source_title' => $chunk['source_title'],
                         'source_type' => $source->type,
-                        'source_url' => $source->source_url,
+                        'source_url' => $chunk['source_url'],
                         'chunk_index' => $index,
                     ]),
                     'created_at' => now(),

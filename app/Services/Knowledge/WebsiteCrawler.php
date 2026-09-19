@@ -13,7 +13,7 @@ class WebsiteCrawler
     ) {}
 
     /**
-     * @return array{content: string, pages: list<array{url: string, title: string}>, skipped: int}
+     * @return array{content: string, pages: list<array{url: string, title: string, content: string}>, skipped: int}
      */
     public function crawl(string $startUrl, int $pageLimit): array
     {
@@ -45,7 +45,11 @@ class WebsiteCrawler
             $section = mb_substr($section, 0, $remaining);
             $sections[] = $section;
             $contentLength += mb_strlen($section);
-            $pages[] = ['url' => $page['url'], 'title' => $page['title']];
+            $pages[] = [
+                'url' => $page['url'],
+                'title' => $page['title'],
+                'content' => $page['content'],
+            ];
 
             foreach ($page['links'] as $link) {
                 if (count($queue) + count($pages) >= $limit || isset($queued[$link['url']])) {

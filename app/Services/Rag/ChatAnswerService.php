@@ -6,6 +6,7 @@ use App\Models\Bot;
 use App\Models\ChatConversation;
 use App\Models\RetrievalLog;
 use App\Services\AI\OpenAIService;
+use App\Services\Conversations\ManualHandoffNotifier;
 use App\Services\Integrations\IntegrationToolFactory;
 use App\Support\BotContactConfig;
 use Generator;
@@ -20,9 +21,10 @@ class ChatAnswerService
         private readonly SemanticSearchService $search,
         private readonly OpenAIService $openAI,
         private readonly IntegrationToolFactory $integrationTools,
+        private readonly ManualHandoffNotifier $manualHandoffNotifier,
     ) {}
 
-    public function answer(Bot $bot, ChatConversation $conversation, string $userMessage): array
+    public function answer(Bot $bot, ChatConversation $conversation, string $userMessage, array $pageContext = []): array
     {
         $conversation->messages()->create([
             'tenant_id' => $bot->tenant_id,
@@ -31,7 +33,7 @@ class ChatAnswerService
             'content' => $userMessage,
         ]);
 
-        $retrieval = $this->retrieve($bot, $conversation, $userMessage);
+        $retrieval = $this->retrieve($bot, $conversation, $userMessage, $pageContext);
 
         if (is_array($retrieval)) {
             return $retrieval;
@@ -80,7 +82,7 @@ class ChatAnswerService
         ], $retrieval->confident);
     }
 
-    public function stream(Bot $bot, ChatConversation $conversation, string $userMessage): Generator
+    public function stream(Bot $bot, ChatConversation $conversation, string $userMessage, array $pageContext = []): Generator
     {
         $conversation->messages()->create([
             'tenant_id' => $bot->tenant_id,
@@ -89,7 +91,7 @@ class ChatAnswerService
             'content' => $userMessage,
         ]);
 
-        $retrieval = $this->retrieve($bot, $conversation, $userMessage);
+        $retrieval = $this->retrieve($bot, $conversation, $userMessage, $pageContext);
 
         if (is_array($retrieval)) {
             yield $this->streamEvent('text_delta', ['delta' => $retrieval['message']]);
@@ -217,13 +219,27 @@ class ChatAnswerService
         return $messages;
     }
 
-    private function retrieve(Bot $bot, ChatConversation $conversation, string $userMessage): array|SearchResult
+    private function retrieve(Bot $bot, ChatConversation $conversation, string $userMessage, array $pageContext): array|SearchResult
     {
         try {
-            return $this->search->searchWithMeta($bot, $userMessage);
+            return $this->search->searchWithMeta($bot, $this->pageAwareQuery($userMessage, $pageContext));
         } catch (Throwable) {
             return $this->fallback($bot, $conversation, $userMessage, 'AI settings are unavailable.');
         }
+    }
+
+    /**
+     * @param  array{url?: string, title?: string}  $pageContext
+     */
+    private function pageAwareQuery(string $userMessage, array $pageContext): string
+    {
+        if (! isset($pageContext['url'])) {
+            return $userMessage;
+        }
+
+        $title = isset($pageContext['title']) ? "\nPage title: {$pageContext['title']}" : '';
+
+        return "{$userMessage}\n\nCurrent page URL: {$pageContext['url']}{$title}";
     }
 
     private function context($chunks): ?string
@@ -248,7 +264,7 @@ class ChatAnswerService
 
     private function fallback(Bot $bot, ChatConversation $conversation, string $query, string $reason): array
     {
-        $conversation->update(['status' => 'escalated']);
+        $this->manualHandoffNotifier->escalate($bot, $conversation);
 
         $assistant = $conversation->messages()->create([
             'tenant_id' => $bot->tenant_id,
@@ -285,7 +301,7 @@ class ChatAnswerService
         $needsContact = $this->shouldRequestContact($bot, $conversation, $confident);
 
         if ($needsContact) {
-            $conversation->update(['status' => 'escalated']);
+            $this->manualHandoffNotifier->escalate($bot, $conversation);
         }
 
         $response['needs_contact'] = $needsContact;

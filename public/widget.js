@@ -32,6 +32,13 @@ function isDownloadUrl(url) {
 
 function applyInlineMarkdown(text) {
     let html = text;
+    const emailLinks = [];
+
+    html = html.replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, (email) => {
+        const placeholder = '\u0000EMAILLINK' + emailLinks.length + '\u0000';
+        emailLinks.push('<a href="mailto:' + email + '">' + email + '</a>');
+        return placeholder;
+    });
 
     html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
     html = html.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
@@ -55,7 +62,23 @@ function applyInlineMarkdown(text) {
         );
     });
 
-    return html;
+    return html.replace(/\u0000EMAILLINK(\d+)\u0000/g, (_, index) => emailLinks[Number(index)] || '');
+}
+
+function messageDirection(text) {
+    const source = String(text || '');
+
+    for (const character of source) {
+        if (/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(character)) {
+            return 'rtl';
+        }
+
+        if (/[A-Za-z\u00C0-\u024F]/.test(character)) {
+            return 'ltr';
+        }
+    }
+
+    return 'ltr';
 }
 
 function formatMarkdown(text) {
@@ -342,6 +365,8 @@ function titleInitial(title) {
     const apiBase = resolveApiBase(script);
     const storageKey = 'crm_ai_bot_' + botKey;
     const state = JSON.parse(localStorage.getItem(storageKey) || '{}');
+    let latestManualMessageId = 0;
+    let manualMessagePolling = null;
     state.visitor_id = state.visitor_id || crypto.randomUUID();
     localStorage.setItem(storageKey, JSON.stringify(state));
 
@@ -457,7 +482,7 @@ function titleInitial(title) {
             await streamMessage(text, assistant);
         } catch {
             try {
-                const res = await post('/message', { conversation_id: state.conversation_id, message: text });
+                const res = await post('/message', { conversation_id: state.conversation_id, message: text, page: pageContext() });
                 setBubbleText(assistant, res.message);
                 if (shouldPromptContact(res)) showContact('fallback');
             } catch {
@@ -525,6 +550,8 @@ function titleInitial(title) {
 
             if (!state.conversation_id) {
                 await startConversation();
+            } else {
+                startManualMessagePolling();
             }
 
             requestAnimationFrame(() => input.focus());
@@ -580,6 +607,7 @@ function titleInitial(title) {
             state.welcome_message = res.welcome_message || welcomeText();
             applyContactConfig(res);
             localStorage.setItem(storageKey, JSON.stringify(state));
+            startManualMessagePolling();
 
             if (res.widget) {
                 config = mergeConfig(config, res.widget);
@@ -649,6 +677,31 @@ function titleInitial(title) {
         return response.json();
     }
 
+    function startManualMessagePolling() {
+        if (manualMessagePolling || !state.conversation_id) return;
+
+        pollManualMessages();
+        manualMessagePolling = window.setInterval(pollManualMessages, 8000);
+    }
+
+    async function pollManualMessages() {
+        if (!state.conversation_id) return;
+
+        try {
+            const response = await post('/manual-messages', {
+                conversation_id: state.conversation_id,
+                after_id: latestManualMessageId,
+            });
+
+            (response.messages || []).forEach((message) => {
+                latestManualMessageId = Math.max(latestManualMessageId, message.id);
+                add('assistant', message.content);
+            });
+        } catch {
+            return;
+        }
+    }
+
     async function streamMessage(text, node) {
         const response = await fetch(apiBase + '/message/stream', {
             method: 'POST',
@@ -657,6 +710,7 @@ function titleInitial(title) {
                 bot_public_key: botKey,
                 conversation_id: state.conversation_id,
                 message: text,
+                page: pageContext(),
             }),
         });
 
@@ -1080,6 +1134,13 @@ function titleInitial(title) {
         };
     }
 
+    function pageContext() {
+        return {
+            url: location.href,
+            title: document.title || null,
+        };
+    }
+
     function parseUtmParams() {
         try {
             const params = new URL(location.href).searchParams;
@@ -1183,6 +1244,7 @@ function titleInitial(title) {
         delete bubble.dataset.rawText;
         bubble.textContent = '';
         bubble.classList.remove('crm-ai-formatted');
+        bubble.removeAttribute('dir');
     }
 
     function messageRole(node) {
@@ -1193,6 +1255,7 @@ function titleInitial(title) {
 
     function setBubbleContent(bubble, text, role) {
         const raw = String(text || '');
+        bubble.dir = messageDirection(raw);
         if (role === 'user') {
             delete bubble.dataset.rawText;
             bubble.classList.remove('crm-ai-formatted');
@@ -1218,6 +1281,7 @@ function titleInitial(title) {
         if (!bubble) return;
         const raw = (bubble.dataset.rawText || bubble.textContent || '') + delta;
         bubble.dataset.rawText = raw;
+        bubble.dir = messageDirection(raw);
         bubble.classList.remove('crm-ai-formatted');
         bubble.textContent = raw;
     }
@@ -1483,7 +1547,9 @@ function titleInitial(title) {
                 font-size: 14px;
                 word-wrap: break-word;
                 overflow-wrap: anywhere;
+                text-align: start;
             }
+            .crm-ai-bubble[dir="rtl"] { text-align: right; }
             .crm-ai-user .crm-ai-bubble {
                 background: var(--crm-accent);
                 color: #fff;
@@ -1548,7 +1614,7 @@ function titleInitial(title) {
             }
             .crm-ai-bubble.crm-ai-formatted ul,
             .crm-ai-bubble.crm-ai-formatted ol {
-                padding-left: 1.25em;
+                padding-inline-start: 1.25em;
             }
             .crm-ai-bubble.crm-ai-formatted li + li { margin-top: 0.2em; }
             .crm-ai-bubble.crm-ai-formatted code {
@@ -1574,8 +1640,8 @@ function titleInitial(title) {
             }
             .crm-ai-bubble.crm-ai-formatted blockquote {
                 margin: 0 0 0.55em;
-                padding-left: 10px;
-                border-left: 3px solid var(--crm-border);
+                padding-inline-start: 10px;
+                border-inline-start: 3px solid var(--crm-border);
                 color: var(--crm-muted);
             }
             .crm-ai-assistant .crm-ai-bubble.crm-ai-formatted a {

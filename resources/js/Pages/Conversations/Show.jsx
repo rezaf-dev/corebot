@@ -1,9 +1,10 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 
 export default function Show({ conversation }) {
     const [expandedLogs, setExpandedLogs] = useState({});
+    const replyForm = useForm({ message: '' });
 
     const toggleLog = (id) => {
         setExpandedLogs((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -11,6 +12,14 @@ export default function Show({ conversation }) {
 
     const visitorMessages = conversation.messages.filter((m) => m.role === 'user').length;
     const assistantMessages = conversation.messages.filter((m) => m.role === 'assistant').length;
+
+    const sendReply = (event) => {
+        event.preventDefault();
+        replyForm.post(route('conversations.messages.store', conversation.id), {
+            preserveScroll: true,
+            onSuccess: () => replyForm.reset(),
+        });
+    };
 
     return (
         <AuthenticatedLayout
@@ -57,12 +66,47 @@ export default function Show({ conversation }) {
                             ))}
                         </div>
                     )}
+
+                    <form
+                        onSubmit={sendReply}
+                        className="sticky bottom-4 rounded-xl border border-indigo-100 bg-white p-4 shadow-lg dark:border-indigo-900/70 dark:bg-gray-800"
+                    >
+                        <div className="flex items-center justify-between gap-3">
+                            <label htmlFor="manual-message" className="text-sm font-semibold text-gray-900 dark:text-white">
+                                Send a manual reply
+                            </label>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">The visitor will see this in the chat widget.</span>
+                        </div>
+                        <textarea
+                            id="manual-message"
+                            value={replyForm.data.message}
+                            onChange={(event) => replyForm.setData('message', event.target.value)}
+                            placeholder="Write your response…"
+                            rows="4"
+                            disabled={replyForm.processing}
+                            className="mt-3 block w-full rounded-lg border-gray-300 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:placeholder:text-gray-500 dark:disabled:bg-gray-900"
+                        />
+                        {replyForm.errors.message && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{replyForm.errors.message}</p>}
+                        <div className="mt-3 flex items-center justify-between gap-3">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Sending clears this conversation from the reply-needed queue.</p>
+                            <button
+                                type="submit"
+                                disabled={replyForm.processing || !replyForm.data.message.trim()}
+                                className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {replyForm.processing ? 'Sending…' : 'Send reply'}
+                            </button>
+                        </div>
+                    </form>
                 </section>
 
                 <aside className="space-y-4">
                     <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
                         <div className="flex flex-wrap items-center gap-2">
                             <StatusBadge status={conversation.status} />
+                            {conversation.status === 'escalated' && (
+                                <span className="text-sm font-medium text-amber-700 dark:text-amber-300">A manual reply is needed.</span>
+                            )}
                         </div>
 
                         <dl className="mt-5 space-y-4">
@@ -209,6 +253,7 @@ function MessageBubble({ message }) {
     const isUser = message.role === 'user';
     const isAssistant = message.role === 'assistant';
     const isSystem = message.role === 'system';
+    const isAdmin = message.role === 'admin';
 
     return (
         <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -216,6 +261,8 @@ function MessageBubble({ message }) {
                 className={`max-w-[85%] rounded-2xl px-4 py-3 ${
                     isUser
                         ? 'bg-indigo-600 text-white'
+                        : isAdmin
+                          ? 'border border-indigo-200 bg-indigo-50 text-gray-900 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-gray-100'
                         : isAssistant
                           ? 'border border-gray-200 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100'
                           : 'border border-dashed border-gray-300 bg-gray-50 text-gray-600 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-400'
@@ -224,10 +271,10 @@ function MessageBubble({ message }) {
                 <div className="flex items-center justify-between gap-4">
                     <span
                         className={`text-xs font-semibold uppercase tracking-wide ${
-                            isUser ? 'text-indigo-200' : 'text-gray-500 dark:text-gray-400'
+                            isUser ? 'text-indigo-200' : isAdmin ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-500 dark:text-gray-400'
                         }`}
                     >
-                        {message.role}
+                        {isAdmin ? 'admin reply' : message.role}
                     </span>
                     {message.created_at && (
                         <span className={`text-xs ${isUser ? 'text-indigo-200' : 'text-gray-400'}`}>

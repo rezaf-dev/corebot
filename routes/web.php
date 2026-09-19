@@ -48,6 +48,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/conversations', [ConversationController::class, 'index'])->name('conversations.index');
     Route::get('/conversations/{conversation}', [ConversationController::class, 'show'])->name('conversations.show');
+    Route::post('/conversations/{conversation}/messages', [ConversationController::class, 'storeMessage'])->name('conversations.messages.store');
 
     Route::get('/widget-install', WidgetInstallController::class)->name('widget.install');
     Route::put('/widget-install/{bot}', [WidgetInstallController::class, 'update'])->name('widget.install.update');

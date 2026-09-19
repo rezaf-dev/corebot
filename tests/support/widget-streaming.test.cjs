@@ -12,6 +12,8 @@ function assertIncludes(expected, label) {
 
 assertIncludes('renderFrame = requestAnimationFrame(flushPendingDelta)', 'frame-batched rendering');
 assertIncludes("bubble.textContent = raw", 'plain text while streaming');
+assertIncludes("bubble.dir = messageDirection(raw)", 'direction updated while streaming');
 assertIncludes("setBubbleText(node, getBubble(node)?.dataset.rawText || '')", 'final markdown rendering');
+assertIncludes('page: pageContext()', 'page context sent with streamed messages');
 
 console.log('widget-streaming tests passed');
