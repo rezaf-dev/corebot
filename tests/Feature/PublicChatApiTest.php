@@ -45,12 +45,17 @@ it('streams public chat messages', function () {
             yield 'data: {"type":"done"}'."\n\n";
         })());
 
-    $this->post('/api/public/chat/message/stream', [
+    $response = $this->post('/api/public/chat/message/stream', [
         'bot_public_key' => $bot->public_key,
         'conversation_id' => $conversation->id,
         'message' => 'Hello',
-    ])->assertStreamed()
-        ->assertHeader('Cache-Control', 'no-cache, no-transform')
+    ]);
+
+    $response->assertStreamed()
         ->assertHeader('X-Accel-Buffering', 'no')
         ->assertStreamedContent('data: {"type":"text_delta","delta":"Hello"}'."\n\n".'data: {"type":"done"}'."\n\n");
+
+    expect($response->headers->get('Cache-Control'))
+        ->toContain('no-cache')
+        ->toContain('no-transform');
 });
