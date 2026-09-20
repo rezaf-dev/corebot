@@ -60,3 +60,30 @@ it('prevents admins from replying to another tenant conversation', function () {
 
     expect($conversation->messages)->toBeEmpty();
 });
+
+it('lets a tenant admin delete a conversation', function () {
+    $tenant = Tenant::create(['name' => 'Demo', 'slug' => 'delete-conversation', 'status' => 'active']);
+    $admin = User::factory()->create(['tenant_id' => $tenant->id, 'role' => 'tenant_admin']);
+    $bot = Bot::create(['tenant_id' => $tenant->id, 'name' => 'Support']);
+    $conversation = ChatConversation::create(['tenant_id' => $tenant->id, 'bot_id' => $bot->id]);
+
+    $this->actingAs($admin)
+        ->delete(route('conversations.destroy', $conversation))
+        ->assertRedirect(route('conversations.index'));
+
+    $this->assertModelMissing($conversation);
+});
+
+it('prevents admins from deleting another tenant conversation', function () {
+    $tenant = Tenant::create(['name' => 'Demo', 'slug' => 'delete-conversation-access', 'status' => 'active']);
+    $admin = User::factory()->create(['tenant_id' => $tenant->id, 'role' => 'tenant_admin']);
+    $otherTenant = Tenant::create(['name' => 'Other', 'slug' => 'delete-conversation-other', 'status' => 'active']);
+    $bot = Bot::create(['tenant_id' => $otherTenant->id, 'name' => 'Support']);
+    $conversation = ChatConversation::create(['tenant_id' => $otherTenant->id, 'bot_id' => $bot->id]);
+
+    $this->actingAs($admin)
+        ->delete(route('conversations.destroy', $conversation))
+        ->assertForbidden();
+
+    $this->assertModelExists($conversation);
+});

@@ -7,6 +7,7 @@ class WidgetConfig
     public const DEFAULTS = [
         'title' => 'Support',
         'subtitle' => 'We typically reply instantly',
+        'avatar_url' => '',
         'primary_color' => '#111827',
         'accent_color' => '#2563eb',
         'background_color' => '#f3f4f6',
@@ -21,6 +22,7 @@ class WidgetConfig
         'send_button_label' => 'Send',
         'input_placeholder' => 'Type your message…',
         'launcher_icon' => 'chat',
+        'launcher_label' => "We're here to help",
         'initial_open' => false,
         'suggested_prompts' => [],
     ];
@@ -65,6 +67,7 @@ class WidgetConfig
         return [
             'title' => ['required', 'string', 'max:80'],
             'subtitle' => ['nullable', 'string', 'max:120'],
+            'avatar_url' => ['nullable', 'url:http,https', 'max:2048'],
             'primary_color' => ['required', 'regex:/^#([A-Fa-f0-9]{6})$/'],
             'accent_color' => ['required', 'regex:/^#([A-Fa-f0-9]{6})$/'],
             'background_color' => ['required', 'regex:/^#([A-Fa-f0-9]{6})$/'],
@@ -79,6 +82,7 @@ class WidgetConfig
             'send_button_label' => ['required', 'string', 'max:24'],
             'input_placeholder' => ['required', 'string', 'max:120'],
             'launcher_icon' => ['required', 'in:'.implode(',', self::icons())],
+            'launcher_label' => ['nullable', 'string', 'max:80'],
             'initial_open' => ['required', 'boolean'],
             'suggested_prompts' => ['nullable', 'array', 'max:4'],
             'suggested_prompts.*' => ['string', 'max:80'],
@@ -95,6 +99,7 @@ class WidgetConfig
         return [
             'data-title' => (string) $config['title'],
             'data-subtitle' => (string) ($config['subtitle'] ?? ''),
+            'data-avatar-url' => (string) ($config['avatar_url'] ?? ''),
             'data-primary-color' => (string) $config['primary_color'],
             'data-accent-color' => (string) $config['accent_color'],
             'data-background-color' => (string) $config['background_color'],
@@ -109,6 +114,7 @@ class WidgetConfig
             'data-send-button-label' => (string) $config['send_button_label'],
             'data-input-placeholder' => (string) $config['input_placeholder'],
             'data-launcher-icon' => (string) $config['launcher_icon'],
+            'data-launcher-label' => (string) ($config['launcher_label'] ?? ''),
             'data-initial-open' => $config['initial_open'] ? 'true' : 'false',
             'data-suggested-prompts' => json_encode($config['suggested_prompts'], JSON_UNESCAPED_UNICODE),
         ];

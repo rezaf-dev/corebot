@@ -18,7 +18,7 @@ class ProcessKnowledgeSourceJob implements ShouldQueue
 {
     use Queueable;
 
-    public int $timeout = 300;
+    public int $timeout = 900;
 
     public function __construct(public int $knowledgeSourceId) {}
 

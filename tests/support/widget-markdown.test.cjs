@@ -28,6 +28,8 @@ assertIncludes(formatMarkdown('Get [the guide](https://example.com/files/guide.p
 assertIncludes(formatMarkdown('Get [the archive](https://example.com/files/export.zip?version=2)'), 'download data-download-link="true"', 'download link with query');
 assertIncludes(formatMarkdown('Visit [X](javascript:alert(1))'), 'Visit X', 'blocked javascript link');
 assertIncludes(formatMarkdown('Email support@example.com for help'), 'href="mailto:support@example.com"', 'plain email link');
+assertIncludes(formatMarkdown('Call us at +1 (555) 123-4567'), 'href="tel:+15551234567"', 'plain phone link');
+assertIncludes(formatMarkdown('[Call support](tel:+1 555 123 4567)'), 'href="tel:+15551234567"', 'markdown phone link');
 assertIncludes(formatMarkdown('Email <script>@example.com'), '&lt;script&gt;@example.com', 'escaped invalid email');
 assertIncludes(formatMarkdown('`code`'), '<code>code</code>', 'inline code');
 assertIncludes(formatMarkdown('- one\n- two'), '<ul><li>one</li><li>two</li></ul>', 'unordered list');

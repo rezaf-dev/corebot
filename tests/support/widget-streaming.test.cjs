@@ -15,5 +15,8 @@ assertIncludes("bubble.textContent = raw", 'plain text while streaming');
 assertIncludes("bubble.dir = messageDirection(raw)", 'direction updated while streaming');
 assertIncludes("setBubbleText(node, getBubble(node)?.dataset.rawText || '')", 'final markdown rendering');
 assertIncludes('page: pageContext()', 'page context sent with streamed messages');
+assertIncludes('showUnreadNotification()', 'closed widget reply notification');
+assertIncludes('playNotificationSound()', 'reply notification sound');
+assertIncludes('crm-ai-launcher-badge', 'unread reply badge');
 
 console.log('widget-streaming tests passed');

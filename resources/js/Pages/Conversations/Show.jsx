@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 
 export default function Show({ conversation }) {
@@ -21,6 +21,14 @@ export default function Show({ conversation }) {
         });
     };
 
+    const destroy = () => {
+        if (!window.confirm('Delete this conversation? This cannot be undone.')) {
+            return;
+        }
+
+        router.delete(route('conversations.destroy', conversation.id));
+    };
+
     return (
         <AuthenticatedLayout
             header={
@@ -33,12 +41,21 @@ export default function Show({ conversation }) {
                             {conversation.bot?.name} · {formatDateTime(conversation.created_at)}
                         </p>
                     </div>
-                    <Link
-                        href={route('conversations.index')}
-                        className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-semibold normal-case tracking-normal text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-gray-500 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                    >
-                        Back to conversations
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href={route('conversations.index')}
+                            className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-semibold normal-case tracking-normal text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-gray-500 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                        >
+                            Back to conversations
+                        </Link>
+                        <button
+                            type="button"
+                            onClick={destroy}
+                            className="inline-flex items-center rounded-md border border-red-200 bg-white px-4 py-2 text-xs font-semibold normal-case tracking-normal text-red-700 shadow-sm transition hover:bg-red-50 dark:border-red-900 dark:bg-gray-800 dark:text-red-300 dark:hover:bg-red-950/30"
+                        >
+                            Delete
+                        </button>
+                    </div>
                 </div>
             }
         >

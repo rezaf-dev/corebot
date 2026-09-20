@@ -10,6 +10,15 @@ function escapeHtml(text) {
 function sanitizeUrl(url) {
     const trimmed = String(url || '').trim();
     if (!trimmed) return null;
+
+    if (/^tel:/i.test(trimmed)) {
+        const phone = trimmed.replace(/^tel:/i, '').trim();
+        if (/^\+?[0-9][0-9().\-\s]{5,}$/.test(phone)) {
+            return 'tel:' + phone.replace(/[^+0-9]/g, '');
+        }
+        return null;
+    }
+
     try {
         const parsed = new URL(trimmed, 'https://example.invalid');
         if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
@@ -33,10 +42,30 @@ function isDownloadUrl(url) {
 function applyInlineMarkdown(text) {
     let html = text;
     const emailLinks = [];
+    const markdownLinks = [];
+    const phoneLinks = [];
 
     html = html.replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, (email) => {
         const placeholder = '\u0000EMAILLINK' + emailLinks.length + '\u0000';
         emailLinks.push('<a href="mailto:' + email + '">' + email + '</a>');
+        return placeholder;
+    });
+
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => {
+        const safeUrl = sanitizeUrl(url);
+        if (!safeUrl) return label;
+        const downloadAttributes = isDownloadUrl(safeUrl) ? ' download data-download-link="true"' : '';
+        const targetAttributes = safeUrl.startsWith('tel:') ? '' : ' target="_blank" rel="noopener noreferrer"';
+        const placeholder = '\u0000MARKDOWNLINK' + markdownLinks.length + '\u0000';
+        markdownLinks.push('<a href="' + safeUrl.replace(/"/g, '&quot;') + '"' + targetAttributes + downloadAttributes + '>' + label + '</a>');
+        return placeholder;
+    });
+
+    html = html.replace(/(?<![\w+])(?:\+?\d[\d().\-\s]{5,}\d)(?!\w)/g, (phone) => {
+        const safePhone = sanitizeUrl('tel:' + phone);
+        if (!safePhone) return phone;
+        const placeholder = '\u0000PHONELINK' + phoneLinks.length + '\u0000';
+        phoneLinks.push('<a href="' + safePhone + '">' + phone + '</a>');
         return placeholder;
     });
 
@@ -45,24 +74,10 @@ function applyInlineMarkdown(text) {
     html = html.replace(/__([^_\n]+)__/g, '<strong>$1</strong>');
     html = html.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>');
     html = html.replace(/(?<!_)_([^_\n]+)_(?!_)/g, '<em>$1</em>');
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => {
-        const safeUrl = sanitizeUrl(url);
-        if (!safeUrl) {
-            return label;
-        }
-        const downloadAttributes = isDownloadUrl(safeUrl) ? ' download data-download-link="true"' : '';
-        return (
-            '<a href="' +
-            safeUrl.replace(/"/g, '&quot;') +
-            '" target="_blank" rel="noopener noreferrer"' +
-            downloadAttributes +
-            '>' +
-            label +
-            '</a>'
-        );
-    });
-
-    return html.replace(/\u0000EMAILLINK(\d+)\u0000/g, (_, index) => emailLinks[Number(index)] || '');
+    return html
+        .replace(/\u0000EMAILLINK(\d+)\u0000/g, (_, index) => emailLinks[Number(index)] || '')
+        .replace(/\u0000MARKDOWNLINK(\d+)\u0000/g, (_, index) => markdownLinks[Number(index)] || '')
+        .replace(/\u0000PHONELINK(\d+)\u0000/g, (_, index) => phoneLinks[Number(index)] || '');
 }
 
 function messageDirection(text) {
@@ -355,6 +370,25 @@ function titleInitial(title) {
 
     return match ? match[0].toUpperCase() : 'S';
 }
+
+function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
+    const safeUrl = sanitizeUrl(avatarUrl);
+    element.replaceChildren();
+
+    if (safeUrl && !safeUrl.startsWith('tel:')) {
+        const image = document.createElement('img');
+        image.src = safeUrl;
+        image.alt = '';
+        image.className = 'crm-ai-avatar-image';
+        element.appendChild(image);
+        return;
+    }
+
+    const initial = document.createElement('span');
+    initial.className = initialClass;
+    initial.textContent = fallback;
+    element.appendChild(initial);
+}
 /* PROMPT_HELPERS_END */
 
 (function () {
@@ -373,6 +407,7 @@ function titleInitial(title) {
     const DEFAULT_CONFIG = {
         title: 'Support',
         subtitle: 'We typically reply instantly',
+        avatar_url: '',
         primary_color: '#111827',
         accent_color: '#2563eb',
         background_color: '#f3f4f6',
@@ -387,6 +422,7 @@ function titleInitial(title) {
         send_button_label: 'Send',
         input_placeholder: 'Type your message…',
         launcher_icon: 'chat',
+        launcher_label: "We're here to help",
         initial_open: false,
         suggested_prompts: [],
     };
@@ -404,9 +440,10 @@ function titleInitial(title) {
     let initialOpenApplied = false;
     let isLoading = false;
     let isStarting = false;
+    let notificationAudioContext = null;
 
     const LAUNCHER_ICONS = {
-        chat: '<path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z"/>',
+        chat: '<path d="M4 3h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm2 5h12v2H6V8Zm0 4h8v2H6v-2Z"/>',
         help: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/>',
         support: '<path d="M12 1c-4.97 0-9 4.03-9 9v7c0 1.66 1.34 3 3 3h1v-8H5c0-3.87 3.13-7 7-7s7 3.13 7 7v1h-2c-1.1 0-2 .9-2 2v6c0 1.1.9 2 2 2h4c1.1 0 2-.9 2-2v-6c0-4.97-4.03-9-9-9z"/>',
     };
@@ -423,12 +460,14 @@ function titleInitial(title) {
     const closeBtn = root.querySelector('.crm-ai-close');
     const headTitle = root.querySelector('.crm-ai-head-title');
     const headSub = root.querySelector('.crm-ai-head-sub');
-    const headInitial = root.querySelector('.crm-ai-head-initial');
+    const headAvatar = root.querySelector('.crm-ai-head-avatar');
     const messages = root.querySelector('.crm-ai-msgs');
     const form = root.querySelector('.crm-ai-form');
     const input = form.querySelector('input');
     const sendBtn = form.querySelector('.crm-ai-send');
     const contact = root.querySelector('.crm-ai-contact');
+    const launcherLabel = root.querySelector('.crm-ai-launcher-label');
+    const launcherBadge = root.querySelector('.crm-ai-launcher-badge');
     const isMobile = () => window.matchMedia('(max-width: 480px)').matches;
 
     renderContactForm({});
@@ -450,6 +489,7 @@ function titleInitial(title) {
     });
 
     button.addEventListener('click', () => togglePanel());
+    button.addEventListener('pointerdown', unlockNotificationSound, { once: true });
     closeBtn.addEventListener('click', () => togglePanel(false));
 
     document.addEventListener('keydown', (event) => {
@@ -541,11 +581,13 @@ function titleInitial(title) {
         panel.classList.toggle('is-open', isOpen);
         button.classList.toggle('is-open', isOpen);
         button.classList.toggle('is-hidden', isOpen && isMobile());
+        launcherLabel.classList.toggle('is-hidden', isOpen);
         button.setAttribute('aria-expanded', String(isOpen));
         iconChat.style.display = isOpen ? 'none' : 'block';
         iconClose.style.display = isOpen ? 'block' : 'none';
 
         if (isOpen) {
+            clearUnreadNotification();
             ensureInitialContent();
 
             if (!state.conversation_id) {
@@ -696,6 +738,9 @@ function titleInitial(title) {
             (response.messages || []).forEach((message) => {
                 latestManualMessageId = Math.max(latestManualMessageId, message.id);
                 add('assistant', message.content);
+                if (!isOpen) {
+                    showUnreadNotification();
+                }
             });
         } catch {
             return;
@@ -809,8 +854,10 @@ function titleInitial(title) {
 
         const title = next.title || DEFAULT_CONFIG.title;
         headTitle.textContent = title;
-        headInitial.textContent = titleInitial(title);
+        setAvatarContent(headAvatar, next.avatar_url, titleInitial(title), 'crm-ai-head-initial');
         headSub.textContent = next.subtitle || DEFAULT_CONFIG.subtitle || 'Online';
+        launcherLabel.textContent = next.launcher_label || '';
+        launcherLabel.classList.toggle('is-visible', Boolean(next.launcher_label));
         input.placeholder = next.input_placeholder || DEFAULT_CONFIG.input_placeholder;
         sendBtn.setAttribute('aria-label', next.send_button_label || DEFAULT_CONFIG.send_button_label);
         config.suggested_prompts = parseSuggestedPrompts(next.suggested_prompts);
@@ -832,6 +879,7 @@ function titleInitial(title) {
         return mergeConfig(DEFAULT_CONFIG, {
             title: dataset.title,
             subtitle: dataset.subtitle,
+            avatar_url: dataset.avatarUrl,
             primary_color: dataset.primaryColor,
             accent_color: dataset.accentColor,
             background_color: dataset.backgroundColor,
@@ -846,6 +894,7 @@ function titleInitial(title) {
             send_button_label: dataset.sendButtonLabel,
             input_placeholder: dataset.inputPlaceholder,
             launcher_icon: dataset.launcherIcon,
+            launcher_label: dataset.launcherLabel,
             initial_open: parseBoolean(dataset.initialOpen),
             suggested_prompts: parseSuggestedPrompts(dataset.suggestedPrompts),
         });
@@ -880,6 +929,35 @@ function titleInitial(title) {
             merged[key] = patch[key];
         });
         return merged;
+    }
+
+    function unlockNotificationSound() {
+        if (!window.AudioContext && !window.webkitAudioContext) return;
+        notificationAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+        notificationAudioContext.resume?.();
+    }
+
+    function showUnreadNotification() {
+        launcherBadge.classList.add('is-visible');
+        playNotificationSound();
+    }
+
+    function clearUnreadNotification() {
+        launcherBadge.classList.remove('is-visible');
+    }
+
+    function playNotificationSound() {
+        if (!notificationAudioContext || notificationAudioContext.state === 'suspended') return;
+        const oscillator = notificationAudioContext.createOscillator();
+        const gain = notificationAudioContext.createGain();
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(880, notificationAudioContext.currentTime);
+        gain.gain.setValueAtTime(0.0001, notificationAudioContext.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.07, notificationAudioContext.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, notificationAudioContext.currentTime + 0.18);
+        oscillator.connect(gain).connect(notificationAudioContext.destination);
+        oscillator.start();
+        oscillator.stop(notificationAudioContext.currentTime + 0.2);
     }
 
     function setLoading(loading) {
@@ -1212,7 +1290,7 @@ function titleInitial(title) {
             const avatar = document.createElement('div');
             avatar.className = 'crm-ai-avatar';
             avatar.setAttribute('aria-hidden', 'true');
-            avatar.textContent = titleInitial(config.title);
+            setAvatarContent(avatar, config.avatar_url, titleInitial(config.title));
             wrap.appendChild(avatar);
         }
 
@@ -1322,7 +1400,7 @@ function titleInitial(title) {
                 --crm-launcher-gap: 16px;
                 --crm-focus-ring: rgba(37, 99, 235, 0.15);
                 --crm-online: #22c55e;
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                 -webkit-font-smoothing: antialiased;
             }
             @media (prefers-color-scheme: dark) {
@@ -1373,6 +1451,30 @@ function titleInitial(title) {
             .crm-ai-btn:focus-visible { outline: 3px solid var(--crm-focus-ring); outline-offset: 3px; }
             .crm-ai-btn svg { width: calc(var(--crm-launcher-size) * 0.46); height: calc(var(--crm-launcher-size) * 0.46); fill: currentColor; }
             .crm-ai-btn.is-open { background: var(--crm-muted); }
+            .crm-ai-launcher-label {
+                position: fixed;
+                z-index: 2147483646;
+                display: none;
+                max-width: 220px;
+                padding: 9px 12px;
+                border: 1px solid var(--crm-border);
+                border-radius: 999px;
+                background: var(--crm-surface);
+                box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
+                color: var(--crm-text);
+                font-size: 13px;
+                font-weight: 600;
+                white-space: nowrap;
+            }
+            .crm-ai-launcher-label.is-visible { display: block; }
+            .crm-ai-launcher-label.is-hidden { display: none; }
+            .crm-ai-root[data-position="bottom-right"] .crm-ai-launcher-label { right: calc(var(--crm-offset-x) + var(--crm-launcher-size) + 12px); bottom: calc(var(--crm-offset-y) + 8px); }
+            .crm-ai-root[data-position="bottom-left"] .crm-ai-launcher-label { left: calc(var(--crm-offset-x) + var(--crm-launcher-size) + 12px); bottom: calc(var(--crm-offset-y) + 8px); }
+            .crm-ai-root[data-position="top-right"] .crm-ai-launcher-label { right: calc(var(--crm-offset-x) + var(--crm-launcher-size) + 12px); top: calc(var(--crm-offset-y) + 8px); }
+            .crm-ai-root[data-position="top-left"] .crm-ai-launcher-label { left: calc(var(--crm-offset-x) + var(--crm-launcher-size) + 12px); top: calc(var(--crm-offset-y) + 8px); }
+            .crm-ai-launcher-badge { position: absolute; top: -3px; right: -3px; display: none; width: 14px; height: 14px; border: 2px solid var(--crm-surface); border-radius: 999px; background: #ef4444; box-shadow: 0 0 0 2px var(--crm-primary); }
+            .crm-ai-launcher-badge.is-visible { display: block; animation: crm-ai-badge-pulse 1.4s ease-in-out infinite; }
+            @keyframes crm-ai-badge-pulse { 50% { transform: scale(1.18); } }
             @keyframes crm-ai-launcher-in {
                 from { opacity: 0; transform: scale(0.82) translateY(8px); }
                 to { opacity: 1; transform: scale(1) translateY(0); }
@@ -1460,6 +1562,12 @@ function titleInitial(title) {
                 color: var(--crm-primary);
                 font-size: 15px;
                 font-weight: 700;
+            }
+            .crm-ai-avatar-image {
+                width: 100%;
+                height: 100%;
+                border-radius: inherit;
+                object-fit: cover;
             }
             .crm-ai-head-info { min-width: 0; }
             .crm-ai-head-title { font-size: 15px; font-weight: 600; line-height: 1.3; color: var(--crm-text); }
@@ -1934,7 +2042,9 @@ function titleInitial(title) {
             <button class="crm-ai-btn" type="button" aria-label="Open support chat" aria-expanded="false">
                 <svg class="crm-ai-icon-chat" viewBox="0 0 24 24" aria-hidden="true"></svg>
                 <svg class="crm-ai-icon-close" viewBox="0 0 24 24" aria-hidden="true" style="display:none"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                <span class="crm-ai-launcher-badge" aria-label="Unread reply"></span>
             </button>
+            <div class="crm-ai-launcher-label" aria-hidden="true"></div>
             <section class="crm-ai-panel" role="dialog" aria-label="Support chat" aria-modal="true">
                 <div class="crm-ai-sheet-handle" aria-hidden="true"></div>
                 <header class="crm-ai-head">

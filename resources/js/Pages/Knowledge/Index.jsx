@@ -531,6 +531,10 @@ function SourceRow({ source, layout }) {
             return;
         }
 
+        if (!window.confirm(`Reindex "${source.title}"? This replaces its existing search index.`)) {
+            return;
+        }
+
         runAction((options) => router.post(route('knowledge-sources.reprocess', source.id), {}, options));
     };
 

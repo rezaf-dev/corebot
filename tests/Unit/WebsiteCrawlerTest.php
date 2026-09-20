@@ -84,3 +84,23 @@ it('stops at the configured hard page ceiling', function () {
     expect($result['pages'])->toHaveCount(2);
     Http::assertSentCount(2);
 });
+
+it('limits the content that can be indexed across all crawled pages', function () {
+    config()->set('corebot.website_crawler.max_indexed_characters', 30);
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://example.com/' => Http::response(
+            '<html><body>'.str_repeat('a', 40).'<a href="/next">Next</a></body></html>',
+            200,
+            ['Content-Type' => 'text/html'],
+        ),
+    ]);
+
+    $urlSafety = new UrlSafety(verifyDns: false);
+    $crawler = new WebsiteCrawler(new WebPageContentExtractor($urlSafety), $urlSafety);
+    $result = $crawler->crawl('https://example.com/', 2);
+
+    expect($result['pages'])->toHaveCount(1)
+        ->and($result['pages'][0]['content'])->toHaveLength(30)
+        ->and($result['content'])->toContain(str_repeat('a', 30));
+});

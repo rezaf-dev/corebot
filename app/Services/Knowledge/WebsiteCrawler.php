@@ -20,15 +20,22 @@ class WebsiteCrawler
         $start = $this->normalizeUrl($startUrl);
         $origin = $this->origin($start);
         $limit = min(max(1, $pageLimit), (int) config('corebot.website_crawler.max_page_limit'));
-        $contentLimit = (int) config('corebot.website_crawler.max_total_content_length');
+        $contentLimit = (int) config('corebot.website_crawler.max_indexed_characters');
         $queue = [$start];
         $queued = [$start => true];
         $pages = [];
         $sections = [];
         $contentLength = 0;
         $skipped = 0;
+        $startedAt = microtime(true);
+        $durationLimit = max(1, (int) config('corebot.website_crawler.max_duration_seconds'));
 
-        while ($queue !== [] && count($pages) < $limit && $contentLength < $contentLimit) {
+        while (
+            $queue !== []
+            && count($pages) < $limit
+            && $contentLength < $contentLimit
+            && (microtime(true) - $startedAt) < $durationLimit
+        ) {
             $url = array_shift($queue);
 
             try {
@@ -40,15 +47,18 @@ class WebsiteCrawler
             }
 
             $remaining = $contentLimit - $contentLength;
+            $indexedContent = mb_substr($page['content'], 0, $remaining);
+            if ($indexedContent === '') {
+                break;
+            }
             $linkIndex = $this->formatLinkIndex($page['links']);
-            $section = "## {$page['title']}\nSource: {$page['url']}\n\n{$page['content']}".$linkIndex;
-            $section = mb_substr($section, 0, $remaining);
+            $section = "## {$page['title']}\nSource: {$page['url']}\n\n{$indexedContent}".$linkIndex;
             $sections[] = $section;
             $contentLength += mb_strlen($section);
             $pages[] = [
                 'url' => $page['url'],
                 'title' => $page['title'],
-                'content' => $page['content'],
+                'content' => $indexedContent,
             ];
 
             foreach ($page['links'] as $link) {

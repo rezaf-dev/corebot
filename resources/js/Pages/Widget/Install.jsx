@@ -100,6 +100,15 @@ export default function Install({ bots, widgetUrl, defaults, positions, icons })
                             <div className="mt-5 grid gap-5 sm:grid-cols-2">
                                 <TextField id="title" label="Title" value={data.title} onChange={(v) => setData('title', v)} error={errors.title} />
                                 <TextField id="subtitle" label="Subtitle" value={data.subtitle} onChange={(v) => setData('subtitle', v)} error={errors.subtitle} />
+                                <TextField
+                                    id="avatar_url"
+                                    label="Support avatar image URL"
+                                    value={data.avatar_url || ''}
+                                    onChange={(v) => setData('avatar_url', v)}
+                                    error={errors.avatar_url}
+                                    placeholder="https://example.com/support-avatar.jpg"
+                                />
+                                <TextField id="launcher_label" label="Launcher callout" value={data.launcher_label} onChange={(v) => setData('launcher_label', v)} error={errors.launcher_label} />
                                 <ColorField id="primary_color" label="Header & buttons" value={data.primary_color} onChange={(v) => setData('primary_color', v)} error={errors.primary_color} />
                                 <ColorField id="accent_color" label="User messages" value={data.accent_color} onChange={(v) => setData('accent_color', v)} error={errors.accent_color} />
                                 <ColorField id="background_color" label="Messages background" value={data.background_color} onChange={(v) => setData('background_color', v)} error={errors.background_color} />
@@ -358,7 +367,7 @@ function WidgetPreview({ config, initialOpen }) {
                                 border: `2px solid ${config.primary_color}22`,
                             }}
                         >
-                            {initial}
+                            {config.avatar_url ? <img src={config.avatar_url} alt="" className="h-full w-full rounded-full object-cover" /> : initial}
                         </div>
                         <div className="min-w-0">
                             <div className="truncate text-sm font-semibold">{config.title}</div>
@@ -374,7 +383,7 @@ function WidgetPreview({ config, initialOpen }) {
                                 className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
                                 style={{ background: config.accent_color + '22', color: config.primary_color }}
                             >
-                                {initial}
+                                {config.avatar_url ? <img src={config.avatar_url} alt="" className="h-full w-full rounded-full object-cover" /> : initial}
                             </div>
                             <div
                                 className="max-w-[85%] rounded-2xl border px-3 py-2 text-xs"
@@ -428,16 +437,30 @@ function WidgetPreview({ config, initialOpen }) {
                 >
                     <span className="text-xs font-bold">●</span>
                 </div>
+                {!initialOpen && config.launcher_label && (
+                    <span
+                        className="absolute rounded-full border px-2.5 py-1 text-[10px] font-semibold shadow-sm"
+                        style={{
+                            background: config.surface_color,
+                            borderColor: config.text_color + '18',
+                            color: config.text_color,
+                            ...(config.position.includes('right') && { right: Number(config.offset_x) + Number(config.launcher_size) + 12, bottom: Number(config.offset_y) + 12 }),
+                            ...(config.position.includes('left') && { left: Number(config.offset_x) + Number(config.launcher_size) + 12, bottom: Number(config.offset_y) + 12 }),
+                        }}
+                    >
+                        {config.launcher_label}
+                    </span>
+                )}
             </div>
         </section>
     );
 }
 
-function TextField({ id, label, value, onChange, error }) {
+function TextField({ id, label, value, onChange, error, placeholder }) {
     return (
         <div>
             <InputLabel htmlFor={id} value={label} />
-            <TextInput id={id} value={value} onChange={(e) => onChange(e.target.value)} className="mt-1 block w-full" />
+            <TextInput id={id} value={value} onChange={(e) => onChange(e.target.value)} className="mt-1 block w-full" placeholder={placeholder} />
             <InputError message={error} className="mt-1" />
         </div>
     );
@@ -489,6 +512,7 @@ function buildEmbedSnippet(widgetUrl, publicKey, config) {
         'data-bot-key': publicKey,
         'data-title': config.title,
         'data-subtitle': config.subtitle || '',
+        'data-avatar-url': config.avatar_url || '',
         'data-primary-color': config.primary_color,
         'data-accent-color': config.accent_color,
         'data-background-color': config.background_color,
@@ -503,6 +527,7 @@ function buildEmbedSnippet(widgetUrl, publicKey, config) {
         'data-send-button-label': config.send_button_label,
         'data-input-placeholder': config.input_placeholder,
         'data-launcher-icon': config.launcher_icon,
+        'data-launcher-label': config.launcher_label || '',
         'data-initial-open': config.initial_open ? 'true' : 'false',
         'data-suggested-prompts': JSON.stringify((config.suggested_prompts || []).filter((item) => item && item.trim())),
     };

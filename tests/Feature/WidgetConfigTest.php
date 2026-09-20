@@ -14,6 +14,7 @@ it('returns widget config for an active bot', function () {
         'widget_config' => [
             'title' => 'Help Desk',
             'primary_color' => '#ff0000',
+            'avatar_url' => 'https://example.com/support.jpg',
             'suggested_prompts' => ['What are your hours?', 'Talk to support'],
         ],
     ]);
@@ -22,8 +23,10 @@ it('returns widget config for an active bot', function () {
         ->assertSuccessful()
         ->assertJsonPath('widget.title', 'Help Desk')
         ->assertJsonPath('widget.primary_color', '#ff0000')
+        ->assertJsonPath('widget.avatar_url', 'https://example.com/support.jpg')
         ->assertJsonPath('widget.position', 'bottom-right')
         ->assertJsonPath('widget.initial_open', false)
+        ->assertJsonPath('widget.launcher_label', "We're here to help")
         ->assertJsonPath('widget.welcome_message', 'Welcome to our CRM help chat.')
         ->assertJsonPath('widget.suggested_prompts', ['What are your hours?', 'Talk to support']);
 });
@@ -102,8 +105,21 @@ it('builds embed snippets with data attributes', function () {
         ->toContain('data-bot-key="bot_testkey"')
         ->toContain('data-title="Help"')
         ->toContain('data-primary-color="#112233"')
+        ->toContain('data-avatar-url=""')
         ->toContain('data-initial-open="false"')
+        ->toContain('data-launcher-label="We&#039;re here to help"')
+        ->toContain('data-launcher-label="We&#039;re here to help"')
         ->toContain('data-suggested-prompts="[]"');
+});
+
+it('includes the support avatar in embed snippets', function () {
+    $snippet = WidgetConfig::embedSnippet(
+        'https://app.test/widget.js',
+        'bot_testkey',
+        ['avatar_url' => 'https://example.com/support.jpg'],
+    );
+
+    expect($snippet)->toContain('data-avatar-url="https://example.com/support.jpg"');
 });
 
 it('includes suggested prompts in embed snippets', function () {

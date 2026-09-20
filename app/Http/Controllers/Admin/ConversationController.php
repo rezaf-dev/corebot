@@ -63,4 +63,13 @@ class ConversationController extends Controller
 
         return back();
     }
+
+    public function destroy(ChatConversation $conversation, TenantAccess $access): RedirectResponse
+    {
+        $access->ensureCanAccess(auth()->user(), $conversation);
+
+        $conversation->delete();
+
+        return redirect()->route('conversations.index')->with('success', 'Conversation deleted.');
+    }
 }

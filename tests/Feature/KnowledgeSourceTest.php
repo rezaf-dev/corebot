@@ -36,7 +36,7 @@ it('renders the knowledge index for tenant admins', function () {
             ->where('sources.data.0.title', 'Policy')
             ->where('stats.total', 1)
             ->where('crawler.default_page_limit', 10)
-            ->where('crawler.max_page_limit', 50)
+            ->where('crawler.max_page_limit', 100)
             ->where('research.search_provider', 'duckduckgo'));
 });
 
