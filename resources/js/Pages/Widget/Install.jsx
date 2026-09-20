@@ -6,6 +6,15 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 
+const launcherTemplates = [
+    "We're here to help",
+    'Need help?',
+    'Chat with our team',
+    'Questions? Ask us',
+    'Support is online',
+    "Let's talk",
+];
+
 export default function Install({ bots, widgetUrl, defaults, positions, icons }) {
     const [selectedBotId, setSelectedBotId] = useState(bots[0]?.id ?? null);
     const [copied, setCopied] = useState(false);
@@ -30,7 +39,7 @@ export default function Install({ bots, widgetUrl, defaults, positions, icons })
     const submit = (e) => {
         e.preventDefault();
         if (!selectedBot) return;
-        put(route('widget.install.update', selectedBot.id), { preserveScroll: true });
+        put(route('widget.install.update', selectedBot.id), { preserveScroll: true, forceFormData: true });
     };
 
     const copySnippet = async () => {
@@ -100,15 +109,37 @@ export default function Install({ bots, widgetUrl, defaults, positions, icons })
                             <div className="mt-5 grid gap-5 sm:grid-cols-2">
                                 <TextField id="title" label="Title" value={data.title} onChange={(v) => setData('title', v)} error={errors.title} />
                                 <TextField id="subtitle" label="Subtitle" value={data.subtitle} onChange={(v) => setData('subtitle', v)} error={errors.subtitle} />
-                                <TextField
-                                    id="avatar_url"
-                                    label="Support avatar image URL"
-                                    value={data.avatar_url || ''}
-                                    onChange={(v) => setData('avatar_url', v)}
-                                    error={errors.avatar_url}
-                                    placeholder="https://example.com/support-avatar.jpg"
-                                />
-                                <TextField id="launcher_label" label="Launcher callout" value={data.launcher_label} onChange={(v) => setData('launcher_label', v)} error={errors.launcher_label} />
+                                <div>
+                                    <InputLabel htmlFor="avatar" value="Support avatar" />
+                                    <input
+                                        id="avatar"
+                                        type="file"
+                                        accept="image/jpeg,image/png,image/webp"
+                                        onChange={(event) => setData('avatar', event.target.files?.[0] || null)}
+                                        className="mt-1 block w-full text-sm text-gray-700 file:mr-4 file:rounded-md file:border-0 file:bg-indigo-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100 dark:text-gray-300 dark:file:bg-indigo-950/50 dark:file:text-indigo-300 dark:hover:file:bg-indigo-950"
+                                    />
+                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">JPEG, PNG, or WebP up to 2 MB.</p>
+                                    <InputError message={errors.avatar} className="mt-1" />
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <TextField id="launcher_label" label="Launcher callout" value={data.launcher_label} onChange={(v) => setData('launcher_label', v)} error={errors.launcher_label} />
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                        {launcherTemplates.map((template) => (
+                                            <button
+                                                key={template}
+                                                type="button"
+                                                onClick={() => setData('launcher_label', template)}
+                                                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                                                    data.launcher_label === template
+                                                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-950/50 dark:text-indigo-300'
+                                                        : 'border-gray-200 bg-white text-gray-600 hover:border-indigo-300 hover:text-indigo-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-indigo-500 dark:hover:text-indigo-300'
+                                                }`}
+                                            >
+                                                {template}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
                                 <ColorField id="primary_color" label="Header & buttons" value={data.primary_color} onChange={(v) => setData('primary_color', v)} error={errors.primary_color} />
                                 <ColorField id="accent_color" label="User messages" value={data.accent_color} onChange={(v) => setData('accent_color', v)} error={errors.accent_color} />
                                 <ColorField id="background_color" label="Messages background" value={data.background_color} onChange={(v) => setData('background_color', v)} error={errors.background_color} />
@@ -435,7 +466,7 @@ function WidgetPreview({ config, initialOpen }) {
                         ...(config.position === 'top-left' && { left: config.offset_x, top: config.offset_y }),
                     }}
                 >
-                    <span className="text-xs font-bold">●</span>
+                    <LauncherIcon icon={config.launcher_icon} />
                 </div>
                 {!initialOpen && config.launcher_label && (
                     <span
@@ -453,6 +484,20 @@ function WidgetPreview({ config, initialOpen }) {
                 )}
             </div>
         </section>
+    );
+}
+
+function LauncherIcon({ icon }) {
+    const paths = {
+        chat: <path d="M4 3h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1 2-2V5a2 2 0 0 1 2-2Zm2 5h12v2H6V8Zm0 4h8v2H6v-2Z" />,
+        help: <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z" />,
+        support: <path d="M12 1c-4.97 0-9 4.03-9 9v7c0 1.66 1.34 3 3 3h1v-8H5c0-3.87 3.13-7 7-7s7 3.13 7 7v1h-2c-1.1 0-2 .9-2 2v6c0 1.1.9 2 2 2h4c1.1 0 2-.9 2-2v-6c0-4.97-4.03-9-9-9z" />,
+    };
+
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="h-[46%] w-[46%] fill-current">
+            {paths[icon] || paths.chat}
+        </svg>
     );
 }
 

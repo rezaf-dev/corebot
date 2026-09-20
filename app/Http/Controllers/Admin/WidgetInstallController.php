@@ -8,6 +8,8 @@ use App\Support\TenantAccess;
 use App\Support\WidgetConfig;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -38,8 +40,26 @@ class WidgetInstallController extends Controller
     {
         $access->ensureCanAccess(auth()->user(), $bot);
 
-        $data = $request->validate(WidgetConfig::validationRules());
-        $bot->update(['widget_config' => WidgetConfig::resolve($data)]);
+        $data = $request->validate([
+            ...WidgetConfig::validationRules(),
+            'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+        ]);
+        $existingConfig = $bot->resolvedWidgetConfig();
+        $config = WidgetConfig::resolve(Arr::except($data, ['avatar', 'avatar_path']));
+        $config['avatar_path'] = $existingConfig['avatar_path'];
+        $config['avatar_url'] = $existingConfig['avatar_url'];
+
+        if ($request->hasFile('avatar')) {
+            $path = $request->file('avatar')->storePublicly("tenants/{$bot->tenant_id}/widget-avatars", 'public');
+            $config['avatar_path'] = $path;
+            $config['avatar_url'] = Storage::disk('public')->url($path);
+        }
+
+        $bot->update(['widget_config' => $config]);
+
+        if ($request->hasFile('avatar') && filled($existingConfig['avatar_path'])) {
+            Storage::disk('public')->delete($existingConfig['avatar_path']);
+        }
 
         return back()->with('success', 'Widget appearance saved.');
     }

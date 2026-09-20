@@ -4,6 +4,8 @@ use App\Models\Bot;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Support\WidgetConfig;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 it('returns widget config for an active bot', function () {
     $tenant = Tenant::create(['name' => 'Demo', 'slug' => 'widget-config', 'status' => 'active']);
@@ -67,6 +69,27 @@ it('saves widget settings for tenant admins', function () {
         ->title->toBe('CRM Help')
         ->position->toBe('bottom-left')
         ->initial_open->toBeTrue();
+});
+
+it('uploads a support avatar for tenant admins', function () {
+    Storage::fake('public');
+
+    $tenant = Tenant::create(['name' => 'Demo', 'slug' => 'widget-avatar-upload', 'status' => 'active']);
+    $user = User::factory()->create(['tenant_id' => $tenant->id, 'role' => 'tenant_admin']);
+    $bot = Bot::create(['tenant_id' => $tenant->id, 'name' => 'Bot']);
+    $payload = WidgetConfig::DEFAULTS;
+    $payload['avatar'] = UploadedFile::fake()->image('support.png');
+
+    $this->actingAs($user)
+        ->put(route('widget.install.update', $bot), $payload)
+        ->assertRedirect();
+
+    $config = $bot->fresh()->resolvedWidgetConfig();
+
+    expect($config['avatar_path'])->toStartWith("tenants/{$tenant->id}/widget-avatars/")
+        ->and($config['avatar_url'])->toContain('/storage/'.$config['avatar_path']);
+
+    Storage::disk('public')->assertExists($config['avatar_path']);
 });
 
 it('resolves api base from widget script url', function (string $widgetUrl, string $expectedApiBase) {

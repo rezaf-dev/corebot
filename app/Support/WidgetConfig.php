@@ -8,6 +8,7 @@ class WidgetConfig
         'title' => 'Support',
         'subtitle' => 'We typically reply instantly',
         'avatar_url' => '',
+        'avatar_path' => '',
         'primary_color' => '#111827',
         'accent_color' => '#2563eb',
         'background_color' => '#f3f4f6',
