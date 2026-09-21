@@ -1359,13 +1359,12 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
             setBubbleContent(bubble, text, role);
         }
 
-        wrap.appendChild(bubble);
+        const messageContent = document.createElement('div');
+        messageContent.className = 'crm-ai-message-content';
+        messageContent.appendChild(bubble);
+        wrap.appendChild(messageContent);
         if (role === 'assistant' && options.messageId) {
-            const feedback = document.createElement('div');
-            feedback.className = 'crm-ai-feedback';
-            feedback.innerHTML = '<button type="button" aria-label="Helpful" data-feedback="up">👍</button><button type="button" aria-label="Not helpful" data-feedback="down">👎</button>';
-            feedback.addEventListener('click', (event) => submitFeedback(options.messageId, event.target.closest('[data-feedback]')?.dataset.feedback));
-            wrap.appendChild(feedback);
+            attachFeedback(wrap, options.messageId);
         }
         messages.appendChild(wrap);
         scrollToBottom();
@@ -1386,9 +1385,20 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         if (node.querySelector('.crm-ai-feedback')) return;
         const feedback = document.createElement('div');
         feedback.className = 'crm-ai-feedback';
-        feedback.innerHTML = '<button type="button" aria-label="Helpful" data-feedback="up">👍</button><button type="button" aria-label="Not helpful" data-feedback="down">👎</button>';
-        feedback.addEventListener('click', (event) => submitFeedback(messageId, event.target.closest('[data-feedback]')?.dataset.feedback));
-        node.appendChild(feedback);
+        feedback.innerHTML = '<span class="crm-ai-feedback-label">Was this helpful?</span><button type="button" aria-label="Helpful" aria-pressed="false" data-feedback="up">👍</button><button type="button" aria-label="Not helpful" aria-pressed="false" data-feedback="down">👎</button>';
+        feedback.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-feedback]');
+            if (!button) return;
+
+            feedback.querySelectorAll('[data-feedback]').forEach((item) => {
+                const selected = item === button;
+                item.classList.toggle('is-selected', selected);
+                item.setAttribute('aria-pressed', String(selected));
+            });
+            feedback.classList.add('is-submitted');
+            submitFeedback(messageId, button.dataset.feedback);
+        });
+        (node.querySelector('.crm-ai-message-content') || node).appendChild(feedback);
     }
 
     function getBubble(node) {
@@ -1713,6 +1723,8 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
                 align-items: flex-end;
                 gap: 8px;
             }
+            .crm-ai-message-content { display: flex; min-width: 0; flex-direction: column; }
+            .crm-ai-assistant .crm-ai-message-content { max-width: calc(100% - 36px); }
             @keyframes crm-ai-msg-in {
                 from { opacity: 0; transform: translateY(6px); }
                 to { opacity: 1; transform: translateY(0); }
@@ -1964,9 +1976,12 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
             .crm-ai-phone-control { display: flex; gap: 8px; }
             .crm-ai-phone-control select { max-width: 150px; border: 1px solid var(--crm-border); border-radius: 10px; background: var(--crm-surface); color: var(--crm-text); padding: 0 8px; }
             .crm-ai-phone-control input { min-width: 0; }
-            .crm-ai-feedback { display: flex; gap: 4px; margin: 5px 0 0 36px; }
-            .crm-ai-feedback button { border: 0; background: transparent; padding: 3px 5px; cursor: pointer; opacity: .7; font-size: 14px; }
-            .crm-ai-feedback button:hover { opacity: 1; background: color-mix(in srgb, var(--crm-accent) 10%, transparent); border-radius: 6px; }
+            .crm-ai-feedback { display: inline-flex; align-items: center; align-self: flex-start; gap: 2px; margin-top: 5px; padding: 2px 4px 2px 8px; border: 1px solid var(--crm-border); border-radius: 999px; background: color-mix(in srgb, var(--crm-surface) 88%, var(--crm-bg)); }
+            .crm-ai-feedback-label { color: var(--crm-muted); font-size: 10px; font-weight: 500; }
+            .crm-ai-feedback button { display: inline-flex; align-items: center; justify-content: center; width: 25px; height: 25px; border: 0; border-radius: 999px; background: transparent; padding: 0; cursor: pointer; font-size: 13px; transition: background .15s ease, transform .15s ease, box-shadow .15s ease; }
+            .crm-ai-feedback button:hover { background: color-mix(in srgb, var(--crm-accent) 12%, transparent); transform: scale(1.08); }
+            .crm-ai-feedback button.is-selected { background: color-mix(in srgb, var(--crm-accent) 18%, var(--crm-surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--crm-accent) 34%, transparent); }
+            .crm-ai-feedback.is-submitted .crm-ai-feedback-label::after { content: " Thanks"; color: var(--crm-accent); }
             .crm-ai-contact-card.is-success {
                 border-color: color-mix(in srgb, #059669 35%, var(--crm-border));
             }
