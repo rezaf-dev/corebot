@@ -2,8 +2,10 @@
 
 use App\Models\Bot;
 use App\Models\ChatConversation;
+use App\Models\ChatMessageFeedback;
 use App\Models\Tenant;
 use App\Services\Rag\ChatAnswerService;
+use Illuminate\Support\Str;
 
 it('rejects public chat for inactive bots', function () {
     $tenant = Tenant::create(['name' => 'Demo', 'slug' => 'demo', 'status' => 'active']);
@@ -35,6 +37,7 @@ it('streams public chat messages', function () {
         'bot_id' => $bot->id,
         'visitor_id' => 'visitor-1',
         'status' => 'open',
+        'public_session_token' => hash('sha256', $conversationToken = Str::random(64)),
     ]);
 
     $this->mock(ChatAnswerService::class)
@@ -55,6 +58,7 @@ it('streams public chat messages', function () {
     $response = $this->post('/api/public/chat/message/stream', [
         'bot_public_key' => $bot->public_key,
         'conversation_id' => $conversation->id,
+        'conversation_token' => $conversationToken,
         'message' => 'Hello',
         'page' => [
             'url' => 'https://example.com/pricing',
@@ -80,12 +84,70 @@ it('rejects a page context outside the bot allowed domains', function () {
         'tenant_id' => $tenant->id,
         'bot_id' => $bot->id,
         'status' => 'open',
+        'public_session_token' => hash('sha256', $conversationToken = Str::random(64)),
+    ]);
+
+    $this->postJson('/api/public/chat/message', [
+        'bot_public_key' => $bot->public_key,
+        'conversation_id' => $conversation->id,
+        'conversation_token' => $conversationToken,
+        'message' => 'Help me',
+        'page' => ['url' => 'https://other.test/pricing'],
+    ])->assertForbidden();
+});
+
+it('requires the conversation token to access a public conversation', function () {
+    $tenant = Tenant::create(['name' => 'Demo', 'slug' => 'public-session-token', 'status' => 'active']);
+    $bot = Bot::create(['tenant_id' => $tenant->id, 'name' => 'Bot']);
+    $conversation = ChatConversation::create([
+        'tenant_id' => $tenant->id,
+        'bot_id' => $bot->id,
+        'public_session_token' => hash('sha256', Str::random(64)),
     ]);
 
     $this->postJson('/api/public/chat/message', [
         'bot_public_key' => $bot->public_key,
         'conversation_id' => $conversation->id,
         'message' => 'Help me',
-        'page' => ['url' => 'https://other.test/pricing'],
-    ])->assertForbidden();
+    ])->assertUnprocessable()->assertJsonValidationErrors('conversation_token');
+
+    $this->postJson('/api/public/chat/manual-messages', [
+        'bot_public_key' => $bot->public_key,
+        'conversation_id' => $conversation->id,
+        'conversation_token' => Str::random(64),
+    ])->assertNotFound();
+
+    $this->postJson('/api/public/chat/contact', [
+        'bot_public_key' => $bot->public_key,
+        'conversation_id' => $conversation->id,
+        'conversation_token' => Str::random(64),
+        'visitor_email' => 'visitor@example.com',
+    ])->assertNotFound();
+});
+
+it('records one feedback vote per public chat session', function () {
+    $tenant = Tenant::create(['name' => 'Feedback Demo', 'slug' => 'feedback-demo', 'status' => 'active']);
+    $bot = Bot::create(['tenant_id' => $tenant->id, 'name' => 'Bot']);
+    $conversation = ChatConversation::create([
+        'tenant_id' => $tenant->id,
+        'bot_id' => $bot->id,
+        'public_session_token' => hash('sha256', $conversationToken = Str::random(64)),
+    ]);
+    $message = $conversation->messages()->create([
+        'tenant_id' => $tenant->id,
+        'bot_id' => $bot->id,
+        'role' => 'assistant',
+        'content' => 'Here is the answer.',
+    ]);
+
+    $this->postJson('/api/public/chat/feedback', [
+        'bot_public_key' => $bot->public_key,
+        'conversation_id' => $conversation->id,
+        'conversation_token' => $conversationToken,
+        'chat_message_id' => $message->id,
+        'vote' => 'down',
+        'reason' => 'Did not answer',
+    ])->assertSuccessful();
+
+    expect(ChatMessageFeedback::query()->where('chat_message_id', $message->id)->value('vote'))->toBe('down');
 });

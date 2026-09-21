@@ -434,6 +434,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         has_contact: Boolean(state.has_contact),
         collect_on_start: false,
         reason: null,
+        countryCode: null,
     };
     let contactErrors = {};
     let isOpen = false;
@@ -468,6 +469,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
     const contact = root.querySelector('.crm-ai-contact');
     const launcherLabel = root.querySelector('.crm-ai-launcher-label');
     const launcherBadge = root.querySelector('.crm-ai-launcher-badge');
+    const newMessagesButton = root.querySelector('.crm-ai-new-messages');
     const isMobile = () => window.matchMedia('(max-width: 480px)').matches;
 
     renderContactForm({});
@@ -538,6 +540,12 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         if (isLoading || contactConfig.has_contact) return;
 
         const payload = Object.fromEntries(new FormData(contact).entries());
+        const country = contact.querySelector('[name="visitor_phone_country"]');
+        if (country && payload.visitor_phone) {
+            const dial = country.selectedOptions[0]?.dataset.dial || '';
+            payload.visitor_phone = dial + String(payload.visitor_phone).replace(/^\+|\D/g, '');
+            payload.country_code = country.value;
+        }
         contactErrors = validateContactPayload(contactConfig.fields, contactConfig.required, payload);
 
         if (Object.keys(contactErrors).length) {
@@ -562,10 +570,17 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
     });
 
     contact.addEventListener('click', (event) => {
+        if (event.target.closest('[data-contact-back]')) {
+            hideContact();
+            return;
+        }
         const skip = event.target.closest('[data-contact-skip]');
         if (!skip || contactConfig.required.length) return;
         hideContact();
     });
+
+    newMessagesButton.addEventListener('click', () => scrollToBottom(true));
+    messages.addEventListener('scroll', updateNewMessagesButton);
 
     function applyInitialOpen() {
         if (initialOpenApplied || !config.initial_open) return;
@@ -646,6 +661,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         try {
             const res = await post('/start', startPayload());
             state.conversation_id = res.conversation_id;
+            state.conversation_token = res.conversation_token;
             state.welcome_message = res.welcome_message || welcomeText();
             applyContactConfig(res);
             localStorage.setItem(storageKey, JSON.stringify(state));
@@ -703,7 +719,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         const response = await fetch(apiBase + path, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-            body: JSON.stringify({ bot_public_key: botKey, ...body }),
+            body: JSON.stringify({ bot_public_key: botKey, conversation_token: state.conversation_token, ...body }),
         });
 
         if (!response.ok) {
@@ -753,6 +769,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
             headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
             body: JSON.stringify({
                 bot_public_key: botKey,
+                conversation_token: state.conversation_token,
                 conversation_id: state.conversation_id,
                 message: text,
                 page: pageContext(),
@@ -802,6 +819,9 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
 
                 if (payload.type === 'meta' && shouldPromptContact(payload)) {
                     showContact('fallback');
+                }
+                if (payload.type === 'meta' && payload.chat_message_id) {
+                    attachFeedback(node, payload.chat_message_id);
                 }
             }
         }
@@ -990,7 +1010,6 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         contact.classList.add('is-visible');
         renderContactForm(getContactFormValues());
         updateChatAvailability();
-        scrollToBottom();
 
         const firstInput = contact.querySelector('input:not([disabled])');
         if (firstInput) {
@@ -1062,6 +1081,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         contactConfig.required = Array.isArray(res.contact_required) ? res.contact_required : ['email'];
         contactConfig.has_contact = Boolean(res.has_contact);
         contactConfig.collect_on_start = Boolean(res.collect_contact_on_start);
+        contactConfig.countryCode = typeof res.country_code === 'string' ? res.country_code : null;
 
         if (res.has_contact) {
             state.has_contact = true;
@@ -1114,12 +1134,17 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
                 const invalid = error ? ' aria-invalid="true"' : '';
                 const describedBy = error ? ' aria-describedby="crm-ai-error-' + def.name + '"' : '';
 
+                const phoneControl = field === 'phone'
+                    ? '<div class="crm-ai-phone-control"><select name="visitor_phone_country" aria-label="Phone country">' + countryOptions(contactConfig.countryCode) + '</select>'
+                    : '';
+                const phoneControlEnd = field === 'phone' ? '</div>' : '';
                 return (
                     '<label class="crm-ai-field">' +
                     '<span class="crm-ai-field-label">' +
                     def.label +
                     (isRequired ? ' <span class="crm-ai-required">*</span>' : '') +
                     '</span>' +
+                    phoneControl +
                     '<input name="' +
                     def.name +
                     '" type="' +
@@ -1133,7 +1158,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
                     (stored ? ' value="' + escapeAttr(stored) + '"' : '') +
                     invalid +
                     describedBy +
-                    ' />' +
+                    ' />' + phoneControlEnd +
                     (error
                         ? '<span id="crm-ai-error-' +
                           def.name +
@@ -1156,6 +1181,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
 
         contact.innerHTML =
             '<div class="crm-ai-contact-card">' +
+            '<button type="button" class="crm-ai-contact-back" data-contact-back aria-label="Back to chat">← Back to chat</button>' +
             '<div class="crm-ai-contact-header">' +
             '<span class="crm-ai-contact-icon" aria-hidden="true">' +
             '<svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>' +
@@ -1210,6 +1236,15 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
             utm_medium: utm.medium,
             utm_campaign: utm.campaign,
         };
+    }
+
+    function countryOptions(defaultCountry) {
+        const countries = [
+            ['US', '+1', 'United States'], ['CA', '+1', 'Canada'], ['GB', '+44', 'United Kingdom'],
+            ['TR', '+90', 'Türkiye'], ['DE', '+49', 'Germany'], ['FR', '+33', 'France'],
+            ['AE', '+971', 'United Arab Emirates'], ['SA', '+966', 'Saudi Arabia'], ['IN', '+91', 'India'],
+        ];
+        return countries.map(([code, dial, name]) => '<option value="' + code + '" data-dial="' + dial + '"' + (code === defaultCountry ? ' selected' : '') + '>' + escapeHtml(name + ' (' + dial + ')') + '</option>').join('');
     }
 
     function pageContext() {
@@ -1278,8 +1313,21 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         form.requestSubmit();
     }
 
-    function scrollToBottom() {
+    function isNearBottom() {
+        return messages.scrollHeight - messages.scrollTop - messages.clientHeight < 48;
+    }
+
+    function updateNewMessagesButton() {
+        newMessagesButton.classList.toggle('is-visible', !isNearBottom());
+    }
+
+    function scrollToBottom(force = false) {
+        if (!force && !isNearBottom()) {
+            newMessagesButton.classList.add('is-visible');
+            return;
+        }
         messages.scrollTop = messages.scrollHeight;
+        newMessagesButton.classList.remove('is-visible');
     }
 
     function add(role, text, options = {}) {
@@ -1305,10 +1353,35 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         }
 
         wrap.appendChild(bubble);
+        if (role === 'assistant' && options.messageId) {
+            const feedback = document.createElement('div');
+            feedback.className = 'crm-ai-feedback';
+            feedback.innerHTML = '<button type="button" aria-label="Helpful" data-feedback="up">👍</button><button type="button" aria-label="Not helpful" data-feedback="down">👎</button>';
+            feedback.addEventListener('click', (event) => submitFeedback(options.messageId, event.target.closest('[data-feedback]')?.dataset.feedback));
+            wrap.appendChild(feedback);
+        }
         messages.appendChild(wrap);
         scrollToBottom();
 
         return wrap;
+    }
+
+    async function submitFeedback(messageId, vote) {
+        if (!vote || !state.conversation_id) return;
+        try {
+            await post('/feedback', { conversation_id: state.conversation_id, chat_message_id: messageId, vote });
+        } catch {
+            return;
+        }
+    }
+
+    function attachFeedback(node, messageId) {
+        if (node.querySelector('.crm-ai-feedback')) return;
+        const feedback = document.createElement('div');
+        feedback.className = 'crm-ai-feedback';
+        feedback.innerHTML = '<button type="button" aria-label="Helpful" data-feedback="up">👍</button><button type="button" aria-label="Not helpful" data-feedback="down">👎</button>';
+        feedback.addEventListener('click', (event) => submitFeedback(messageId, event.target.closest('[data-feedback]')?.dataset.feedback));
+        node.appendChild(feedback);
     }
 
     function getBubble(node) {
@@ -1612,7 +1685,10 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
                 background: var(--crm-bg);
                 scroll-behavior: smooth;
                 -webkit-overflow-scrolling: touch;
+                position: relative;
             }
+            .crm-ai-new-messages { position: absolute; z-index: 2; right: 16px; bottom: 76px; display: none; border: 0; border-radius: 999px; padding: 8px 12px; background: var(--crm-primary); color: #fff; font: inherit; font-size: 12px; box-shadow: 0 4px 14px rgba(15,23,42,.25); cursor: pointer; }
+            .crm-ai-new-messages.is-visible { display: block; }
             .crm-ai-msg {
                 margin: 0 0 14px;
                 display: flex;
@@ -1852,9 +1928,12 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
             .crm-ai-contact button[type="submit"]:disabled { opacity: 0.55; cursor: not-allowed; }
             .crm-ai-contact {
                 display: none;
-                padding: 0 14px 12px;
-                border-top: 0;
-                background: transparent;
+                position: absolute;
+                z-index: 4;
+                inset: 0;
+                overflow-y: auto;
+                padding: 16px;
+                background: var(--crm-bg);
             }
             .crm-ai-contact.is-visible { display: block; }
             .crm-ai-panel--contact .crm-ai-msgs {
@@ -1874,6 +1953,13 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
                 background: var(--crm-surface);
                 box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
             }
+            .crm-ai-contact-back { align-self: flex-start; border: 0; background: transparent; color: var(--crm-muted); padding: 0; font: inherit; font-size: 13px; cursor: pointer; }
+            .crm-ai-phone-control { display: flex; gap: 8px; }
+            .crm-ai-phone-control select { max-width: 150px; border: 1px solid var(--crm-border); border-radius: 10px; background: var(--crm-surface); color: var(--crm-text); padding: 0 8px; }
+            .crm-ai-phone-control input { min-width: 0; }
+            .crm-ai-feedback { display: flex; gap: 4px; margin: 5px 0 0 36px; }
+            .crm-ai-feedback button { border: 0; background: transparent; padding: 3px 5px; cursor: pointer; opacity: .7; font-size: 14px; }
+            .crm-ai-feedback button:hover { opacity: 1; background: color-mix(in srgb, var(--crm-accent) 10%, transparent); border-radius: 6px; }
             .crm-ai-contact-card.is-success {
                 border-color: color-mix(in srgb, #059669 35%, var(--crm-border));
             }
@@ -2063,6 +2149,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
                     </button>
                 </header>
                 <div class="crm-ai-msgs" role="log" aria-live="polite" aria-relevant="additions"></div>
+                <button type="button" class="crm-ai-new-messages">New messages ↓</button>
                 <form class="crm-ai-contact" aria-label="Contact details"></form>
                 <form class="crm-ai-form">
                     <div class="crm-ai-form-row">

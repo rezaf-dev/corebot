@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\PublicChatController;
+use App\Http\Controllers\PublicChatFeedbackController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('throttle:public-chat')->prefix('public/chat')->group(function () {
@@ -10,4 +11,5 @@ Route::middleware('throttle:public-chat')->prefix('public/chat')->group(function
     Route::post('/message/stream', [PublicChatController::class, 'stream']);
     Route::post('/contact', [PublicChatController::class, 'contact']);
     Route::post('/manual-messages', [PublicChatController::class, 'manualMessages']);
+    Route::post('/feedback', [PublicChatFeedbackController::class, 'store']);
 });

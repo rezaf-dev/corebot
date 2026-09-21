@@ -50,10 +50,10 @@ it('uses the llm for general replies when no chunks are available', function () 
 
     expect($response['message'])->toBe('Hi, how can I help?')
         ->and($response['fallback'])->toBeFalse()
-        ->and($response['needs_contact'])->toBeTrue()
+        ->and($response['needs_contact'])->toBeFalse()
         ->and($response['sources'])->toBeEmpty();
 
-    expect($conversation->fresh()->status)->toBe('escalated');
+    expect($conversation->fresh()->status)->toBe('open');
 });
 
 it('uses the current page context to retrieve related knowledge', function () {

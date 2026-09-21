@@ -4,6 +4,7 @@ use App\Models\Bot;
 use App\Models\ChatConversation;
 use App\Models\Tenant;
 use App\Models\User;
+use Illuminate\Support\Str;
 
 it('lets a tenant admin send a manual reply to a conversation', function () {
     $tenant = Tenant::create(['name' => 'Demo', 'slug' => 'manual-reply', 'status' => 'active']);
@@ -30,7 +31,11 @@ it('lets a tenant admin send a manual reply to a conversation', function () {
 it('returns manual replies to the conversation widget', function () {
     $tenant = Tenant::create(['name' => 'Demo', 'slug' => 'manual-reply-widget', 'status' => 'active']);
     $bot = Bot::create(['tenant_id' => $tenant->id, 'name' => 'Support']);
-    $conversation = ChatConversation::create(['tenant_id' => $tenant->id, 'bot_id' => $bot->id]);
+    $conversation = ChatConversation::create([
+        'tenant_id' => $tenant->id,
+        'bot_id' => $bot->id,
+        'public_session_token' => hash('sha256', $conversationToken = Str::random(64)),
+    ]);
     $reply = $conversation->messages()->create([
         'tenant_id' => $tenant->id,
         'bot_id' => $bot->id,
@@ -41,6 +46,7 @@ it('returns manual replies to the conversation widget', function () {
     $this->postJson('/api/public/chat/manual-messages', [
         'bot_public_key' => $bot->public_key,
         'conversation_id' => $conversation->id,
+        'conversation_token' => $conversationToken,
     ])
         ->assertSuccessful()
         ->assertJsonPath('messages.0.id', $reply->id)

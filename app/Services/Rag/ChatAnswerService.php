@@ -70,16 +70,19 @@ class ChatAnswerService
             'context_text' => $context,
         ]);
 
+        $handoffReason = $this->handoffReason($userMessage, $answer);
+
         return $this->withContactMeta($bot, $conversation, [
             'message' => $answer,
             'fallback' => false,
+            'chat_message_id' => $assistant->id,
             'sources' => $chunks->map(fn ($chunk) => [
                 'id' => $chunk->id,
                 'title' => $chunk->metadata['source_title'] ?? 'Knowledge source',
                 'url' => $chunk->metadata['source_url'] ?? null,
                 'distance' => $chunk->distance,
             ])->values(),
-        ], $retrieval->confident);
+        ], $handoffReason);
     }
 
     public function stream(Bot $bot, ChatConversation $conversation, string $userMessage, array $pageContext = []): Generator
@@ -98,6 +101,7 @@ class ChatAnswerService
             yield $this->streamEvent('meta', [
                 'fallback' => true,
                 'needs_contact' => $retrieval['needs_contact'],
+                'chat_message_id' => $retrieval['chat_message_id'],
                 'sources' => [],
             ]);
             yield $this->streamEvent('done');
@@ -126,6 +130,7 @@ class ChatAnswerService
             yield $this->streamEvent('meta', [
                 'fallback' => true,
                 'needs_contact' => $fallback['needs_contact'],
+                'chat_message_id' => $fallback['chat_message_id'],
                 'sources' => [],
             ]);
             yield $this->streamEvent('done');
@@ -156,17 +161,19 @@ class ChatAnswerService
 
         $meta = $this->withContactMeta($bot, $conversation, [
             'fallback' => false,
+            'chat_message_id' => $assistant->id,
             'sources' => $chunks->map(fn ($chunk) => [
                 'id' => $chunk->id,
                 'title' => $chunk->metadata['source_title'] ?? 'Knowledge source',
                 'url' => $chunk->metadata['source_url'] ?? null,
                 'distance' => $chunk->distance,
             ])->values(),
-        ], $retrieval->confident);
+        ], $this->handoffReason($userMessage, $answer));
 
         yield $this->streamEvent('meta', [
             'fallback' => $meta['fallback'],
             'needs_contact' => $meta['needs_contact'],
+            'chat_message_id' => $meta['chat_message_id'],
             'sources' => $meta['sources'],
         ]);
         yield $this->streamEvent('done');
@@ -288,20 +295,22 @@ class ChatAnswerService
         return $this->withContactMeta($bot, $conversation, [
             'message' => $bot->fallback_message,
             'fallback' => true,
+            'chat_message_id' => $assistant->id,
             'sources' => [],
-        ], confident: false);
+        ], 'unable_to_answer');
     }
 
     /**
      * @param  array<string, mixed>  $response
      * @return array<string, mixed>
      */
-    private function withContactMeta(Bot $bot, ChatConversation $conversation, array $response, bool $confident): array
+    private function withContactMeta(Bot $bot, ChatConversation $conversation, array $response, ?string $handoffReason): array
     {
-        $needsContact = $this->shouldRequestContact($bot, $conversation, $confident);
+        $needsContact = $this->shouldRequestContact($bot, $conversation, $handoffReason);
 
         if ($needsContact) {
             $this->manualHandoffNotifier->escalate($bot, $conversation);
+            $conversation->update(['handoff_reason' => $handoffReason]);
         }
 
         $response['needs_contact'] = $needsContact;
@@ -309,7 +318,7 @@ class ChatAnswerService
         return $response;
     }
 
-    private function shouldRequestContact(Bot $bot, ChatConversation $conversation, bool $confident): bool
+    private function shouldRequestContact(Bot $bot, ChatConversation $conversation, ?string $handoffReason): bool
     {
         if (BotContactConfig::fields($bot) === []) {
             return false;
@@ -319,7 +328,20 @@ class ChatAnswerService
             return false;
         }
 
-        return ! $confident;
+        return $handoffReason !== null;
+    }
+
+    private function handoffReason(string $userMessage, string $answer): ?string
+    {
+        if (preg_match('/\b(human|person|agent|representative|support team|call me|talk to support)\b/i', $userMessage)) {
+            return 'human_requested';
+        }
+
+        if (preg_match('/\b(i (do not|don\'t) know|cannot answer|can\'t answer|unable to answer|no information)\b/i', $answer)) {
+            return 'unable_to_answer';
+        }
+
+        return null;
     }
 
     private function prompt(Bot $bot, ?string $context): string

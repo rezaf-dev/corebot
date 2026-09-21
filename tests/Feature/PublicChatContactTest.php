@@ -4,6 +4,7 @@ use App\Models\Bot;
 use App\Models\ChatConversation;
 use App\Models\Tenant;
 use App\Services\GeoIp\MaxMindGeoIpService;
+use Illuminate\Support\Str;
 
 it('returns contact configuration when starting a conversation', function () {
     $tenant = Tenant::create(['name' => 'Demo', 'slug' => 'demo-start-contact', 'status' => 'active']);
@@ -43,9 +44,14 @@ it('returns contact configuration when starting a conversation', function () {
         ->assertJsonPath('has_contact', false)
         ->assertJsonPath('collect_contact_on_start', true);
 
+    $conversationToken = $response->json('conversation_token');
+
+    expect($conversationToken)->toBeString()->toHaveLength(64);
+
     $conversation = ChatConversation::query()->first();
 
     expect($conversation->referrer_url)->toBe('https://google.com/')
+        ->and($conversation->public_session_token)->toBe(hash('sha256', $conversationToken))
         ->and($conversation->timezone)->toBe('America/New_York')
         ->and($conversation->utm_source)->toBe('google')
         ->and($conversation->utm_medium)->toBe('cpc')
@@ -106,11 +112,13 @@ it('validates required contact fields', function () {
         'tenant_id' => $tenant->id,
         'bot_id' => $bot->id,
         'status' => 'open',
+        'public_session_token' => hash('sha256', $conversationToken = Str::random(64)),
     ]);
 
     $this->postJson('/api/public/chat/contact', [
         'bot_public_key' => $bot->public_key,
         'conversation_id' => $conversation->id,
+        'conversation_token' => $conversationToken,
         'visitor_name' => 'Jane',
     ])->assertUnprocessable();
 });

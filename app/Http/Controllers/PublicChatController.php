@@ -11,6 +11,7 @@ use App\Support\BotContactConfig;
 use Generator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PublicChatController extends Controller
@@ -34,10 +35,13 @@ class PublicChatController extends Controller
         $priorContact = $this->priorVisitorContact($bot, $data['visitor_id'] ?? null);
         $geo = $geoIp->lookup($request->ip());
 
+        $conversationToken = Str::random(64);
+
         $conversation = ChatConversation::create([
             'tenant_id' => $bot->tenant_id,
             'bot_id' => $bot->id,
             'visitor_id' => $data['visitor_id'] ?? null,
+            'public_session_token' => hash('sha256', $conversationToken),
             'visitor_name' => $priorContact['visitor_name'] ?? null,
             'visitor_email' => $priorContact['visitor_email'] ?? null,
             'visitor_phone' => $priorContact['visitor_phone'] ?? null,
@@ -60,6 +64,7 @@ class PublicChatController extends Controller
             $this->contactConfigPayload($bot, $conversation),
             [
                 'conversation_id' => $conversation->id,
+                'conversation_token' => $conversationToken,
                 'welcome_message' => $bot->welcome_message,
                 'collect_contact_on_start' => (bool) $bot->collect_contact_on_start,
                 'widget' => $bot->resolvedWidgetConfig(),
@@ -113,19 +118,24 @@ class PublicChatController extends Controller
         $data = $request->validate([
             'bot_public_key' => ['required', 'string'],
             'conversation_id' => ['required', 'integer'],
+            'conversation_token' => ['required', 'string', 'size:64'],
             'visitor_name' => ['nullable', 'string', 'max:255'],
             'visitor_email' => ['nullable', 'email', 'max:255'],
-            'visitor_phone' => ['nullable', 'string', 'max:50'],
+            'visitor_phone' => ['nullable', 'string', 'regex:/^\+[1-9]\d{6,14}$/'],
+            'country_code' => ['nullable', 'string', 'size:2'],
         ]);
 
         $bot = $this->activeBot($data['bot_public_key']);
-        $conversation = ChatConversation::query()
-            ->where('id', $data['conversation_id'])
-            ->where('tenant_id', $bot->tenant_id)
-            ->where('bot_id', $bot->id)
-            ->firstOrFail();
+        $conversation = $this->publicConversation($bot, $data['conversation_id'], $data['conversation_token']);
 
         $leadCapture->capture($bot, $conversation, $data);
+
+        if (isset($data['country_code'])) {
+            $conversation->update([
+                'country_code' => strtoupper($data['country_code']),
+                'country_name' => null,
+            ]);
+        }
 
         return response()->json(['ok' => true]);
     }
@@ -135,15 +145,12 @@ class PublicChatController extends Controller
         $data = $request->validate([
             'bot_public_key' => ['required', 'string'],
             'conversation_id' => ['required', 'integer'],
+            'conversation_token' => ['required', 'string', 'size:64'],
             'after_id' => ['nullable', 'integer', 'min:0'],
         ]);
 
         $bot = $this->activeBot($data['bot_public_key']);
-        $conversation = ChatConversation::query()
-            ->where('id', $data['conversation_id'])
-            ->where('tenant_id', $bot->tenant_id)
-            ->where('bot_id', $bot->id)
-            ->firstOrFail();
+        $conversation = $this->publicConversation($bot, $data['conversation_id'], $data['conversation_token']);
 
         return response()->json([
             'messages' => $conversation->messages()
@@ -169,17 +176,14 @@ class PublicChatController extends Controller
         $data = $request->validate([
             'bot_public_key' => ['required', 'string'],
             'conversation_id' => ['required', 'integer'],
+            'conversation_token' => ['required', 'string', 'size:64'],
             'message' => ['required', 'string', 'max:2000'],
             'page.url' => ['nullable', 'url:http,https', 'max:2000'],
             'page.title' => ['nullable', 'string', 'max:255'],
         ]);
 
         $bot = $this->activeBot($data['bot_public_key'], withAiSettings: true);
-        $conversation = ChatConversation::query()
-            ->where('id', $data['conversation_id'])
-            ->where('tenant_id', $bot->tenant_id)
-            ->where('bot_id', $bot->id)
-            ->firstOrFail();
+        $conversation = $this->publicConversation($bot, $data['conversation_id'], $data['conversation_token']);
 
         $pageContext = array_filter([
             'url' => $data['page']['url'] ?? null,
@@ -206,6 +210,16 @@ class PublicChatController extends Controller
         abort_unless($host && in_array($host, $domains, true), 403);
     }
 
+    private function publicConversation(Bot $bot, int $conversationId, string $conversationToken): ChatConversation
+    {
+        return ChatConversation::query()
+            ->whereKey($conversationId)
+            ->where('tenant_id', $bot->tenant_id)
+            ->where('bot_id', $bot->id)
+            ->where('public_session_token', hash('sha256', $conversationToken))
+            ->firstOrFail();
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -216,6 +230,7 @@ class PublicChatController extends Controller
             'contact_required' => BotContactConfig::required($bot),
             'has_contact' => BotContactConfig::hasCompleteContact($bot, $conversation),
             'contact' => BotContactConfig::widgetContact($conversation),
+            'country_code' => $conversation->country_code,
         ];
     }
 

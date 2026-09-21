@@ -5,6 +5,7 @@ use App\Models\Bot;
 use App\Models\ChatConversation;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 it('queues lead captured mail when contact is saved', function () {
     Mail::fake();
@@ -22,11 +23,13 @@ it('queues lead captured mail when contact is saved', function () {
         'bot_id' => $bot->id,
         'visitor_id' => 'visitor-1',
         'status' => 'escalated',
+        'public_session_token' => hash('sha256', $conversationToken = Str::random(64)),
     ]);
 
     $this->postJson('/api/public/chat/contact', [
         'bot_public_key' => $bot->public_key,
         'conversation_id' => $conversation->id,
+        'conversation_token' => $conversationToken,
         'visitor_name' => 'Jane Doe',
         'visitor_email' => 'jane@example.com',
     ])->assertOk();
@@ -58,11 +61,13 @@ it('does not send lead mail twice for the same conversation', function () {
         'visitor_email' => 'jane@example.com',
         'contact_notified_at' => now(),
         'status' => 'escalated',
+        'public_session_token' => hash('sha256', $conversationToken = Str::random(64)),
     ]);
 
     $this->postJson('/api/public/chat/contact', [
         'bot_public_key' => $bot->public_key,
         'conversation_id' => $conversation->id,
+        'conversation_token' => $conversationToken,
         'visitor_email' => 'jane@example.com',
     ])->assertOk();
 
@@ -83,11 +88,13 @@ it('skips lead mail when bot has no notification email', function () {
         'tenant_id' => $tenant->id,
         'bot_id' => $bot->id,
         'status' => 'open',
+        'public_session_token' => hash('sha256', $conversationToken = Str::random(64)),
     ]);
 
     $this->postJson('/api/public/chat/contact', [
         'bot_public_key' => $bot->public_key,
         'conversation_id' => $conversation->id,
+        'conversation_token' => $conversationToken,
         'visitor_email' => 'jane@example.com',
     ])->assertOk();
 
