@@ -82,6 +82,7 @@ export default function Edit({ settings }) {
 
             <div className="mx-auto max-w-3xl space-y-6 p-6">
                 <StatusOverview settings={settings} />
+                {!settings.is_active && <ActivationNotice />}
                 <TestResultCard settings={settings} testing={testing} />
 
                 <form onSubmit={submit} className="space-y-6">
@@ -185,15 +186,28 @@ export default function Edit({ settings }) {
                             {processing ? 'Saving…' : 'Save settings'}
                         </PrimaryButton>
                         <SecondaryButton type="button" onClick={testConnection} disabled={testing || processing}>
-                            {testing ? 'Testing…' : 'Test connection'}
+                            {testing ? 'Testing…' : 'Test & activate'}
                         </SecondaryButton>
                         {recentlySuccessful && (
-                            <span className="text-sm text-emerald-600 dark:text-emerald-400">Saved.</span>
+                            <span className="text-sm text-amber-700 dark:text-amber-300">
+                                Saved. Test & activate the new configuration before bots can use it.
+                            </span>
                         )}
                     </div>
                 </form>
             </div>
         </AuthenticatedLayout>
+    );
+}
+
+function ActivationNotice() {
+    return (
+        <section className="rounded-lg border border-amber-200 bg-amber-50 p-5 dark:border-amber-900/60 dark:bg-amber-950/30">
+            <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-200">One more step: activate this configuration</h3>
+            <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">
+                Saving a provider or model change keeps bots paused until you click “Test & activate” and the connection passes.
+            </p>
+        </section>
     );
 }
 

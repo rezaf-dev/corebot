@@ -141,11 +141,54 @@ it('does not request contact when retrieval is confident', function () {
             ],
         ]);
 
-    $response = app(ChatAnswerService::class)->answer($bot->load('tenant.aiSetting'), $conversation, 'pricing?');
+    $response = app(ChatAnswerService::class)->answer($bot->load('tenant.aiSetting'), $conversation, 'How do I reset my password?');
 
     expect($response['needs_contact'])->toBeFalse()
         ->and($response['sources'][0]['url'])->toBe('https://example.com/help')
         ->and($conversation->fresh()->status)->toBe('open');
+});
+
+it('requests contact for a potential customer', function () {
+    $tenant = Tenant::create(['name' => 'Demo', 'slug' => 'potential-customer', 'status' => 'active']);
+    $tenant->aiSetting()->create([
+        'provider' => 'openai',
+        'api_key' => 'sk-test',
+        'base_url' => 'https://api.openai.com/v1',
+        'chat_model' => 'gpt-4o-mini',
+        'embedding_model' => 'text-embedding-3-small',
+        'is_active' => true,
+    ]);
+    $bot = Bot::create([
+        'tenant_id' => $tenant->id,
+        'name' => 'Support',
+        'contact_fields' => ['email'],
+        'contact_required' => ['email'],
+    ]);
+    $conversation = ChatConversation::create([
+        'tenant_id' => $tenant->id,
+        'bot_id' => $bot->id,
+        'status' => 'open',
+    ]);
+
+    $this->mock(SemanticSearchService::class)
+        ->shouldReceive('searchWithMeta')
+        ->once()
+        ->andReturn(new SearchResult(collect(), confident: false));
+
+    $this->mock(OpenAIService::class)
+        ->shouldReceive('createChatCompletion')
+        ->once()
+        ->andReturn(['choices' => [['message' => ['content' => 'We can help with that.']]]]);
+
+    $response = app(ChatAnswerService::class)->answer(
+        $bot->load('tenant.aiSetting'),
+        $conversation,
+        'Could I get a quote for 500 units?',
+    );
+
+    expect($response['needs_contact'])->toBeTrue()
+        ->and($conversation->fresh()->status)->toBe('escalated')
+        ->and($conversation->fresh()->handoff_reason)->toBe('potential_customer');
 });
 
 it('does not request contact when required fields are already present', function () {

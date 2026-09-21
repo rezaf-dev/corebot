@@ -7,6 +7,7 @@ use App\Models\ChatConversation;
 use App\Models\RetrievalLog;
 use App\Services\AI\OpenAIService;
 use App\Services\Conversations\ManualHandoffNotifier;
+use App\Services\Conversations\PotentialCustomerDetector;
 use App\Services\Integrations\IntegrationToolFactory;
 use App\Support\BotContactConfig;
 use Generator;
@@ -22,6 +23,7 @@ class ChatAnswerService
         private readonly OpenAIService $openAI,
         private readonly IntegrationToolFactory $integrationTools,
         private readonly ManualHandoffNotifier $manualHandoffNotifier,
+        private readonly PotentialCustomerDetector $potentialCustomerDetector,
     ) {}
 
     public function answer(Bot $bot, ChatConversation $conversation, string $userMessage, array $pageContext = []): array
@@ -335,6 +337,10 @@ class ChatAnswerService
     {
         if (preg_match('/\b(human|person|agent|representative|support team|call me|talk to support)\b/i', $userMessage)) {
             return 'human_requested';
+        }
+
+        if ($this->potentialCustomerDetector->isPotentialCustomer($userMessage)) {
+            return 'potential_customer';
         }
 
         if (preg_match('/\b(i (do not|don\'t) know|cannot answer|can\'t answer|unable to answer|no information)\b/i', $answer)) {
