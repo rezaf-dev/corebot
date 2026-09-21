@@ -681,7 +681,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
 
             showWelcomeMessage(state.welcome_message);
 
-            if (res.collect_contact_on_start && shouldPromptContact(res)) {
+            if (res.collect_contact_on_start && !contactConfig.has_contact && contactConfig.fields.length) {
                 showContact('start');
             }
         } catch {
