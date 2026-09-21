@@ -401,6 +401,13 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
     const state = JSON.parse(localStorage.getItem(storageKey) || '{}');
     let latestManualMessageId = 0;
     let manualMessagePolling = null;
+
+    // Conversations created before session-token protection cannot safely be resumed.
+    if (state.conversation_id && !state.conversation_token) {
+        delete state.conversation_id;
+        delete state.welcome_message;
+    }
+
     state.visitor_id = state.visitor_id || crypto.randomUUID();
     localStorage.setItem(storageKey, JSON.stringify(state));
 
@@ -508,7 +515,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         const text = input.value.trim();
         if (!text) return;
 
-        if (!state.conversation_id) {
+        if (!state.conversation_id || !state.conversation_token) {
             await startConversation();
             if (!state.conversation_id) return;
         }
@@ -605,7 +612,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
             clearUnreadNotification();
             ensureInitialContent();
 
-            if (!state.conversation_id) {
+            if (!state.conversation_id || !state.conversation_token) {
                 await startConversation();
             } else {
                 startManualMessagePolling();
@@ -736,14 +743,14 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
     }
 
     function startManualMessagePolling() {
-        if (manualMessagePolling || !state.conversation_id) return;
+        if (manualMessagePolling || !state.conversation_id || !state.conversation_token) return;
 
         pollManualMessages();
         manualMessagePolling = window.setInterval(pollManualMessages, 8000);
     }
 
     async function pollManualMessages() {
-        if (!state.conversation_id) return;
+        if (!state.conversation_id || !state.conversation_token) return;
 
         try {
             const response = await post('/manual-messages', {
