@@ -1508,17 +1508,35 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
                 z-index: 2147483647;
                 border: 0;
                 border-radius: 999px;
-                background: var(--crm-primary);
+                background: linear-gradient(145deg, rgba(255, 255, 255, 0.14), transparent 65%), var(--crm-primary);
                 color: #fff;
                 width: var(--crm-launcher-size);
                 height: var(--crm-launcher-size);
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                box-shadow: 0 12px 32px rgba(15, 23, 42, 0.28);
+                box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22), 0 6px 14px rgba(15, 23, 42, 0.2), 0 14px 32px color-mix(in srgb, var(--crm-primary) 30%, transparent);
                 cursor: pointer;
-                animation: crm-ai-launcher-in 0.45s ease both;
+                animation: crm-ai-launcher-in 0.45s ease backwards;
                 transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+            }
+            .crm-ai-btn::before {
+                content: '';
+                position: absolute;
+                inset: -6px;
+                border: 1px solid color-mix(in srgb, var(--crm-accent) 24%, transparent);
+                border-radius: inherit;
+                box-shadow: 0 0 22px color-mix(in srgb, var(--crm-accent) 20%, transparent);
+                pointer-events: none;
+                opacity: 0.65;
+                animation: crm-ai-launcher-glow 3.6s ease-in-out 1s 3;
+                transition: opacity 0.2s ease;
+            }
+            .crm-ai-btn:is(:hover, :focus-visible)::before { animation: none; opacity: 1; }
+            .crm-ai-btn.is-open::before { animation: none; opacity: 0; }
+            @keyframes crm-ai-launcher-glow {
+                0%, 100% { transform: scale(1); opacity: 0.65; }
+                50% { transform: scale(1.12); opacity: 0.15; }
             }
             .crm-ai-root[data-position="bottom-right"] .crm-ai-btn {
                 right: max(var(--crm-offset-x), env(safe-area-inset-right));
@@ -1538,23 +1556,27 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
             }
             .crm-ai-btn:hover { background: var(--crm-primary-hover); transform: scale(1.05); box-shadow: 0 14px 36px rgba(15, 23, 42, 0.32); }
             .crm-ai-btn:active { transform: scale(0.97); }
-            .crm-ai-btn:focus-visible { outline: 3px solid var(--crm-focus-ring); outline-offset: 3px; }
+            .crm-ai-btn:focus-visible { outline: 3px solid var(--crm-accent); outline-offset: 4px; }
             .crm-ai-btn svg { width: calc(var(--crm-launcher-size) * 0.46); height: calc(var(--crm-launcher-size) * 0.46); fill: currentColor; }
             .crm-ai-btn.is-open { background: var(--crm-muted); }
             .crm-ai-launcher-label {
                 position: fixed;
                 z-index: 2147483646;
                 display: none;
-                max-width: 220px;
-                padding: 9px 12px;
+                max-width: min(220px, calc(100vw - var(--crm-offset-x) - var(--crm-launcher-size) - 28px));
+                padding: 10px 14px;
                 border: 1px solid var(--crm-border);
                 border-radius: 999px;
                 background: var(--crm-surface);
-                box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
+                box-shadow: 0 4px 8px rgba(15, 23, 42, 0.04), 0 10px 28px rgba(15, 23, 42, 0.12);
                 color: var(--crm-text);
                 font-size: 13px;
                 font-weight: 600;
+                line-height: 1.5;
+                overflow: hidden;
+                text-overflow: ellipsis;
                 white-space: nowrap;
+                animation: crm-ai-launcher-in 0.45s ease 0.15s backwards;
             }
             .crm-ai-launcher-label.is-visible { display: block; }
             .crm-ai-launcher-label.is-hidden { display: none; }
@@ -2122,6 +2144,13 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
                 font-size: 13px;
             }
             .crm-ai-starting .crm-ai-typing span { width: 6px; height: 6px; }
+            @media (prefers-reduced-motion: reduce) {
+                .crm-ai-btn, .crm-ai-btn::before, .crm-ai-launcher-label, .crm-ai-launcher-badge.is-visible {
+                    animation: none;
+                    transition: none;
+                }
+                .crm-ai-btn:hover, .crm-ai-btn:active { transform: none; }
+            }
             @media (max-width: 480px) {
                 .crm-ai-panel {
                     left: 0 !important;
