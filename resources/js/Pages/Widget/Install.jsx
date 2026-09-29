@@ -33,8 +33,8 @@ export default function Install({ bots, widgetUrl, defaults, positions, icons })
 
     const snippet = useMemo(() => {
         if (!selectedBot) return '';
-        return buildEmbedSnippet(widgetUrl, selectedBot.public_key, data);
-    }, [selectedBot, widgetUrl, data]);
+        return buildEmbedSnippet(widgetUrl, selectedBot.public_key);
+    }, [selectedBot, widgetUrl]);
 
     const submit = (e) => {
         e.preventDefault();
@@ -551,30 +551,10 @@ function RangeField({ id, label, value, min, max, onChange, error }) {
     );
 }
 
-function buildEmbedSnippet(widgetUrl, publicKey, config) {
+function buildEmbedSnippet(widgetUrl, publicKey) {
     const attrs = {
         src: widgetUrl,
         'data-bot-key': publicKey,
-        'data-title': config.title,
-        'data-subtitle': config.subtitle || '',
-        'data-avatar-url': config.avatar_url || '',
-        'data-primary-color': config.primary_color,
-        'data-accent-color': config.accent_color,
-        'data-background-color': config.background_color,
-        'data-surface-color': config.surface_color,
-        'data-text-color': config.text_color,
-        'data-position': config.position,
-        'data-offset-x': String(config.offset_x),
-        'data-offset-y': String(config.offset_y),
-        'data-border-radius': String(config.border_radius),
-        'data-panel-width': String(config.panel_width),
-        'data-launcher-size': String(config.launcher_size),
-        'data-send-button-label': config.send_button_label,
-        'data-input-placeholder': config.input_placeholder,
-        'data-launcher-icon': config.launcher_icon,
-        'data-launcher-label': config.launcher_label || '',
-        'data-initial-open': config.initial_open ? 'true' : 'false',
-        'data-suggested-prompts': JSON.stringify((config.suggested_prompts || []).filter((item) => item && item.trim())),
     };
 
     return (

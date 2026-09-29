@@ -51,7 +51,6 @@ class BotController extends Controller
             'widgetSnippet' => WidgetConfig::embedSnippet(
                 url('/widget.js'),
                 $bot->public_key,
-                $bot->resolvedWidgetConfig(),
             ),
         ]);
     }

@@ -116,49 +116,12 @@ it('saves suggested prompts for tenant admins', function () {
         ->toBe(['Pricing plans', 'Book a demo']);
 });
 
-it('builds embed snippets with data attributes', function () {
+it('builds stable embed snippets without widget config', function () {
     $snippet = WidgetConfig::embedSnippet(
         'https://app.test/widget.js',
         'bot_testkey',
-        ['title' => 'Help', 'primary_color' => '#112233'],
     );
 
     expect($snippet)
-        ->toContain('src="https://app.test/widget.js"')
-        ->toContain('data-bot-key="bot_testkey"')
-        ->toContain('data-title="Help"')
-        ->toContain('data-primary-color="#112233"')
-        ->toContain('data-avatar-url=""')
-        ->toContain('data-initial-open="false"')
-        ->toContain('data-launcher-label="We&#039;re here to help"')
-        ->toContain('data-launcher-label="We&#039;re here to help"')
-        ->toContain('data-suggested-prompts="[]"');
-});
-
-it('includes the support avatar in embed snippets', function () {
-    $snippet = WidgetConfig::embedSnippet(
-        'https://app.test/widget.js',
-        'bot_testkey',
-        ['avatar_url' => 'https://example.com/support.jpg'],
-    );
-
-    expect($snippet)->toContain('data-avatar-url="https://example.com/support.jpg"');
-});
-
-it('includes suggested prompts in embed snippets', function () {
-    $snippet = WidgetConfig::embedSnippet(
-        'https://app.test/widget.js',
-        'bot_testkey',
-        ['suggested_prompts' => ['Need help?', 'Pricing']],
-    );
-
-    expect($snippet)->toContain('data-suggested-prompts="[&quot;Need help?&quot;,&quot;Pricing&quot;]"');
-});
-
-it('includes initial open in embed snippets when enabled', function () {
-    $config = array_merge(WidgetConfig::DEFAULTS, ['initial_open' => true]);
-
-    $snippet = WidgetConfig::embedSnippet('https://app.test/widget.js', 'bot_testkey', $config);
-
-    expect($snippet)->toContain('data-initial-open="true"');
+        ->toBe('<script src="https://app.test/widget.js" data-bot-key="bot_testkey"></script>');
 });

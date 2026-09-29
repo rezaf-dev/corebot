@@ -90,37 +90,6 @@ class WidgetConfig
         ];
     }
 
-    /**
-     * @return array<string, string>
-     */
-    public static function dataAttributes(array $config): array
-    {
-        $config = self::resolve($config);
-
-        return [
-            'data-title' => (string) $config['title'],
-            'data-subtitle' => (string) ($config['subtitle'] ?? ''),
-            'data-avatar-url' => (string) ($config['avatar_url'] ?? ''),
-            'data-primary-color' => (string) $config['primary_color'],
-            'data-accent-color' => (string) $config['accent_color'],
-            'data-background-color' => (string) $config['background_color'],
-            'data-surface-color' => (string) $config['surface_color'],
-            'data-text-color' => (string) $config['text_color'],
-            'data-position' => (string) $config['position'],
-            'data-offset-x' => (string) $config['offset_x'],
-            'data-offset-y' => (string) $config['offset_y'],
-            'data-border-radius' => (string) $config['border_radius'],
-            'data-panel-width' => (string) $config['panel_width'],
-            'data-launcher-size' => (string) $config['launcher_size'],
-            'data-send-button-label' => (string) $config['send_button_label'],
-            'data-input-placeholder' => (string) $config['input_placeholder'],
-            'data-launcher-icon' => (string) $config['launcher_icon'],
-            'data-launcher-label' => (string) ($config['launcher_label'] ?? ''),
-            'data-initial-open' => $config['initial_open'] ? 'true' : 'false',
-            'data-suggested-prompts' => json_encode($config['suggested_prompts'], JSON_UNESCAPED_UNICODE),
-        ];
-    }
-
     public static function apiBaseFromWidgetUrl(string $widgetScriptUrl): string
     {
         $parts = parse_url($widgetScriptUrl);
@@ -138,15 +107,12 @@ class WidgetConfig
         return $parts['scheme'].'://'.$parts['host'].$port.$apiPath;
     }
 
-    public static function embedSnippet(string $widgetUrl, string $publicKey, array $config): string
+    public static function embedSnippet(string $widgetUrl, string $publicKey): string
     {
-        $attributes = array_merge(
-            [
-                'src' => $widgetUrl,
-                'data-bot-key' => $publicKey,
-            ],
-            self::dataAttributes($config),
-        );
+        $attributes = [
+            'src' => $widgetUrl,
+            'data-bot-key' => $publicKey,
+        ];
 
         $parts = [];
 
