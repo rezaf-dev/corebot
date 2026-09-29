@@ -118,12 +118,11 @@ it('saves suggested prompts for tenant admins', function () {
 
 it('builds stable embed snippets without widget config', function () {
     $snippet = WidgetConfig::embedSnippet(
-        'https://app.test/widget.js',
-        'bot_testkey',
+        'https://app.test/widgets/bot_testkey.js',
     );
 
     expect($snippet)
-        ->toBe('<script src="https://app.test/widget.js" data-bot-key="bot_testkey"></script>');
+        ->toBe('<script src="https://app.test/widgets/bot_testkey.js"></script>');
 });
 
 it('does not accept widget config from script data attributes', function () {

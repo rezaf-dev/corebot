@@ -26,6 +26,10 @@ return [
 
     'demo_bot_public_key' => env('DEMO_BOT_PUBLIC_KEY'),
 
+    'widget_assets' => [
+        'path' => env('WIDGET_ASSET_PATH', public_path('widgets')),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | DOCX text extraction (python-docx via scripts/extract_docx.py)

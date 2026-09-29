@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Bot;
 use App\Support\TenantAccess;
+use App\Support\WidgetAsset;
 use App\Support\WidgetConfig;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,7 +34,7 @@ class BotController extends Controller
         return redirect()->route('bots.index')->with('success', 'Bot created.');
     }
 
-    public function edit(Bot $bot, TenantAccess $access): Response
+    public function edit(Bot $bot, TenantAccess $access, WidgetAsset $widgetAsset): Response
     {
         $access->ensureCanAccess(auth()->user(), $bot);
 
@@ -47,11 +48,7 @@ class BotController extends Controller
                 ['value' => 'send_email', 'label' => 'Send email'],
                 ['value' => 'http_get', 'label' => 'HTTP GET query'],
             ],
-            'widgetUrl' => url('/widget.js'),
-            'widgetSnippet' => WidgetConfig::embedSnippet(
-                url('/widget.js'),
-                $bot->public_key,
-            ),
+            'widgetSnippet' => WidgetConfig::embedSnippet($widgetAsset->url($bot)),
         ]);
     }
 

@@ -107,11 +107,10 @@ class WidgetConfig
         return $parts['scheme'].'://'.$parts['host'].$port.$apiPath;
     }
 
-    public static function embedSnippet(string $widgetUrl, string $publicKey): string
+    public static function embedSnippet(string $widgetUrl): string
     {
         $attributes = [
             'src' => $widgetUrl,
-            'data-bot-key' => $publicKey,
         ];
 
         $parts = [];

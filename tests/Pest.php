@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
 /*
@@ -16,7 +17,15 @@ use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
-    ->beforeEach(fn () => $this->withoutVite())
+    ->beforeEach(function () {
+        $this->withoutVite();
+        $path = storage_path('framework/testing/widget-assets/'.getmypid());
+        File::deleteDirectory($path);
+        config(['corebot.widget_assets.path' => $path]);
+    })
+    ->afterEach(function () {
+        File::deleteDirectory(config('corebot.widget_assets.path'));
+    })
     ->in('Feature');
 
 pest()->extend(TestCase::class)->in('Unit');

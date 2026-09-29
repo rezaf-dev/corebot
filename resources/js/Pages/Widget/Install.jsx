@@ -15,7 +15,7 @@ const launcherTemplates = [
     "Let's talk",
 ];
 
-export default function Install({ bots, widgetUrl, defaults, positions, icons }) {
+export default function Install({ bots, defaults, positions, icons }) {
     const [selectedBotId, setSelectedBotId] = useState(bots[0]?.id ?? null);
     const [copied, setCopied] = useState(false);
 
@@ -33,8 +33,8 @@ export default function Install({ bots, widgetUrl, defaults, positions, icons })
 
     const snippet = useMemo(() => {
         if (!selectedBot) return '';
-        return buildEmbedSnippet(widgetUrl, selectedBot.public_key);
-    }, [selectedBot, widgetUrl]);
+        return buildEmbedSnippet(selectedBot.widget_url);
+    }, [selectedBot]);
 
     const submit = (e) => {
         e.preventDefault();
@@ -552,10 +552,9 @@ function RangeField({ id, label, value, min, max, onChange, error }) {
     );
 }
 
-function buildEmbedSnippet(widgetUrl, publicKey) {
+function buildEmbedSnippet(widgetUrl) {
     const attrs = {
         src: widgetUrl,
-        'data-bot-key': publicKey,
     };
 
     return (

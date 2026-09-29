@@ -392,11 +392,12 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
 /* PROMPT_HELPERS_END */
 
 (function () {
+    const serverBootstrap = /* __COREBOT_BOOTSTRAP__ */ null;
     const script = document.currentScript;
-    const botKey = script && script.dataset.botKey;
+    const botKey = serverBootstrap?.bot_key || (script && script.dataset.botKey);
     if (!botKey) return;
 
-    const apiBase = resolveApiBase(script);
+    const apiBase = serverBootstrap?.api_base || resolveApiBase(script);
     const storageKey = 'crm_ai_bot_' + botKey;
     const state = JSON.parse(localStorage.getItem(storageKey) || '{}');
     let latestManualMessageId = 0;
@@ -434,7 +435,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         suggested_prompts: [],
     };
 
-    let config = { ...DEFAULT_CONFIG };
+    let config = mergeConfig(DEFAULT_CONFIG, serverBootstrap?.widget || {});
     let contactConfig = {
         fields: ['name', 'email'],
         required: ['email'],
@@ -484,20 +485,11 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
 
     applyConfig(config);
 
-    loadRemoteConfig().then((remote) => {
-        config = mergeConfig(config, remote.widget || {});
-        applyConfig(config);
-        applyRemoteContactConfig(remote);
-
-        if (remote.welcome_message) {
-            state.welcome_message = remote.welcome_message;
-            config.welcome_message = remote.welcome_message;
-            localStorage.setItem(storageKey, JSON.stringify(state));
-        }
-
-        applyInitialOpen();
-        crmRoot.dataset.configReady = 'true';
-    });
+    if (serverBootstrap) {
+        applyRemoteConfig(serverBootstrap);
+    } else {
+        loadRemoteConfig().then(applyRemoteConfig);
+    }
 
     button.addEventListener('click', () => togglePanel());
     button.addEventListener('pointerdown', unlockNotificationSound, { once: true });
@@ -704,6 +696,20 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         } catch {
             return {};
         }
+    }
+
+    function applyRemoteConfig(remote) {
+        config = mergeConfig(config, remote.widget || {});
+        applyConfig(config);
+        applyRemoteContactConfig(remote);
+
+        if (config.welcome_message) {
+            state.welcome_message = config.welcome_message;
+            localStorage.setItem(storageKey, JSON.stringify(state));
+        }
+
+        applyInitialOpen();
+        crmRoot.dataset.configReady = 'true';
     }
 
     function applyRemoteContactConfig(remote) {

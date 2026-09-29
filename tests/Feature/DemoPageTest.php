@@ -18,5 +18,6 @@ it('embeds the demo widget when a bot key is configured', function () {
         ->assertSuccessful()
         ->assertSee('Try asking', false)
         ->assertSee('Can I use this on Laravel?', false)
-        ->assertSee('data-bot-key="bot_demo123"', false);
+        ->assertSee('/widgets/bot_demo123.js', false)
+        ->assertDontSee('data-bot-key', false);
 });

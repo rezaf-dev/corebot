@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\WidgetAsset;
 use App\Support\WidgetConfig;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -50,6 +51,14 @@ PROMPT;
             $bot->system_prompt ??= self::DEFAULT_SYSTEM_PROMPT;
             $bot->fallback_message ??= self::DEFAULT_FALLBACK_MESSAGE;
             $bot->welcome_message ??= 'Hi, how can I help with your CRM today?';
+        });
+
+        static::saved(function (Bot $bot): void {
+            app(WidgetAsset::class)->sync($bot);
+        });
+
+        static::deleted(function (Bot $bot): void {
+            app(WidgetAsset::class)->delete($bot);
         });
     }
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Bot;
 use App\Support\TenantAccess;
+use App\Support\WidgetAsset;
 use App\Support\WidgetConfig;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,7 +16,7 @@ use Inertia\Response;
 
 class WidgetInstallController extends Controller
 {
-    public function __invoke(TenantAccess $access): Response
+    public function __invoke(TenantAccess $access, WidgetAsset $widgetAsset): Response
     {
         $bots = $access->scope(Bot::query(), auth()->user())
             ->where('status', 'active')
@@ -27,9 +28,9 @@ class WidgetInstallController extends Controller
                 'id' => $bot->id,
                 'name' => $bot->name,
                 'public_key' => $bot->public_key,
+                'widget_url' => $widgetAsset->url($bot),
                 'widget_config' => $bot->resolvedWidgetConfig(),
             ]),
-            'widgetUrl' => url('/widget.js'),
             'defaults' => WidgetConfig::DEFAULTS,
             'positions' => WidgetConfig::positions(),
             'icons' => WidgetConfig::icons(),

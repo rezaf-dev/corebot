@@ -134,7 +134,7 @@
     </div>
 
     @if ($botPublicKey)
-        <script src="{{ $widgetUrl }}" data-bot-key="{{ $botPublicKey }}"></script>
+        <script src="{{ $widgetUrl }}"></script>
         <script>
             document.getElementById('demo-prompts')?.addEventListener('click', function (event) {
                 const btn = event.target.closest('[data-question]');
