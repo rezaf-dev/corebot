@@ -125,3 +125,18 @@ it('builds stable embed snippets without widget config', function () {
     expect($snippet)
         ->toBe('<script src="https://app.test/widget.js" data-bot-key="bot_testkey"></script>');
 });
+
+it('does not accept widget config from script data attributes', function () {
+    $widgetSource = file_get_contents(public_path('widget.js'));
+
+    expect($widgetSource)
+        ->not->toContain('parseDatasetConfig')
+        ->not->toContain('script.dataset.apiBase')
+        ->not->toContain('dataset.primaryColor')
+        ->not->toContain('dataset.launcherIcon')
+        ->toContain('script.dataset.botKey');
+});
+
+it('offers the approved launcher icon set', function () {
+    expect(WidgetConfig::icons())->toBe(['chat', 'help', 'support', 'assistant']);
+});

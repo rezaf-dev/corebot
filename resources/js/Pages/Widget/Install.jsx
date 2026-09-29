@@ -489,13 +489,14 @@ function WidgetPreview({ config, initialOpen }) {
 
 function LauncherIcon({ icon }) {
     const paths = {
-        chat: <path d="M4 3h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1 2-2V5a2 2 0 0 1 2-2Zm2 5h12v2H6V8Zm0 4h8v2H6v-2Z" />,
-        help: <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z" />,
-        support: <path d="M12 1c-4.97 0-9 4.03-9 9v7c0 1.66 1.34 3 3 3h1v-8H5c0-3.87 3.13-7 7-7s7 3.13 7 7v1h-2c-1.1 0-2 .9-2 2v6c0 1.1.9 2 2 2h4c1.1 0 2-.9 2-2v-6c0-4.97-4.03-9-9-9z" />,
+        chat: <><path d="M21 15a4 4 0 0 1-4 4H8l-5 3v-3a4 4 0 0 1-2-3V7a4 4 0 0 1 4-4h12a4 4 0 0 1 4 4Z" /><path d="M8 9h8M8 13h5" /></>,
+        help: <><circle cx="12" cy="12" r="10" /><path d="M9.6 9a2.6 2.6 0 1 1 4 2.2c-1 .7-1.6 1.3-1.6 2.8M12 17h.01" /></>,
+        support: <><path d="M4 13v-2a8 8 0 0 1 16 0v2" /><path d="M4 12H3a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h3v-7H4ZM20 12h1a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-3v-7h2Z" /><path d="M18 19c-.5 2.5-2.5 3.5-5 3.5h-1.5" /></>,
+        assistant: <><path d="m12 2 1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5Z" /><path d="m19 13 1 3 3 1-3 1-1 3-1-3-3-1 3-1ZM5 14l.8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8Z" /></>,
     };
 
     return (
-        <svg viewBox="0 0 24 24" aria-hidden="true" className="h-[46%] w-[46%] fill-current">
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="h-[46%] w-[46%] fill-none stroke-current stroke-2 [stroke-linecap:round] [stroke-linejoin:round]">
             {paths[icon] || paths.chat}
         </svg>
     );

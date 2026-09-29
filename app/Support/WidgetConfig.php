@@ -136,7 +136,7 @@ class WidgetConfig
      */
     public static function icons(): array
     {
-        return ['chat', 'help', 'support'];
+        return ['chat', 'help', 'support', 'assistant'];
     }
 
     private static function normalizeColor(string $color, string $fallback): string

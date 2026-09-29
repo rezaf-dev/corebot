@@ -434,7 +434,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         suggested_prompts: [],
     };
 
-    let config = parseDatasetConfig(script.dataset);
+    let config = { ...DEFAULT_CONFIG };
     let contactConfig = {
         fields: ['name', 'email'],
         required: ['email'],
@@ -451,9 +451,10 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
     let notificationAudioContext = null;
 
     const LAUNCHER_ICONS = {
-        chat: '<path d="M4 3h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm2 5h12v2H6V8Zm0 4h8v2H6v-2Z"/>',
-        help: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/>',
-        support: '<path d="M12 1c-4.97 0-9 4.03-9 9v7c0 1.66 1.34 3 3 3h1v-8H5c0-3.87 3.13-7 7-7s7 3.13 7 7v1h-2c-1.1 0-2 .9-2 2v6c0 1.1.9 2 2 2h4c1.1 0 2-.9 2-2v-6c0-4.97-4.03-9-9-9z"/>',
+        chat: '<path d="M21 15a4 4 0 0 1-4 4H8l-5 3v-3a4 4 0 0 1-2-3V7a4 4 0 0 1 4-4h12a4 4 0 0 1 4 4Z"/><path d="M8 9h8M8 13h5"/>',
+        help: '<circle cx="12" cy="12" r="10"/><path d="M9.6 9a2.6 2.6 0 1 1 4 2.2c-1 .7-1.6 1.3-1.6 2.8M12 17h.01"/>',
+        support: '<path d="M4 13v-2a8 8 0 0 1 16 0v2"/><path d="M4 12H3a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h3v-7H4ZM20 12h1a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-3v-7h2Z"/><path d="M18 19c-.5 2.5-2.5 3.5-5 3.5h-1.5"/>',
+        assistant: '<path d="m12 2 1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5Z"/><path d="m19 13 1 3 3 1-3 1-1 3-1-3-3-1 3-1ZM5 14l.8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8Z"/>',
     };
 
     const root = document.createElement('div');
@@ -605,8 +606,6 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         button.classList.toggle('is-hidden', isOpen && isMobile());
         launcherLabel.classList.toggle('is-hidden', isOpen);
         button.setAttribute('aria-expanded', String(isOpen));
-        iconChat.style.display = isOpen ? 'none' : 'block';
-        iconClose.style.display = isOpen ? 'block' : 'none';
 
         if (isOpen) {
             clearUnreadNotification();
@@ -897,34 +896,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
     }
 
     function resolveApiBase(script) {
-        const path = script.dataset.apiBase || 'api/public/chat';
-
-        return new URL(path, script.src).toString().replace(/\/$/, '');
-    }
-
-    function parseDatasetConfig(dataset) {
-        return mergeConfig(DEFAULT_CONFIG, {
-            title: dataset.title,
-            subtitle: dataset.subtitle,
-            avatar_url: dataset.avatarUrl,
-            primary_color: dataset.primaryColor,
-            accent_color: dataset.accentColor,
-            background_color: dataset.backgroundColor,
-            surface_color: dataset.surfaceColor,
-            text_color: dataset.textColor,
-            position: dataset.position,
-            offset_x: dataset.offsetX ? Number(dataset.offsetX) : undefined,
-            offset_y: dataset.offsetY ? Number(dataset.offsetY) : undefined,
-            border_radius: dataset.borderRadius ? Number(dataset.borderRadius) : undefined,
-            panel_width: dataset.panelWidth ? Number(dataset.panelWidth) : undefined,
-            launcher_size: dataset.launcherSize ? Number(dataset.launcherSize) : undefined,
-            send_button_label: dataset.sendButtonLabel,
-            input_placeholder: dataset.inputPlaceholder,
-            launcher_icon: dataset.launcherIcon,
-            launcher_label: dataset.launcherLabel,
-            initial_open: parseBoolean(dataset.initialOpen),
-            suggested_prompts: parseSuggestedPrompts(dataset.suggestedPrompts),
-        });
+        return new URL('api/public/chat', script.src).toString().replace(/\/$/, '');
     }
 
     function parseBoolean(value) {
@@ -1557,7 +1529,21 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
             .crm-ai-btn:hover { background: var(--crm-primary-hover); transform: scale(1.05); box-shadow: 0 14px 36px rgba(15, 23, 42, 0.32); }
             .crm-ai-btn:active { transform: scale(0.97); }
             .crm-ai-btn:focus-visible { outline: 3px solid var(--crm-accent); outline-offset: 4px; }
-            .crm-ai-btn svg { width: calc(var(--crm-launcher-size) * 0.46); height: calc(var(--crm-launcher-size) * 0.46); fill: currentColor; }
+            .crm-ai-btn svg {
+                position: absolute;
+                width: calc(var(--crm-launcher-size) * 0.46);
+                height: calc(var(--crm-launcher-size) * 0.46);
+                fill: none;
+                stroke: currentColor;
+                stroke-width: 2;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+                transition: opacity 0.22s ease, transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+            }
+            .crm-ai-icon-chat { opacity: 1; transform: scale(1) rotate(0deg); }
+            .crm-ai-icon-close { opacity: 0; transform: scale(0.55) rotate(-90deg); }
+            .crm-ai-btn.is-open .crm-ai-icon-chat { opacity: 0; transform: scale(0.55) rotate(90deg); }
+            .crm-ai-btn.is-open .crm-ai-icon-close { opacity: 1; transform: scale(1) rotate(0deg); }
             .crm-ai-btn.is-open { background: var(--crm-muted); }
             .crm-ai-launcher-label {
                 position: fixed;
@@ -2145,7 +2131,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
             }
             .crm-ai-starting .crm-ai-typing span { width: 6px; height: 6px; }
             @media (prefers-reduced-motion: reduce) {
-                .crm-ai-btn, .crm-ai-btn::before, .crm-ai-launcher-label, .crm-ai-launcher-badge.is-visible {
+                .crm-ai-btn, .crm-ai-btn::before, .crm-ai-btn svg, .crm-ai-launcher-label, .crm-ai-launcher-badge.is-visible {
                     animation: none;
                     transition: none;
                 }
@@ -2178,7 +2164,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         <div class="crm-ai-root" data-position="bottom-right" data-theme-defaults="true">
             <button class="crm-ai-btn" type="button" aria-label="Open support chat" aria-expanded="false">
                 <svg class="crm-ai-icon-chat" viewBox="0 0 24 24" aria-hidden="true"></svg>
-                <svg class="crm-ai-icon-close" viewBox="0 0 24 24" aria-hidden="true" style="display:none"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                <svg class="crm-ai-icon-close" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
                 <span class="crm-ai-launcher-badge" aria-label="Unread reply"></span>
             </button>
             <div class="crm-ai-launcher-label" aria-hidden="true"></div>
