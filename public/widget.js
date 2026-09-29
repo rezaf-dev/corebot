@@ -496,6 +496,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         }
 
         applyInitialOpen();
+        crmRoot.dataset.configReady = 'true';
     });
 
     button.addEventListener('click', () => togglePanel());
@@ -1489,8 +1490,11 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
                 justify-content: center;
                 box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22), 0 6px 14px rgba(15, 23, 42, 0.2), 0 14px 32px color-mix(in srgb, var(--crm-primary) 30%, transparent);
                 cursor: pointer;
-                animation: crm-ai-launcher-in 0.45s ease backwards;
                 transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+            }
+            .crm-ai-root[data-config-ready="false"] { visibility: hidden; }
+            .crm-ai-root[data-config-ready="true"] .crm-ai-btn {
+                animation: crm-ai-launcher-in 0.45s ease backwards;
             }
             .crm-ai-btn::before {
                 content: '';
@@ -1562,9 +1566,11 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
-                animation: crm-ai-launcher-in 0.45s ease 0.15s backwards;
             }
             .crm-ai-launcher-label.is-visible { display: block; }
+            .crm-ai-root[data-config-ready="true"] .crm-ai-launcher-label.is-visible {
+                animation: crm-ai-launcher-in 0.45s ease 0.15s backwards;
+            }
             .crm-ai-launcher-label.is-hidden { display: none; }
             .crm-ai-root[data-position="bottom-right"] .crm-ai-launcher-label { right: calc(var(--crm-offset-x) + var(--crm-launcher-size) + 12px); bottom: calc(var(--crm-offset-y) + 8px); }
             .crm-ai-root[data-position="bottom-left"] .crm-ai-launcher-label { left: calc(var(--crm-offset-x) + var(--crm-launcher-size) + 12px); bottom: calc(var(--crm-offset-y) + 8px); }
@@ -2161,7 +2167,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
                 }
             }
         </style>
-        <div class="crm-ai-root" data-position="bottom-right" data-theme-defaults="true">
+        <div class="crm-ai-root" data-position="bottom-right" data-theme-defaults="true" data-config-ready="false">
             <button class="crm-ai-btn" type="button" aria-label="Open support chat" aria-expanded="false">
                 <svg class="crm-ai-icon-chat" viewBox="0 0 24 24" aria-hidden="true"></svg>
                 <svg class="crm-ai-icon-close" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>

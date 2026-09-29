@@ -140,3 +140,14 @@ it('does not accept widget config from script data attributes', function () {
 it('offers the approved launcher icon set', function () {
     expect(WidgetConfig::icons())->toBe(['chat', 'help', 'support', 'assistant']);
 });
+
+it('keeps the widget hidden until remote config is applied', function () {
+    $widgetSource = file_get_contents(public_path('widget.js'));
+
+    expect($widgetSource)
+        ->toContain('data-config-ready="false"')
+        ->toContain('.crm-ai-root[data-config-ready="false"] { visibility: hidden; }')
+        ->toContain("crmRoot.dataset.configReady = 'true';")
+        ->and(strpos($widgetSource, 'applyConfig(config);', strpos($widgetSource, 'loadRemoteConfig().then')))
+        ->toBeLessThan(strpos($widgetSource, "crmRoot.dataset.configReady = 'true';"));
+});
