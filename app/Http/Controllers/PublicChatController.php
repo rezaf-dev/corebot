@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Bot;
 use App\Models\ChatConversation;
+use App\Services\ClientIpResolver;
 use App\Services\GeoIp\MaxMindGeoIpService;
 use App\Services\Leads\LeadCaptureService;
 use App\Services\Rag\ChatAnswerService;
@@ -16,7 +17,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PublicChatController extends Controller
 {
-    public function start(Request $request, MaxMindGeoIpService $geoIp): JsonResponse
+    public function start(Request $request, MaxMindGeoIpService $geoIp, ClientIpResolver $clientIp): JsonResponse
     {
         $data = $request->validate([
             'bot_public_key' => ['required', 'string'],
@@ -33,7 +34,8 @@ class PublicChatController extends Controller
         $this->ensureAllowedDomain($bot, $data['source_url'] ?? $request->headers->get('referer'));
 
         $priorContact = $this->priorVisitorContact($bot, $data['visitor_id'] ?? null);
-        $geo = $geoIp->lookup($request->ip());
+        $ipAddress = $clientIp->resolve($request);
+        $geo = $geoIp->lookup($ipAddress);
 
         $conversationToken = Str::random(64);
 
@@ -46,7 +48,7 @@ class PublicChatController extends Controller
             'visitor_email' => $priorContact['visitor_email'] ?? null,
             'visitor_phone' => $priorContact['visitor_phone'] ?? null,
             'source_url' => $data['source_url'] ?? null,
-            'ip_address' => $request->ip(),
+            'ip_address' => $ipAddress,
             'user_agent' => $request->userAgent(),
             'referrer_url' => $data['referrer_url'] ?? null,
             'country_code' => $geo['country_code'],

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\ClientIpResolver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -26,15 +27,15 @@ class AppServiceProvider extends ServiceProvider
     {
         URL::forceRootUrl(config('app.url'));
         RateLimiter::for('public-chat', function (Request $request) {
-            return Limit::perMinute(30)->by($request->ip().'|'.$request->input('bot_public_key', 'unknown'));
+            return Limit::perMinute(30)->by(app(ClientIpResolver::class)->resolve($request).'|'.$request->input('bot_public_key', 'unknown'));
         });
 
         RateLimiter::for('support-request', function (Request $request) {
-            return Limit::perMinute(5)->by($request->ip());
+            return Limit::perMinute(5)->by(app(ClientIpResolver::class)->resolve($request));
         });
 
         RateLimiter::for('knowledge-research', function (Request $request) {
-            return Limit::perMinute(10)->by((string) $request->user()?->id ?: $request->ip());
+            return Limit::perMinute(10)->by((string) $request->user()?->id ?: app(ClientIpResolver::class)->resolve($request));
         });
 
         Vite::prefetch(concurrency: 3);
