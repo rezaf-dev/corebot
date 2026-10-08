@@ -7,19 +7,22 @@ use App\Http\Requests\StoreManualConversationMessageRequest;
 use App\Models\ChatConversation;
 use App\Support\TenantAccess;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class ConversationController extends Controller
 {
-    public function index(TenantAccess $access): Response
+    public function index(Request $request, TenantAccess $access): Response
     {
         return Inertia::render('Conversations/Index', [
+            'tab' => in_array($request->query('tab'), ['needs_reply', 'all', 'escalated', 'leads'], true)
+                ? $request->query('tab')
+                : 'needs_reply',
             'conversations' => $access->scope(ChatConversation::query(), auth()->user())
                 ->with('bot:id,name')
                 ->withCount('messages')
-                ->orderByRaw("case when status = 'escalated' then 0 else 1 end")
-                ->latest('updated_at')
+                ->latest('created_at')
                 ->get(),
         ]);
     }

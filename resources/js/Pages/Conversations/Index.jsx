@@ -1,9 +1,21 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { Head, Link, router } from '@inertiajs/react';
+import { useEffect, useMemo, useState } from 'react';
 
-export default function Index({ conversations }) {
-    const [filter, setFilter] = useState('needs_reply');
+export default function Index({ conversations, tab = 'needs_reply' }) {
+    const [filter, setFilter] = useState(tab);
+
+    useEffect(() => {
+        setFilter(tab);
+    }, [tab]);
+
+    const changeFilter = (nextFilter) => {
+        setFilter(nextFilter);
+        router.get(route('conversations.index'), { tab: nextFilter }, {
+            preserveScroll: true,
+            preserveState: true,
+        });
+    };
 
     const stats = useMemo(() => {
         const open = conversations.filter((c) => c.status === 'open').length;
@@ -53,16 +65,16 @@ export default function Index({ conversations }) {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                    <FilterButton active={filter === 'needs_reply'} onClick={() => setFilter('needs_reply')} priority>
+                    <FilterButton active={filter === 'needs_reply'} onClick={() => changeFilter('needs_reply')} priority>
                         Needs your reply ({stats.needsReply})
                     </FilterButton>
-                    <FilterButton active={filter === 'all'} onClick={() => setFilter('all')}>
+                    <FilterButton active={filter === 'all'} onClick={() => changeFilter('all')}>
                         All ({stats.total})
                     </FilterButton>
-                    <FilterButton active={filter === 'escalated'} onClick={() => setFilter('escalated')}>
+                    <FilterButton active={filter === 'escalated'} onClick={() => changeFilter('escalated')}>
                         Escalated ({stats.escalated})
                     </FilterButton>
-                    <FilterButton active={filter === 'leads'} onClick={() => setFilter('leads')}>
+                    <FilterButton active={filter === 'leads'} onClick={() => changeFilter('leads')}>
                         Has contact ({stats.withContact})
                     </FilterButton>
                 </div>
@@ -171,7 +183,7 @@ function ConversationRow({ conversation, layout }) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <Link
-                            href={route('conversations.show', conversation.id)}
+                            href={route('conversations.show', conversation.id) + `?tab=${encodeURIComponent(new URLSearchParams(window.location.search).get('tab') || 'needs_reply')}`}
                             className="font-semibold text-gray-900 hover:text-indigo-600 dark:text-white dark:hover:text-indigo-400"
                         >
                             Conversation #{conversation.id}
@@ -209,7 +221,7 @@ function ConversationRow({ conversation, layout }) {
         <tr className={`hover:bg-gray-50/80 dark:hover:bg-gray-900/40 ${needsReply ? 'bg-amber-50/70 dark:bg-amber-950/10' : ''}`}>
             <td className="px-5 py-4">
                 <Link
-                    href={route('conversations.show', conversation.id)}
+                    href={route('conversations.show', conversation.id) + `?tab=${encodeURIComponent(new URLSearchParams(window.location.search).get('tab') || 'needs_reply')}`}
                     className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
                 >
                     <span className="block">#{conversation.id}</span>

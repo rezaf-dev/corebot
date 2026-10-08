@@ -43,7 +43,7 @@ export default function Show({ conversation }) {
                     </div>
                     <div className="flex items-center gap-2">
                         <Link
-                            href={route('conversations.index')}
+                            href={route('conversations.index', { tab: new URLSearchParams(window.location.search).get('tab') || 'needs_reply' })}
                             className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-semibold normal-case tracking-normal text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-gray-500 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                         >
                             Back to conversations
@@ -299,13 +299,109 @@ function MessageBubble({ message }) {
                         </span>
                     )}
                 </div>
-                <p className={`mt-2 whitespace-pre-wrap text-sm ${isUser ? 'text-white' : ''}`}>{message.content}</p>
+                <div className={`markdown-message mt-2 text-sm ${isUser ? 'text-white' : ''}`}>
+                    <MarkdownMessage content={message.content} />
+                </div>
                 {isSystem && (
                     <p className="mt-2 text-xs opacity-75">System instructions (not shown to visitors)</p>
                 )}
             </div>
         </div>
     );
+}
+
+function MarkdownMessage({ content }) {
+    const lines = (content || '').split('\n');
+    const blocks = [];
+    let paragraph = [];
+    let list = [];
+    let code = [];
+    let inCode = false;
+
+    const flushParagraph = () => {
+        if (paragraph.length) {
+            blocks.push(<p key={`p-${blocks.length}`}>{renderInlineMarkdown(paragraph.join(' '))}</p>);
+            paragraph = [];
+        }
+    };
+    const flushList = () => {
+        if (list.length) {
+            blocks.push(<ul key={`ul-${blocks.length}`} className="list-disc pl-5">{list.map((item, index) => <li key={index}>{renderInlineMarkdown(item)}</li>)}</ul>);
+            list = [];
+        }
+    };
+
+    lines.forEach((line, index) => {
+        if (line.startsWith('```')) {
+            flushParagraph();
+            flushList();
+            if (inCode) {
+                blocks.push(<pre key={`code-${blocks.length}`} className="overflow-x-auto rounded bg-black/10 p-2 dark:bg-black/30"><code>{code.join('\n')}</code></pre>);
+                code = [];
+            }
+            inCode = !inCode;
+            return;
+        }
+        if (inCode) {
+            code.push(line);
+            return;
+        }
+
+        const heading = line.match(/^(#{1,3})\s+(.+)$/);
+        const listItem = line.match(/^\s*[-*+]\s+(.+)$/);
+        if (!line.trim() || heading || listItem) {
+            flushParagraph();
+        }
+        if (heading) {
+            flushList();
+            const Tag = `h${heading[1].length}`;
+            blocks.push(<Tag key={`h-${index}`} className="font-semibold">{renderInlineMarkdown(heading[2])}</Tag>);
+        } else if (listItem) {
+            list.push(listItem[1]);
+        } else if (!line.trim()) {
+            flushList();
+        } else {
+            flushList();
+            paragraph.push(line);
+        }
+    });
+
+    flushParagraph();
+    flushList();
+    if (inCode) {
+        blocks.push(<pre key={`code-${blocks.length}`} className="overflow-x-auto rounded bg-black/10 p-2 dark:bg-black/30"><code>{code.join('\n')}</code></pre>);
+    }
+
+    return <div className="space-y-2 break-words">{blocks}</div>;
+}
+
+function renderInlineMarkdown(text) {
+    const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)]+\))/g).filter(Boolean);
+
+    return parts.map((part, index) => {
+        if (part.startsWith('`') && part.endsWith('`')) {
+            return <code key={index} className="rounded bg-black/10 px-1 dark:bg-black/30">{part.slice(1, -1)}</code>;
+        }
+        if (part.startsWith('**') && part.endsWith('**')) {
+            return <strong key={index}>{part.slice(2, -2)}</strong>;
+        }
+        if (part.startsWith('*') && part.endsWith('*')) {
+            return <em key={index}>{part.slice(1, -1)}</em>;
+        }
+        const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+        if (link) {
+            try {
+                const url = new URL(link[2], window.location.origin);
+                if (['http:', 'https:'].includes(url.protocol)) {
+                    return <a key={index} href={url.href} target="_blank" rel="noopener noreferrer" className="underline">{link[1]}</a>;
+                }
+            } catch {
+                return link[1];
+            }
+            return link[1];
+        }
+        return part;
+    });
 }
 
 function RetrievalLogCard({ log, index, expanded, onToggle }) {
