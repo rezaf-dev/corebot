@@ -1,3 +1,4 @@
+import { currentLocale, t } from '@/localization';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
@@ -71,14 +72,12 @@ export default function Edit({ settings }) {
         <AuthenticatedLayout
             header={
                 <div>
-                    <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">AI Settings</h2>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Configure OpenAI or OpenRouter credentials and models used for chat and knowledge embeddings.
-                    </p>
+                    <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">{t("AI Settings")}</h2>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Configure OpenAI or OpenRouter credentials and models used for chat and knowledge embeddings.")}</p>
                 </div>
             }
         >
-            <Head title="AI Settings" />
+            <Head title={t("AI Settings")} />
 
             <div className="mx-auto max-w-3xl space-y-6 p-6">
                 <StatusOverview settings={settings} />
@@ -87,14 +86,12 @@ export default function Edit({ settings }) {
 
                 <form onSubmit={submit} className="space-y-6">
                     <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">Connection</h3>
-                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                            Your API key is encrypted at rest. Leave the key field blank to keep the current value.
-                        </p>
+                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Connection")}</h3>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Your API key is encrypted at rest. Leave the key field blank to keep the current value.")}</p>
 
                         <div className="mt-5 space-y-5">
                             <div>
-                                <InputLabel htmlFor="provider" value="Provider" />
+                                <InputLabel htmlFor="provider" value={t("Provider")} />
                                 <select
                                     id="provider"
                                     value={data.provider}
@@ -102,36 +99,34 @@ export default function Edit({ settings }) {
                                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-indigo-600 dark:focus:ring-indigo-600"
                                 >
                                     {Object.entries(PROVIDERS).map(([value, option]) => (
-                                        <option key={value} value={value}>{option.label}</option>
+                                        <option key={value} value={value}>{t(option.label)}</option>
                                     ))}
                                 </select>
-                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                    Changing providers requires a new API key and a successful connection test.
-                                </p>
+                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("Changing providers requires a new API key and a successful connection test.")}</p>
                                 <InputError message={errors.provider} className="mt-1" />
                             </div>
 
                             <div>
-                                <InputLabel htmlFor="api_key" value="API key" />
+                                <InputLabel htmlFor="api_key" value={t("API key")} />
                                 <TextInput
                                     id="api_key"
                                     type="password"
                                     value={data.api_key}
                                     onChange={(e) => setData('api_key', e.target.value)}
                                     className="mt-1 block w-full"
-                                    placeholder={settings.masked_api_key && data.provider === settings.provider ? 'Leave blank to keep current key' : provider.keyPlaceholder}
+                                    placeholder={settings.masked_api_key && data.provider === settings.provider ? t("Leave blank to keep current key") : provider.keyPlaceholder}
                                     autoComplete="off"
                                 />
                                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                     {settings.masked_api_key && data.provider === settings.provider
-                                        ? `Current key: ${settings.masked_api_key}`
-                                        : `Enter an API key for ${provider.label}.`}
+                                        ? t("Current key: :name", { name: settings.masked_api_key })
+                                        : t("Enter an API key for :name.", { name: provider.label })}
                                 </p>
                                 <InputError message={errors.api_key} className="mt-1" />
                             </div>
 
                             <div>
-                                <InputLabel htmlFor="base_url" value="Base URL" />
+                                <InputLabel htmlFor="base_url" value={t("Base URL")} />
                                 <TextInput
                                     id="base_url"
                                     type="url"
@@ -143,8 +138,8 @@ export default function Edit({ settings }) {
                                 />
                                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                     {data.provider === 'openrouter'
-                                        ? 'OpenRouter requests use its official API endpoint.'
-                                        : 'Use OpenAI or a compatible OpenAI API endpoint.'}
+                                        ? t("OpenRouter requests use its official API endpoint.")
+                                        : t("Use OpenAI or a compatible OpenAI API endpoint.")}
                                 </p>
                                 <InputError message={errors.base_url} className="mt-1" />
                             </div>
@@ -152,15 +147,13 @@ export default function Edit({ settings }) {
                     </section>
 
                     <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">Models</h3>
-                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                            Chat model powers bot replies. Embedding model indexes your knowledge base.
-                        </p>
+                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Models")}</h3>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Chat model powers bot replies. Embedding model indexes your knowledge base.")}</p>
 
                         <div className="mt-5 grid gap-5 sm:grid-cols-2">
                             <ModelField
                                 id="chat_model"
-                                label="Chat model"
+                                label={t("Chat model")}
                                 value={data.chat_model}
                                 options={provider.chatModels}
                                 onChange={(value) => setData('chat_model', value)}
@@ -168,7 +161,7 @@ export default function Edit({ settings }) {
                             />
                             <ModelField
                                 id="embedding_model"
-                                label="Embedding model"
+                                label={t("Embedding model")}
                                 value={data.embedding_model}
                                 options={provider.embeddingModels}
                                 onChange={(value) => setData('embedding_model', value)}
@@ -176,22 +169,18 @@ export default function Edit({ settings }) {
                             />
                         </div>
 
-                        <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-                            Embedding dimensions are fixed at {settings.embedding_dimensions} for this tenant.
-                        </p>
+                        <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">{t("Embedding dimensions are fixed at")}{' '}{settings.embedding_dimensions}{' '}{t("for this tenant.")}</p>
                     </section>
 
                     <div className="flex flex-wrap items-center gap-3">
                         <PrimaryButton disabled={processing}>
-                            {processing ? 'Saving…' : 'Save settings'}
+                            {processing ? t("Saving…") : t("Save settings")}
                         </PrimaryButton>
                         <SecondaryButton type="button" onClick={testConnection} disabled={testing || processing}>
-                            {testing ? 'Testing…' : 'Test & activate'}
+                            {testing ? t("Testing…") : t("Test & activate")}
                         </SecondaryButton>
                         {recentlySuccessful && (
-                            <span className="text-sm text-amber-700 dark:text-amber-300">
-                                Saved. Test & activate the new configuration before bots can use it.
-                            </span>
+                            <span className="text-sm text-amber-700 dark:text-amber-300">{t("Saved. Test & activate the new configuration before bots can use it.")}</span>
                         )}
                     </div>
                 </form>
@@ -203,10 +192,8 @@ export default function Edit({ settings }) {
 function ActivationNotice() {
     return (
         <section className="rounded-lg border border-amber-200 bg-amber-50 p-5 dark:border-amber-900/60 dark:bg-amber-950/30">
-            <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-200">One more step: activate this configuration</h3>
-            <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">
-                Saving a provider or model change keeps bots paused until you click “Test & activate” and the connection passes.
-            </p>
+            <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-200">{t("One more step: activate this configuration")}</h3>
+            <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">{t("Saving a provider or model change keeps bots paused until you click “Test & activate” and the connection passes.")}</p>
         </section>
     );
 }
@@ -223,18 +210,16 @@ function StatusOverview({ settings }) {
         <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
             <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">Overview</h3>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Bots and knowledge indexing only work when the connection is active.
-                    </p>
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Overview")}</h3>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Bots and knowledge indexing only work when the connection is active.")}</p>
                 </div>
                 <StatusBadge active={settings.is_active} />
             </div>
 
             <dl className="mt-5 grid gap-4 sm:grid-cols-2">
                 {items.map(({ label, value }) => (
-                    <div key={label} className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/50">
-                        <dt className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</dt>
+                    <div key={t(label)} className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/50">
+                        <dt className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{t(label)}</dt>
                         <dd className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{value}</dd>
                     </div>
                 ))}
@@ -252,8 +237,8 @@ function StatusBadge({ active }) {
                     : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
             }`}
         >
-            <span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${active ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-            {active ? 'Active' : 'Inactive'}
+            <span className={`me-1.5 inline-block h-2 w-2 rounded-full ${active ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+            {active ? t("Active") : t("Inactive")}
         </span>
     );
 }
@@ -266,10 +251,8 @@ function TestResultCard({ settings, testing }) {
     if (!hasResult) {
         return (
             <section className="rounded-lg border border-dashed border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white">Connection test</h3>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    Save your settings, then run a test to verify the API key and embedding model.
-                </p>
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Connection test")}</h3>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Save your settings, then run a test to verify the API key and embedding model.")}</p>
             </section>
         );
     }
@@ -288,10 +271,9 @@ function TestResultCard({ settings, testing }) {
         >
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">Connection test</h3>
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Connection test")}</h3>
                     {settings.last_tested_at && !testing && (
-                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                            Last run {formatDateTime(settings.last_tested_at)}
+                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{t("Last run")}{' '}{formatDateTime(settings.last_tested_at)}
                         </p>
                     )}
                 </div>
@@ -310,21 +292,15 @@ function TestResultCard({ settings, testing }) {
 
             {testing ? (
                 <div className="mt-4 flex items-center gap-3 text-sm text-indigo-800 dark:text-indigo-200">
-                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent dark:border-indigo-300" />
-                    Running embedding test against your configured endpoint…
-                </div>
+                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent dark:border-indigo-300" />{t("Running embedding test against your configured endpoint…")}</div>
             ) : (
                 <div className="mt-4">
                     {isSuccess && (
-                        <p className="text-sm text-emerald-800 dark:text-emerald-200">
-                            Connection verified. Chat and embeddings can use these settings.
-                        </p>
+                        <p className="text-sm text-emerald-800 dark:text-emerald-200">{t("Connection verified. Chat and embeddings can use these settings.")}</p>
                     )}
                     {isFailed && (
                         <div className="space-y-2">
-                            <p className="text-sm text-red-800 dark:text-red-200">
-                                Connection failed. Check your API key, base URL, and embedding model.
-                            </p>
+                            <p className="text-sm text-red-800 dark:text-red-200">{t("Connection failed. Check your API key, base URL, and embedding model.")}</p>
                             {settings.last_test_error && (
                                 <pre className="overflow-x-auto rounded-md bg-red-100/80 p-3 text-xs text-red-900 dark:bg-red-950/60 dark:text-red-200">
                                     {settings.last_test_error}
@@ -341,7 +317,7 @@ function TestResultCard({ settings, testing }) {
 function ModelField({ id, label, value, options, onChange, error }) {
     return (
         <div>
-            <InputLabel htmlFor={id} value={label} />
+            <InputLabel htmlFor={id} value={t(label)} />
             <TextInput
                 id={id}
                 list={`${id}-suggestions`}
@@ -361,7 +337,7 @@ function ModelField({ id, label, value, options, onChange, error }) {
 
 function formatDateTime(value) {
     try {
-        return new Intl.DateTimeFormat(undefined, {
+        return new Intl.DateTimeFormat(currentLocale(), {
             dateStyle: 'medium',
             timeStyle: 'short',
         }).format(new Date(value));

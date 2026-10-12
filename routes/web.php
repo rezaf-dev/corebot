@@ -7,9 +7,11 @@ use App\Http\Controllers\Admin\ConversationController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\KnowledgeResearchController;
 use App\Http\Controllers\Admin\KnowledgeSourceController;
+use App\Http\Controllers\Admin\LanguageSettingsController;
 use App\Http\Controllers\Admin\TenantController;
 use App\Http\Controllers\Admin\WidgetInstallController;
 use App\Http\Controllers\DemoController;
+use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SupportRequestController;
 use Illuminate\Support\Facades\Route;
@@ -18,6 +20,7 @@ use Inertia\Inertia;
 Route::get('/', fn () => Inertia::render('Welcome'))->name('home');
 
 Route::get('/demo', DemoController::class)->name('demo');
+Route::post('/locale', [LocaleController::class, 'update'])->name('locale.update');
 
 Route::post('/support-requests', [SupportRequestController::class, 'store'])
     ->middleware('throttle:support-request')
@@ -25,6 +28,8 @@ Route::post('/support-requests', [SupportRequestController::class, 'store'])
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/language-settings', [LanguageSettingsController::class, 'edit'])->name('language-settings.edit');
+    Route::put('/language-settings', [LanguageSettingsController::class, 'update'])->name('language-settings.update');
 
     Route::get('/tenants', [TenantController::class, 'index'])->name('tenants.index');
     Route::post('/tenants', [TenantController::class, 'store'])->name('tenants.store');

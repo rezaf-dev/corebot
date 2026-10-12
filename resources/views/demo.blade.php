@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ app()->getLocale() }}" dir="{{ app(\App\Support\Localization::class)->direction(app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ $appName }} — Live demo</title>
+    <title>{{ $appName }} — {{ __('Live demo') }}</title>
     <style>
         *, *::before, *::after { box-sizing: border-box; }
         body {
@@ -48,7 +48,7 @@
         }
         a { color: #67e8f9; text-decoration: none; }
         a:hover { text-decoration: underline; }
-        ul { margin: 12px 0 0; padding-left: 20px; color: #94a3b8; font-size: 14px; }
+        ul { margin: 12px 0 0; padding-inline-start: 20px; color: #94a3b8; font-size: 14px; }
         li { margin-bottom: 6px; }
         .links { margin-top: 24px; display: flex; flex-wrap: wrap; gap: 16px; font-size: 14px; }
         .prompts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
@@ -56,7 +56,7 @@
             font: inherit;
             font-size: 13px;
             line-height: 1.4;
-            text-align: left;
+            text-align: start;
             color: #cbd5e1;
             background: #0f172a;
             border: 1px solid #334155;
@@ -75,39 +75,36 @@
 </head>
 <body>
     <div class="wrap">
-        <span class="badge">Live demo</span>
-        <h1>{{ $appName }} chat widget</h1>
+        <span class="badge">{{ __('Live demo') }}</span>
+        <h1>{{ __(':name chat widget', ['name' => $appName]) }}</h1>
         <p>
-            This page embeds the same vanilla JavaScript widget your clients install on their CRM or website.
-            Open the chat launcher in the corner to start a conversation.
+            {{ __('This page embeds the same chat widget your clients install on their CRM or website. Open the chat launcher in the corner to start a conversation.') }}
         </p>
 
         @if ($botPublicKey)
             <div class="card">
-                <h2>Widget active</h2>
+                <h2>{{ __('Widget active') }}</h2>
                 <p>
-                    Bot key loaded from <code>DEMO_BOT_PUBLIC_KEY</code>. Messages use your configured OpenAI
-                    settings and knowledge for that bot.
+                    {{ __('Bot key loaded from DEMO_BOT_PUBLIC_KEY. Messages use your configured OpenAI settings and knowledge for that bot.') }}
                 </p>
                 <ul>
-                    <li>Ensure the bot is <strong>active</strong> in the admin dashboard.</li>
-                    <li>Configure <strong>AI settings</strong> and run the <strong>queue worker</strong> for knowledge indexing.</li>
-                    <li>Add this demo host to the bot&apos;s <strong>allowed domains</strong> if domain restrictions are enabled.</li>
+                    <li>{{ __('Ensure the bot is active in the admin dashboard.') }}</li>
+                    <li>{{ __('Configure AI settings and run the queue worker for knowledge indexing.') }}</li>
+                    <li>{{ __('Add this demo host to the bot allowed domains if domain restrictions are enabled.') }}</li>
                 </ul>
             </div>
         @else
             <div class="card warn">
-                <h2>Demo not configured</h2>
+                <h2>{{ __('Demo not configured') }}</h2>
                 <p>
-                    Set <code>DEMO_BOT_PUBLIC_KEY</code> in your <code>.env</code> to the <code>public_key</code> of an
-                    active bot (from <strong>Bots</strong> in the admin or seed data), then refresh this page.
+                    {{ __('Set DEMO_BOT_PUBLIC_KEY in your .env to the public_key of an active bot, then refresh this page.') }}
                 </p>
             </div>
         @endif
 
         <div class="card">
-            <h2>Try asking</h2>
-            <p>Click a question to send it in the chat widget.</p>
+            <h2>{{ __('Try asking') }}</h2>
+            <p>{{ __('Click a question to send it in the chat widget.') }}</p>
             <div class="prompts" id="demo-prompts">
                 @foreach ([
                     'What does this company do?',
@@ -121,20 +118,20 @@
                     'Is there a free trial?',
                     'What happens if the chatbot cannot answer?',
                 ] as $question)
-                    <button type="button" class="prompt" data-question="{{ $question }}" @disabled(! $botPublicKey)>
-                        {{ $question }}
+                    <button type="button" class="prompt" data-question="{{ __($question) }}" @disabled(! $botPublicKey)>
+                        {{ __($question) }}
                     </button>
                 @endforeach
             </div>
         </div>
 
         <div class="links">
-            <a href="{{ url('/') }}">← Project home</a>
+            <a href="{{ route('home') }}">{{ __('Project home') }}</a>
         </div>
     </div>
 
     @if ($botPublicKey)
-        <script src="{{ $widgetUrl }}"></script>
+        <script src="{{ $widgetUrl }}" data-locale="{{ app()->getLocale() }}"></script>
         <script>
             document.getElementById('demo-prompts')?.addEventListener('click', function (event) {
                 const btn = event.target.closest('[data-question]');

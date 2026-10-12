@@ -1,14 +1,19 @@
+import { t } from '@/localization';
+import LanguageSelector from '@/Components/LanguageSelector';
 import ApplicationLogo from '@/Components/ApplicationLogo';
 import { Link } from '@inertiajs/react';
 
 export default function GuestLayout({ children }) {
     return (
         <div className="flex min-h-screen flex-col items-center bg-gray-100 pt-6 text-gray-900 sm:justify-center sm:pt-0 dark:bg-gray-900 dark:text-gray-100">
+            <div className="absolute end-4 top-4">
+                <LanguageSelector />
+            </div>
             <div>
                 <Link
                     href={route('home')}
                     className="inline-flex items-center justify-center"
-                    aria-label="corebot home"
+                    aria-label={t("corebot home")}
                 >
                     <ApplicationLogo markClassName="h-20 w-20" />
                 </Link>

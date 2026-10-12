@@ -1,3 +1,4 @@
+import { t } from '@/localization';
 import DangerButton from '@/Components/DangerButton';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
@@ -38,14 +39,9 @@ export default function DeleteUserForm() {
 
     return (
         <div className="space-y-4">
-            <p className="text-sm text-red-800/90 dark:text-red-300/90">
-                This action cannot be undone. All conversations, bots, and knowledge tied to your account may become
-                inaccessible depending on your role.
-            </p>
+            <p className="text-sm text-red-800/90 dark:text-red-300/90">{t("This action cannot be undone. All conversations, bots, and knowledge tied to your account may become inaccessible depending on your role.")}</p>
 
-            <DangerButton type="button" onClick={confirmUserDeletion} className="!normal-case !tracking-normal">
-                Delete my account
-            </DangerButton>
+            <DangerButton type="button" onClick={confirmUserDeletion} className="!normal-case !tracking-normal">{t("Delete my account")}</DangerButton>
 
             <Modal show={confirmingUserDeletion} onClose={closeModal} maxWidth="md">
                 <form onSubmit={deleteUser} className="p-6">
@@ -59,15 +55,12 @@ export default function DeleteUserForm() {
                         </svg>
                     </div>
 
-                    <h2 className="mt-4 text-lg font-semibold text-gray-900 dark:text-white">Delete your account?</h2>
+                    <h2 className="mt-4 text-lg font-semibold text-gray-900 dark:text-white">{t("Delete your account?")}</h2>
 
-                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                        Enter your password to confirm. You will be signed out immediately and your account will be
-                        permanently removed.
-                    </p>
+                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{t("Enter your password to confirm. You will be signed out immediately and your account will be permanently removed.")}</p>
 
                     <div className="mt-5">
-                        <InputLabel htmlFor="delete_password" value="Password" />
+                        <InputLabel htmlFor="delete_password" value={t("Password")} />
                         <TextInput
                             id="delete_password"
                             type="password"
@@ -78,17 +71,15 @@ export default function DeleteUserForm() {
                             className="mt-1 block w-full"
                             isFocused
                             autoComplete="current-password"
-                            placeholder="Your current password"
+                            placeholder={t("Your current password")}
                         />
                         <InputError message={errors.password} className="mt-1" />
                     </div>
 
                     <div className="mt-6 flex flex-wrap justify-end gap-3">
-                        <SecondaryButton type="button" onClick={closeModal} className="!normal-case !tracking-normal">
-                            Cancel
-                        </SecondaryButton>
+                        <SecondaryButton type="button" onClick={closeModal} className="!normal-case !tracking-normal">{t("Cancel")}</SecondaryButton>
                         <DangerButton disabled={processing} className="!normal-case !tracking-normal">
-                            {processing ? 'Deleting…' : 'Yes, delete account'}
+                            {processing ? t("Deleting…") : t("Yes, delete account")}
                         </DangerButton>
                     </div>
                 </form>

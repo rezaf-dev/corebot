@@ -1,3 +1,4 @@
+import { t } from '@/localization';
 export const ACTIVE_STATUSES = ['queued', 'processing', 'draft'];
 
 export function normalizeStatus(status) {
@@ -29,7 +30,7 @@ export function statusLabel(status) {
         cancelled: 'Cancelled',
     };
 
-    return labels[normalizeStatus(status)] || status;
+    return t(labels[normalizeStatus(status)] || status);
 }
 
 export function statusDescription(status) {
@@ -41,7 +42,7 @@ export function statusDescription(status) {
         cancelled: 'Processing was cancelled before completion.',
     };
 
-    return descriptions[normalizeStatus(status)] || '';
+    return t(descriptions[normalizeStatus(status)] || '');
 }
 
 export function statusStyles(status) {

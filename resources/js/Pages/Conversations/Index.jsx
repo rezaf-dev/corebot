@@ -1,3 +1,4 @@
+import { currentLocale, t } from '@/localization';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
@@ -47,35 +48,29 @@ export default function Index({ conversations, tab = 'needs_reply' }) {
         <AuthenticatedLayout
             header={
                 <div>
-                    <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">Conversations</h2>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Review widget chats, visitor details, and message history across your bots.
-                    </p>
+                    <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">{t("Conversations")}</h2>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Review widget chats, visitor details, and message history across your bots.")}</p>
                 </div>
             }
         >
-            <Head title="Conversations" />
+            <Head title={t("Conversations")} />
 
             <div className="mx-auto max-w-7xl space-y-6 p-6">
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <StatCard label="Total conversations" value={stats.total} />
-                    <StatCard label="Open" value={stats.open} />
-                    <StatCard label="Needs your reply" value={stats.needsReply} accent="amber" />
-                    <StatCard label="Total messages" value={stats.messages} hint={`${stats.withContact} leads`} />
+                    <StatCard label={t("Total conversations")} value={stats.total} />
+                    <StatCard label={t("Open")} value={stats.open} />
+                    <StatCard label={t("Needs your reply")} value={stats.needsReply} accent="amber" />
+                    <StatCard label={t("Total messages")} value={stats.messages} hint={t(":count leads", { count: stats.withContact })} />
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                    <FilterButton active={filter === 'needs_reply'} onClick={() => changeFilter('needs_reply')} priority>
-                        Needs your reply ({stats.needsReply})
+                    <FilterButton active={filter === 'needs_reply'} onClick={() => changeFilter('needs_reply')} priority>{t("Needs your reply (")}{stats.needsReply})
                     </FilterButton>
-                    <FilterButton active={filter === 'all'} onClick={() => changeFilter('all')}>
-                        All ({stats.total})
+                    <FilterButton active={filter === 'all'} onClick={() => changeFilter('all')}>{t("All (")}{stats.total})
                     </FilterButton>
-                    <FilterButton active={filter === 'escalated'} onClick={() => changeFilter('escalated')}>
-                        Escalated ({stats.escalated})
+                    <FilterButton active={filter === 'escalated'} onClick={() => changeFilter('escalated')}>{t("Escalated (")}{stats.escalated})
                     </FilterButton>
-                    <FilterButton active={filter === 'leads'} onClick={() => changeFilter('leads')}>
-                        Has contact ({stats.withContact})
+                    <FilterButton active={filter === 'leads'} onClick={() => changeFilter('leads')}>{t("Has contact (")}{stats.withContact})
                     </FilterButton>
                 </div>
 
@@ -83,22 +78,22 @@ export default function Index({ conversations, tab = 'needs_reply' }) {
                     <EmptyState />
                 ) : filtered.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-gray-200 bg-white px-6 py-10 text-center dark:border-gray-700 dark:bg-gray-800">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">No conversations match this filter.</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{t("No conversations match this filter.")}</p>
                     </div>
                 ) : (
                     <>
                         <div className="hidden overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800 lg:block">
-                            <table className="w-full text-left text-sm">
+                            <table className="w-full text-start text-sm">
                                 <thead className="border-b border-gray-100 bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:bg-gray-900/50 dark:text-gray-400">
                                     <tr>
-                                        <th className="px-5 py-3">Conversation</th>
-                                        <th className="px-5 py-3">Bot</th>
-                                        <th className="px-5 py-3">Status</th>
-                                        <th className="px-5 py-3">Visitor</th>
-                                        <th className="px-5 py-3">Country</th>
-                                        <th className="px-5 py-3">Messages</th>
-                                        <th className="px-5 py-3">Started</th>
-                                        <th className="px-5 py-3">Source</th>
+                                        <th className="px-5 py-3">{t("Conversation")}</th>
+                                        <th className="px-5 py-3">{t("Bot")}</th>
+                                        <th className="px-5 py-3">{t("Status")}</th>
+                                        <th className="px-5 py-3">{t("Visitor")}</th>
+                                        <th className="px-5 py-3">{t("Country")}</th>
+                                        <th className="px-5 py-3">{t("Messages")}</th>
+                                        <th className="px-5 py-3">{t("Started")}</th>
+                                        <th className="px-5 py-3">{t("Source")}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -149,9 +144,9 @@ function FilterButton({ active, onClick, children, priority = false }) {
 function StatCard({ label, value, hint, accent }) {
     return (
         <div className={`rounded-lg bg-white p-5 shadow dark:bg-gray-800 ${accent === 'amber' ? 'ring-1 ring-amber-200 dark:ring-amber-900' : ''}`}>
-            <div className="text-sm text-gray-500 dark:text-gray-400">{label}</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">{t(label)}</div>
             <div className="mt-2 text-3xl font-semibold text-gray-900 dark:text-white">{value}</div>
-            {hint && <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{hint}</div>}
+            {hint && <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t(hint)}</div>}
         </div>
     );
 }
@@ -159,16 +154,12 @@ function StatCard({ label, value, hint, accent }) {
 function EmptyState() {
     return (
         <div className="rounded-lg border border-dashed border-gray-200 bg-white px-6 py-12 text-center dark:border-gray-700 dark:bg-gray-800">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">No conversations yet</h3>
-            <p className="mx-auto mt-2 max-w-md text-sm text-gray-500 dark:text-gray-400">
-                Conversations appear when visitors use the chat widget on your site. Embed a bot from the Widget install page to get started.
-            </p>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t("No conversations yet")}</h3>
+            <p className="mx-auto mt-2 max-w-md text-sm text-gray-500 dark:text-gray-400">{t("Conversations appear when visitors use the chat widget on your site. Embed a bot from the Widget install page to get started.")}</p>
             <Link
                 href={route('widget.install')}
                 className="mt-6 inline-flex items-center rounded-md border border-transparent bg-gray-800 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white transition hover:bg-gray-700 dark:bg-gray-200 dark:text-gray-800 dark:hover:bg-white"
-            >
-                Widget install
-            </Link>
+            >{t("Widget install")}</Link>
         </div>
     );
 }
@@ -185,8 +176,7 @@ function ConversationRow({ conversation, layout }) {
                         <Link
                             href={route('conversations.show', conversation.id) + `?tab=${encodeURIComponent(new URLSearchParams(window.location.search).get('tab') || 'needs_reply')}`}
                             className="font-semibold text-gray-900 hover:text-indigo-600 dark:text-white dark:hover:text-indigo-400"
-                        >
-                            Conversation #{conversation.id}
+                        >{t("Conversation #")}{conversation.id}
                         </Link>
                         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{conversation.bot?.name}</p>
                     </div>
@@ -194,11 +184,11 @@ function ConversationRow({ conversation, layout }) {
                 </div>
                 <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
                     <div>
-                        <dt className="text-xs text-gray-500 dark:text-gray-400">Visitor</dt>
+                        <dt className="text-xs text-gray-500 dark:text-gray-400">{t("Visitor")}</dt>
                         <dd className="mt-0.5 font-medium text-gray-900 dark:text-white">{visitor}</dd>
                     </div>
                     <div>
-                        <dt className="text-xs text-gray-500 dark:text-gray-400">Messages</dt>
+                        <dt className="text-xs text-gray-500 dark:text-gray-400">{t("Messages")}</dt>
                         <dd className="mt-0.5 font-medium text-gray-900 dark:text-white">{conversation.messages_count}</dd>
                     </div>
                 </dl>
@@ -225,7 +215,7 @@ function ConversationRow({ conversation, layout }) {
                     className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
                 >
                     <span className="block">#{conversation.id}</span>
-                    {needsReply && <span className="mt-1 block text-xs font-semibold text-amber-700 dark:text-amber-300">Reply needed</span>}
+                    {needsReply && <span className="mt-1 block text-xs font-semibold text-amber-700 dark:text-amber-300">{t("Reply needed")}</span>}
                 </Link>
             </td>
             <td className="px-5 py-4 text-gray-700 dark:text-gray-300">{conversation.bot?.name || '—'}</td>
@@ -265,7 +255,7 @@ function StatusBadge({ status }) {
 
     return (
         <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${styles[status] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}>
-            {status}
+            {t(status?.charAt(0).toUpperCase() + status?.slice(1))}
         </span>
     );
 }
@@ -284,10 +274,10 @@ function formatVisitor(conversation) {
     }
 
     if (conversation.visitor_id) {
-        return `Visitor ${conversation.visitor_id.slice(0, 8)}…`;
+        return t("Visitor :name\u2026", { name: conversation.visitor_id.slice(0, 8) });
     }
 
-    return 'Anonymous';
+    return t('Anonymous');
 }
 
 function truncateUrl(url) {
@@ -303,7 +293,7 @@ function formatDateTime(value) {
     if (!value) return '—';
 
     try {
-        return new Intl.DateTimeFormat(undefined, {
+        return new Intl.DateTimeFormat(currentLocale(), {
             dateStyle: 'medium',
             timeStyle: 'short',
         }).format(new Date(value));

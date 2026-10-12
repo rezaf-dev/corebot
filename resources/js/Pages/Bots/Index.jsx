@@ -1,3 +1,4 @@
+import { t } from '@/localization';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
@@ -12,27 +13,23 @@ export default function Index({ bots }) {
             header={
                 <div className="flex flex-wrap items-end justify-between gap-4">
                     <div>
-                        <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">Bots</h2>
-                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                            Manage chatbots, embed keys, and knowledge scoped to each bot.
-                        </p>
+                        <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">{t("Bots")}</h2>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Manage chatbots, embed keys, and knowledge scoped to each bot.")}</p>
                     </div>
                     <Link
                         href={route('bots.create')}
                         className="inline-flex items-center rounded-md border border-transparent bg-gray-800 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white transition duration-150 ease-in-out hover:bg-gray-700 focus:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 active:bg-gray-900 dark:bg-gray-200 dark:text-gray-800 dark:hover:bg-white dark:focus:bg-white dark:focus:ring-offset-gray-800"
-                    >
-                        New bot
-                    </Link>
+                    >{t("New bot")}</Link>
                 </div>
             }
         >
-            <Head title="Bots" />
+            <Head title={t("Bots")} />
 
             <div className="mx-auto max-w-7xl space-y-6 p-6">
                 <div className="grid gap-4 sm:grid-cols-3">
-                    <StatCard label="Total bots" value={bots.length} />
-                    <StatCard label="Active bots" value={activeBots} />
-                    <StatCard label="Knowledge sources" value={totalKnowledge} hint={`${totalConversations} conversations`} />
+                    <StatCard label={t("Total bots")} value={bots.length} />
+                    <StatCard label={t("Active bots")} value={activeBots} />
+                    <StatCard label={t("Knowledge sources")} value={totalKnowledge} hint={t(':count conversations', { count: totalConversations })} />
                 </div>
 
                 {bots.length === 0 ? (
@@ -40,15 +37,15 @@ export default function Index({ bots }) {
                 ) : (
                     <>
                         <div className="hidden overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800 md:block">
-                            <table className="w-full text-left text-sm">
+                            <table className="w-full text-start text-sm">
                                 <thead className="border-b border-gray-100 bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:bg-gray-900/50 dark:text-gray-400">
                                     <tr>
-                                        <th className="px-5 py-3">Bot</th>
-                                        <th className="px-5 py-3">Status</th>
-                                        <th className="px-5 py-3">Public key</th>
-                                        <th className="px-5 py-3">Knowledge</th>
-                                        <th className="px-5 py-3">Conversations</th>
-                                        <th className="px-5 py-3 text-right">Actions</th>
+                                        <th className="px-5 py-3">{t("Bot")}</th>
+                                        <th className="px-5 py-3">{t("Status")}</th>
+                                        <th className="px-5 py-3">{t("Public key")}</th>
+                                        <th className="px-5 py-3">{t("Knowledge")}</th>
+                                        <th className="px-5 py-3">{t("Conversations")}</th>
+                                        <th className="px-5 py-3 text-end">{t("Actions")}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -67,11 +64,8 @@ export default function Index({ bots }) {
                     </>
                 )}
 
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Need the embed snippet? Visit{' '}
-                    <Link href={route('widget.install')} className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
-                        Widget install
-                    </Link>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{t("Need the embed snippet? Visit")}{' '}
+                    <Link href={route('widget.install')} className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">{t("Widget install")}</Link>
                     .
                 </p>
             </div>
@@ -82,9 +76,9 @@ export default function Index({ bots }) {
 function StatCard({ label, value, hint }) {
     return (
         <div className="rounded-lg bg-white p-5 shadow dark:bg-gray-800">
-            <div className="text-sm text-gray-500 dark:text-gray-400">{label}</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">{t(label)}</div>
             <div className="mt-2 text-3xl font-semibold text-gray-900 dark:text-white">{value}</div>
-            {hint && <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{hint}</div>}
+            {hint && <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t(hint)}</div>}
         </div>
     );
 }
@@ -92,16 +86,12 @@ function StatCard({ label, value, hint }) {
 function EmptyState() {
     return (
         <div className="rounded-lg border border-dashed border-gray-200 bg-white px-6 py-12 text-center dark:border-gray-700 dark:bg-gray-800">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">No bots yet</h3>
-            <p className="mx-auto mt-2 max-w-md text-sm text-gray-500 dark:text-gray-400">
-                Create your first bot to start adding knowledge, embedding the chat widget, and collecting conversations.
-            </p>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t("No bots yet")}</h3>
+            <p className="mx-auto mt-2 max-w-md text-sm text-gray-500 dark:text-gray-400">{t("Create your first bot to start adding knowledge, embedding the chat widget, and collecting conversations.")}</p>
             <Link
                 href={route('bots.create')}
                 className="mt-6 inline-flex items-center rounded-md border border-transparent bg-gray-800 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white transition hover:bg-gray-700 dark:bg-gray-200 dark:text-gray-800 dark:hover:bg-white"
-            >
-                Create your first bot
-            </Link>
+            >{t("Create your first bot")}</Link>
         </div>
     );
 }
@@ -115,12 +105,12 @@ function BotRow({ bot, layout }) {
             setCopied(true);
             window.setTimeout(() => setCopied(false), 2000);
         } catch {
-            window.prompt('Copy this public key:', bot.public_key);
+            window.prompt(t('Copy this public key:'), bot.public_key);
         }
     };
 
     const confirmDelete = () => {
-        if (window.confirm(`Delete "${bot.name}"? This cannot be undone.`)) {
+        if (window.confirm(t("Delete \":name\"? This cannot be undone.", { name: bot.name }))) {
             router.delete(route('bots.destroy', bot.id));
         }
     };
@@ -138,8 +128,8 @@ function BotRow({ bot, layout }) {
                     <BotActions bot={bot} onDelete={confirmDelete} compact />
                 </div>
                 <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                    <Metric label="Knowledge" value={bot.knowledge_sources_count} />
-                    <Metric label="Conversations" value={bot.conversations_count} />
+                    <Metric label={t("Knowledge")} value={bot.knowledge_sources_count} />
+                    <Metric label={t("Conversations")} value={bot.conversations_count} />
                 </dl>
                 <div className="mt-4">
                     <PublicKey value={bot.public_key} copied={copied} onCopy={copyKey} />
@@ -161,7 +151,7 @@ function BotRow({ bot, layout }) {
             </td>
             <td className="px-5 py-4 text-gray-700 dark:text-gray-300">{bot.knowledge_sources_count}</td>
             <td className="px-5 py-4 text-gray-700 dark:text-gray-300">{bot.conversations_count}</td>
-            <td className="px-5 py-4 text-right">
+            <td className="px-5 py-4 text-end">
                 <BotActions bot={bot} onDelete={confirmDelete} />
             </td>
         </tr>
@@ -171,7 +161,7 @@ function BotRow({ bot, layout }) {
 function Metric({ label, value }) {
     return (
         <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 dark:border-gray-700 dark:bg-gray-900/50">
-            <dt className="text-xs text-gray-500 dark:text-gray-400">{label}</dt>
+            <dt className="text-xs text-gray-500 dark:text-gray-400">{t(label)}</dt>
             <dd className="mt-0.5 font-semibold text-gray-900 dark:text-white">{value}</dd>
         </div>
     );
@@ -188,7 +178,7 @@ function StatusBadge({ status }) {
                     : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
             }`}
         >
-            {status}
+            {t(status?.charAt(0).toUpperCase() + status?.slice(1))}
         </span>
     );
 }
@@ -204,7 +194,7 @@ function PublicKey({ value, copied, onCopy }) {
                 onClick={onCopy}
                 className="text-xs font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
             >
-                {copied ? 'Copied' : 'Copy'}
+                {copied ? t("Copied") : t("Copy")}
             </button>
         </div>
     );
@@ -216,25 +206,17 @@ const actionLinkClass =
 function BotActions({ bot, onDelete, compact = false }) {
     return (
         <div className={`flex flex-wrap gap-2 ${compact ? '' : 'justify-end'}`}>
-            <Link href={route('bots.edit', bot.id)} className={actionLinkClass}>
-                Edit
-            </Link>
-            <Link href={route('knowledge-sources.index')} className={actionLinkClass}>
-                Knowledge
-            </Link>
+            <Link href={route('bots.edit', bot.id)} className={actionLinkClass}>{t("Edit")}</Link>
+            <Link href={route('knowledge-sources.index')} className={actionLinkClass}>{t("Knowledge")}</Link>
             {!compact && (
                 <button
                     type="button"
                     onClick={onDelete}
                     className="inline-flex items-center rounded-md border border-transparent px-4 py-2 text-xs font-semibold uppercase tracking-widest text-red-600 transition hover:text-red-500 focus:outline-none dark:text-red-400"
-                >
-                    Delete
-                </button>
+                >{t("Delete")}</button>
             )}
             {compact && (
-                <button type="button" onClick={onDelete} className="text-xs font-medium text-red-600 dark:text-red-400">
-                    Delete
-                </button>
+                <button type="button" onClick={onDelete} className="text-xs font-medium text-red-600 dark:text-red-400">{t("Delete")}</button>
             )}
         </div>
     );

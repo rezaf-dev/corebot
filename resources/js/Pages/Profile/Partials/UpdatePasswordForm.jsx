@@ -1,3 +1,4 @@
+import { t } from '@/localization';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
@@ -39,7 +40,7 @@ export default function UpdatePasswordForm() {
     return (
         <form onSubmit={updatePassword} className="space-y-5">
             <div>
-                <InputLabel htmlFor="current_password" value="Current password" />
+                <InputLabel htmlFor="current_password" value={t("Current password")} />
                 <TextInput
                     id="current_password"
                     ref={currentPasswordInput}
@@ -54,7 +55,7 @@ export default function UpdatePasswordForm() {
 
             <div className="grid gap-5 sm:grid-cols-2">
                 <div>
-                    <InputLabel htmlFor="password" value="New password" />
+                    <InputLabel htmlFor="password" value={t("New password")} />
                     <TextInput
                         id="password"
                         ref={passwordInput}
@@ -68,7 +69,7 @@ export default function UpdatePasswordForm() {
                 </div>
 
                 <div>
-                    <InputLabel htmlFor="password_confirmation" value="Confirm new password" />
+                    <InputLabel htmlFor="password_confirmation" value={t("Confirm new password")} />
                     <TextInput
                         id="password_confirmation"
                         value={data.password_confirmation}
@@ -81,13 +82,11 @@ export default function UpdatePasswordForm() {
                 </div>
             </div>
 
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-                Use at least 8 characters with a mix of letters and numbers. Avoid reusing passwords from other sites.
-            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{t("Use at least 8 characters with a mix of letters and numbers. Avoid reusing passwords from other sites.")}</p>
 
             <div className="flex flex-wrap items-center gap-3">
                 <PrimaryButton disabled={processing} className="!normal-case !tracking-normal">
-                    {processing ? 'Updating…' : 'Update password'}
+                    {processing ? t("Updating…") : t("Update password")}
                 </PrimaryButton>
                 <Transition
                     show={recentlySuccessful}
@@ -98,7 +97,7 @@ export default function UpdatePasswordForm() {
                     leaveFrom="opacity-100"
                     leaveTo="opacity-0"
                 >
-                    <span className="text-sm text-emerald-600 dark:text-emerald-400">Password updated.</span>
+                    <span className="text-sm text-emerald-600 dark:text-emerald-400">{t("Password updated.")}</span>
                 </Transition>
             </div>
         </form>

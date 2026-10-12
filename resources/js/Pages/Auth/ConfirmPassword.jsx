@@ -1,3 +1,4 @@
+import { t } from '@/localization';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
@@ -20,16 +21,13 @@ export default function ConfirmPassword() {
 
     return (
         <GuestLayout>
-            <Head title="Confirm Password" />
+            <Head title={t("Confirm Password")} />
 
-            <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-                This is a secure area of the application. Please confirm your
-                password before continuing.
-            </div>
+            <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">{t("This is a secure area of the application. Please confirm your password before continuing.")}</div>
 
             <form onSubmit={submit}>
                 <div className="mt-4">
-                    <InputLabel htmlFor="password" value="Password" />
+                    <InputLabel htmlFor="password" value={t("Password")} />
 
                     <TextInput
                         id="password"
@@ -45,9 +43,7 @@ export default function ConfirmPassword() {
                 </div>
 
                 <div className="mt-4 flex items-center justify-end">
-                    <PrimaryButton className="ms-4" disabled={processing}>
-                        Confirm
-                    </PrimaryButton>
+                    <PrimaryButton className="ms-4" disabled={processing}>{t("Confirm")}</PrimaryButton>
                 </div>
             </form>
         </GuestLayout>

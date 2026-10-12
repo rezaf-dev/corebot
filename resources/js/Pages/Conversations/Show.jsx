@@ -1,3 +1,4 @@
+import { currentLocale, t } from '@/localization';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
@@ -22,7 +23,7 @@ export default function Show({ conversation }) {
     };
 
     const destroy = () => {
-        if (!window.confirm('Delete this conversation? This cannot be undone.')) {
+        if (!window.confirm(t('Delete this conversation? This cannot be undone.'))) {
             return;
         }
 
@@ -34,8 +35,7 @@ export default function Show({ conversation }) {
             header={
                 <div className="flex flex-wrap items-end justify-between gap-4">
                     <div>
-                        <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">
-                            Conversation #{conversation.id}
+                        <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">{t("Conversation #")}{conversation.id}
                         </h2>
                         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                             {conversation.bot?.name} · {formatDateTime(conversation.created_at)}
@@ -45,36 +45,30 @@ export default function Show({ conversation }) {
                         <Link
                             href={route('conversations.index', { tab: new URLSearchParams(window.location.search).get('tab') || 'needs_reply' })}
                             className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-semibold normal-case tracking-normal text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-gray-500 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                        >
-                            Back to conversations
-                        </Link>
+                        >{t("Back to conversations")}</Link>
                         <button
                             type="button"
                             onClick={destroy}
                             className="inline-flex items-center rounded-md border border-red-200 bg-white px-4 py-2 text-xs font-semibold normal-case tracking-normal text-red-700 shadow-sm transition hover:bg-red-50 dark:border-red-900 dark:bg-gray-800 dark:text-red-300 dark:hover:bg-red-950/30"
-                        >
-                            Delete
-                        </button>
+                        >{t("Delete")}</button>
                     </div>
                 </div>
             }
         >
-            <Head title={`Conversation ${conversation.id}`} />
+            <Head title={t("Conversation :name", { name: conversation.id })} />
 
             <div className="mx-auto grid max-w-7xl gap-6 p-6 lg:grid-cols-[1fr_360px]">
                 <section className="space-y-4">
                     <div className="flex items-center justify-between gap-4">
-                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                            Messages ({conversation.messages.length})
+                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Messages (")}{conversation.messages.length})
                         </h3>
                         <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {visitorMessages} visitor · {assistantMessages} assistant
-                        </span>
+                            {visitorMessages}{' '}{t("visitor ·")}{' '}{assistantMessages}{' '}{t("assistant")}</span>
                     </div>
 
                     {conversation.messages.length === 0 ? (
                         <div className="rounded-lg border border-dashed border-gray-200 bg-white px-6 py-10 text-center dark:border-gray-700 dark:bg-gray-800">
-                            <p className="text-sm text-gray-500 dark:text-gray-400">No messages in this conversation yet.</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">{t("No messages in this conversation yet.")}</p>
                         </div>
                     ) : (
                         <div className="space-y-3">
@@ -89,29 +83,27 @@ export default function Show({ conversation }) {
                         className="sticky bottom-4 rounded-xl border border-indigo-100 bg-white p-4 shadow-lg dark:border-indigo-900/70 dark:bg-gray-800"
                     >
                         <div className="flex items-center justify-between gap-3">
-                            <label htmlFor="manual-message" className="text-sm font-semibold text-gray-900 dark:text-white">
-                                Send a manual reply
-                            </label>
-                            <span className="text-xs text-gray-500 dark:text-gray-400">The visitor will see this in the chat widget.</span>
+                            <label htmlFor="manual-message" className="text-sm font-semibold text-gray-900 dark:text-white">{t("Send a manual reply")}</label>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">{t("The visitor will see this in the chat widget.")}</span>
                         </div>
                         <textarea
                             id="manual-message"
                             value={replyForm.data.message}
                             onChange={(event) => replyForm.setData('message', event.target.value)}
-                            placeholder="Write your response…"
+                            placeholder={t("Write your response…")}
                             rows="4"
                             disabled={replyForm.processing}
                             className="mt-3 block w-full rounded-lg border-gray-300 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:placeholder:text-gray-500 dark:disabled:bg-gray-900"
                         />
                         {replyForm.errors.message && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{replyForm.errors.message}</p>}
                         <div className="mt-3 flex items-center justify-between gap-3">
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Sending clears this conversation from the reply-needed queue.</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{t("Sending clears this conversation from the reply-needed queue.")}</p>
                             <button
                                 type="submit"
                                 disabled={replyForm.processing || !replyForm.data.message.trim()}
                                 className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                {replyForm.processing ? 'Sending…' : 'Send reply'}
+                                {replyForm.processing ? t("Sending…") : t("Send reply")}
                             </button>
                         </div>
                     </form>
@@ -122,46 +114,44 @@ export default function Show({ conversation }) {
                         <div className="flex flex-wrap items-center gap-2">
                             <StatusBadge status={conversation.status} />
                             {conversation.status === 'escalated' && (
-                                <span className="text-sm font-medium text-amber-700 dark:text-amber-300">A manual reply is needed.</span>
+                                <span className="text-sm font-medium text-amber-700 dark:text-amber-300">{t("A manual reply is needed.")}</span>
                             )}
                         </div>
 
                         <dl className="mt-5 space-y-4">
-                            <MetaItem label="Bot" value={conversation.bot?.name || '—'} />
-                            <MetaItem label="Visitor name" value={conversation.visitor_name || '—'} />
-                            <MetaItem label="Email" value={conversation.visitor_email || '—'} />
-                            <MetaItem label="Phone" value={conversation.visitor_phone || '—'} />
+                            <MetaItem label={t("Bot")} value={conversation.bot?.name || '—'} />
+                            <MetaItem label={t("Visitor name")} value={conversation.visitor_name || '—'} />
+                            <MetaItem label={t("Email")} value={conversation.visitor_email || '—'} />
+                            <MetaItem label={t("Phone")} value={conversation.visitor_phone || '—'} />
                             <MetaItem
-                                label="Visitor ID"
+                                label={t("Visitor ID")}
                                 value={conversation.visitor_id ? (
                                     <span className="font-mono text-xs">{conversation.visitor_id}</span>
                                 ) : (
                                     '—'
                                 )}
                             />
-                            <MetaItem label="Started" value={formatDateTime(conversation.created_at)} />
-                            <MetaItem label="Last updated" value={formatDateTime(conversation.updated_at)} />
+                            <MetaItem label={t("Started")} value={formatDateTime(conversation.created_at)} />
+                            <MetaItem label={t("Last updated")} value={formatDateTime(conversation.updated_at)} />
                         </dl>
 
                         <div className="mt-5 border-t border-gray-100 pt-5 dark:border-gray-700">
-                            <h4 className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                Visitor context
-                            </h4>
+                            <h4 className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("Visitor context")}</h4>
                             <dl className="mt-4 space-y-4">
                                 <MetaItem
-                                    label="Country"
+                                    label={t("Country")}
                                     value={
                                         conversation.country_name
                                             ? `${conversation.country_name}${conversation.country_code ? ` (${conversation.country_code})` : ''}`
                                             : '—'
                                     }
                                 />
-                                <MetaItem label="City" value={conversation.city || '—'} />
-                                <MetaItem label="IP address" value={conversation.ip_address || '—'} />
-                                <MetaItem label="Language" value={conversation.language || '—'} />
-                                <MetaItem label="Timezone" value={conversation.timezone || '—'} />
+                                <MetaItem label={t("City")} value={conversation.city || '—'} />
+                                <MetaItem label={t("IP address")} value={conversation.ip_address || '—'} />
+                                <MetaItem label={t("Language")} value={conversation.language || '—'} />
+                                <MetaItem label={t("Timezone")} value={conversation.timezone || '—'} />
                                 <MetaItem
-                                    label="Referrer"
+                                    label={t("Referrer")}
                                     value={
                                         conversation.referrer_url ? (
                                             <a
@@ -179,9 +169,9 @@ export default function Show({ conversation }) {
                                 />
                                 {(conversation.utm_source || conversation.utm_medium || conversation.utm_campaign) && (
                                     <>
-                                        <MetaItem label="UTM source" value={conversation.utm_source || '—'} />
-                                        <MetaItem label="UTM medium" value={conversation.utm_medium || '—'} />
-                                        <MetaItem label="UTM campaign" value={conversation.utm_campaign || '—'} />
+                                        <MetaItem label={t("UTM source")} value={conversation.utm_source || '—'} />
+                                        <MetaItem label={t("UTM medium")} value={conversation.utm_medium || '—'} />
+                                        <MetaItem label={t("UTM campaign")} value={conversation.utm_campaign || '—'} />
                                     </>
                                 )}
                             </dl>
@@ -189,7 +179,7 @@ export default function Show({ conversation }) {
 
                         {conversation.source_url && (
                             <div className="mt-5 border-t border-gray-100 pt-5 dark:border-gray-700">
-                                <dt className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Source URL</dt>
+                                <dt className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("Source URL")}</dt>
                                 <a
                                     href={conversation.source_url}
                                     target="_blank"
@@ -203,15 +193,12 @@ export default function Show({ conversation }) {
                     </section>
 
                     <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                            Integration actions ({(conversation.integration_action_logs || []).length})
+                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Integration actions (")}{(conversation.integration_action_logs || []).length})
                         </h3>
-                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                            Tool calls made during this conversation.
-                        </p>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Tool calls made during this conversation.")}</p>
 
                         {(conversation.integration_action_logs || []).length === 0 ? (
-                            <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">No integration actions recorded.</p>
+                            <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">{t("No integration actions recorded.")}</p>
                         ) : (
                             <ul className="mt-4 space-y-3">
                                 {(conversation.integration_action_logs || []).map((log) => (
@@ -225,7 +212,7 @@ export default function Show({ conversation }) {
                                         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                             {log.tool_name}
                                             {log.response_status ? ` · HTTP ${log.response_status}` : ''}
-                                            {log.error ? ' · Failed' : ' · OK'}
+                                            {log.error ? t(" · Failed") : t(" · OK")}
                                         </p>
                                         {log.error && (
                                             <p className="mt-2 text-xs text-red-600 dark:text-red-400">{log.error}</p>
@@ -237,15 +224,12 @@ export default function Show({ conversation }) {
                     </section>
 
                     <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                            Retrieval logs ({conversation.retrieval_logs.length})
+                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Retrieval logs (")}{conversation.retrieval_logs.length})
                         </h3>
-                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                            Knowledge chunks used when generating assistant replies.
-                        </p>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Knowledge chunks used when generating assistant replies.")}</p>
 
                         {conversation.retrieval_logs.length === 0 ? (
-                            <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">No retrieval activity recorded.</p>
+                            <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">{t("No retrieval activity recorded.")}</p>
                         ) : (
                             <div className="mt-4 space-y-3">
                                 {conversation.retrieval_logs.map((log, index) => (
@@ -291,7 +275,7 @@ function MessageBubble({ message }) {
                             isUser ? 'text-indigo-200' : isAdmin ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-500 dark:text-gray-400'
                         }`}
                     >
-                        {isAdmin ? 'admin reply' : message.role}
+                        {isAdmin ? t("admin reply") : message.role}
                     </span>
                     {message.created_at && (
                         <span className={`text-xs ${isUser ? 'text-indigo-200' : 'text-gray-400'}`}>
@@ -299,11 +283,11 @@ function MessageBubble({ message }) {
                         </span>
                     )}
                 </div>
-                <div className={`markdown-message mt-2 text-sm ${isUser ? 'text-white' : ''}`}>
+                <div dir="auto" className={`markdown-message mt-2 text-sm ${isUser ? 'text-white' : ''}`}>
                     <MarkdownMessage content={message.content} />
                 </div>
                 {isSystem && (
-                    <p className="mt-2 text-xs opacity-75">System instructions (not shown to visitors)</p>
+                    <p className="mt-2 text-xs opacity-75">{t("System instructions (not shown to visitors)")}</p>
                 )}
             </div>
         </div>
@@ -326,7 +310,7 @@ function MarkdownMessage({ content }) {
     };
     const flushList = () => {
         if (list.length) {
-            blocks.push(<ul key={`ul-${blocks.length}`} className="list-disc pl-5">{list.map((item, index) => <li key={index}>{renderInlineMarkdown(item)}</li>)}</ul>);
+            blocks.push(<ul key={`ul-${blocks.length}`} className="list-disc ps-5">{list.map((item, index) => <li key={index}>{renderInlineMarkdown(item)}</li>)}</ul>);
             list = [];
         }
     };
@@ -336,7 +320,7 @@ function MarkdownMessage({ content }) {
             flushParagraph();
             flushList();
             if (inCode) {
-                blocks.push(<pre key={`code-${blocks.length}`} className="overflow-x-auto rounded bg-black/10 p-2 dark:bg-black/30"><code>{code.join('\n')}</code></pre>);
+                blocks.push(<pre key={`code-${blocks.length}`} className="overflow-x-auto rounded bg-black/10 p-2 dark:bg-black/30"><code dir="ltr">{code.join('\n')}</code></pre>);
                 code = [];
             }
             inCode = !inCode;
@@ -369,7 +353,7 @@ function MarkdownMessage({ content }) {
     flushParagraph();
     flushList();
     if (inCode) {
-        blocks.push(<pre key={`code-${blocks.length}`} className="overflow-x-auto rounded bg-black/10 p-2 dark:bg-black/30"><code>{code.join('\n')}</code></pre>);
+        blocks.push(<pre key={`code-${blocks.length}`} className="overflow-x-auto rounded bg-black/10 p-2 dark:bg-black/30"><code dir="ltr">{code.join('\n')}</code></pre>);
     }
 
     return <div className="space-y-2 break-words">{blocks}</div>;
@@ -412,27 +396,24 @@ function RetrievalLogCard({ log, index, expanded, onToggle }) {
             <button
                 type="button"
                 onClick={onToggle}
-                className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left"
+                className="flex w-full items-start justify-between gap-3 px-4 py-3 text-start"
             >
                 <div className="min-w-0">
-                    <div className="text-sm font-semibold text-gray-900 dark:text-white">Retrieval #{index + 1}</div>
-                    <p className="mt-1 truncate text-xs text-gray-600 dark:text-gray-400">
-                        Query: {log.query || '—'}
+                    <div className="text-sm font-semibold text-gray-900 dark:text-white">{t("Retrieval #")}{index + 1}</div>
+                    <p className="mt-1 truncate text-xs text-gray-600 dark:text-gray-400">{t("Query:")}{' '}{log.query || '—'}
                     </p>
                     <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                        {chunkCount} chunk{chunkCount === 1 ? '' : 's'} selected
-                    </p>
+                        {chunkCount}{' '}{t("chunk")}{chunkCount === 1 ? '' : 's'}{' '}{t("selected")}</p>
                 </div>
                 <span className="shrink-0 text-xs font-medium text-indigo-600 dark:text-indigo-400">
-                    {expanded ? 'Hide' : 'Show'}
+                    {expanded ? t("Hide") : t("Show")}
                 </span>
             </button>
 
             {expanded && (
                 <div className="border-t border-gray-200 px-4 py-3 dark:border-gray-700">
                     {(log.selected_chunk_ids || []).length > 0 && (
-                        <p className="text-xs text-gray-600 dark:text-gray-400">
-                            Chunk IDs: {(log.selected_chunk_ids || []).join(', ')}
+                        <p className="text-xs text-gray-600 dark:text-gray-400">{t("Chunk IDs:")}{' '}{(log.selected_chunk_ids || []).join(', ')}
                         </p>
                     )}
                     {log.context_text ? (
@@ -440,7 +421,7 @@ function RetrievalLogCard({ log, index, expanded, onToggle }) {
                             {log.context_text}
                         </pre>
                     ) : (
-                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">No context text stored.</p>
+                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{t("No context text stored.")}</p>
                     )}
                 </div>
             )}
@@ -451,7 +432,7 @@ function RetrievalLogCard({ log, index, expanded, onToggle }) {
 function MetaItem({ label, value }) {
     return (
         <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</dt>
+            <dt className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{t(label)}</dt>
             <dd className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{value}</dd>
         </div>
     );
@@ -465,7 +446,7 @@ function StatusBadge({ status }) {
 
     return (
         <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${styles[status] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}>
-            {status}
+            {t(status?.charAt(0).toUpperCase() + status?.slice(1))}
         </span>
     );
 }
@@ -474,7 +455,7 @@ function formatDateTime(value) {
     if (!value) return '—';
 
     try {
-        return new Intl.DateTimeFormat(undefined, {
+        return new Intl.DateTimeFormat(currentLocale(), {
             dateStyle: 'medium',
             timeStyle: 'short',
         }).format(new Date(value));
@@ -485,7 +466,7 @@ function formatDateTime(value) {
 
 function formatTime(value) {
     try {
-        return new Intl.DateTimeFormat(undefined, {
+        return new Intl.DateTimeFormat(currentLocale(), {
             timeStyle: 'short',
         }).format(new Date(value));
     } catch {

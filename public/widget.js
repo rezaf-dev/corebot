@@ -391,8 +391,25 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
 }
 /* PROMPT_HELPERS_END */
 
+/* LOCALIZATION_HELPERS_START */
+function createWidgetLocalization(initial) {
+    let settings = initial || { locale: 'en', direction: 'ltr', translations: {} };
+
+    return {
+        set(next) { settings = next || settings; },
+        locale() { return settings.locale || 'en'; },
+        direction() { return settings.direction === 'rtl' ? 'rtl' : 'ltr'; },
+        translate(key) {
+            return Object.hasOwn(settings.translations || {}, key) ? settings.translations[key] : key;
+        },
+    };
+}
+/* LOCALIZATION_HELPERS_END */
+
 (function () {
     const serverBootstrap = /* __COREBOT_BOOTSTRAP__ */ null;
+    const widgetLocalization = createWidgetLocalization(serverBootstrap?.localization);
+    const t = (key) => widgetLocalization.translate(key);
     const script = document.currentScript;
     const botKey = serverBootstrap?.bot_key || (script && script.dataset.botKey);
     if (!botKey) return;
@@ -487,9 +504,8 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
 
     if (serverBootstrap) {
         applyRemoteConfig(serverBootstrap);
-    } else {
-        loadRemoteConfig().then(applyRemoteConfig);
     }
+    loadRemoteConfig().then(applyRemoteConfig);
 
     button.addEventListener('click', () => togglePanel());
     button.addEventListener('pointerdown', unlockNotificationSound, { once: true });
@@ -529,7 +545,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
                 setBubbleText(assistant, res.message);
                 if (shouldPromptContact(res)) showContact('fallback');
             } catch {
-                setBubbleText(assistant, 'Support is unavailable right now. Please try again later.');
+                setBubbleText(assistant, t("Support is unavailable right now. Please try again later."));
             }
         } finally {
             setLoading(false);
@@ -563,7 +579,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
             const apiErrors = mapContactFieldErrors(error && error.data && error.data.errors);
             contactErrors = Object.keys(apiErrors).length
                 ? apiErrors
-                : { _form: 'Could not save your details. Please try again.' };
+                : { _form: t("Could not save your details. Please try again.") };
             renderContactForm(getContactFormValues());
         } finally {
             setContactSubmitting(false);
@@ -599,6 +615,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         button.classList.toggle('is-hidden', isOpen && isMobile());
         launcherLabel.classList.toggle('is-hidden', isOpen);
         button.setAttribute('aria-expanded', String(isOpen));
+        button.setAttribute('aria-label', t(isOpen ? 'Close chat' : 'Open support chat'));
 
         if (isOpen) {
             clearUnreadNotification();
@@ -624,7 +641,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         return (
             state.welcome_message ||
             config.welcome_message ||
-            'Hi! How can I help you today?'
+            t('Hi! How can I help you today?')
         );
     }
 
@@ -644,7 +661,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         messages.innerHTML = `
             <div class="crm-ai-starting">
                 <span class="crm-ai-typing" aria-hidden="true"><span></span><span></span><span></span></span>
-                Connecting…
+                ${escapeHtml(t("Connecting…"))}
             </div>`;
     }
 
@@ -662,6 +679,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
             state.conversation_id = res.conversation_id;
             state.conversation_token = res.conversation_token;
             state.welcome_message = res.welcome_message || welcomeText();
+            applyLocalization(res.localization);
             applyContactConfig(res);
             localStorage.setItem(storageKey, JSON.stringify(state));
             startManualMessagePolling();
@@ -677,7 +695,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
                 showContact('start');
             }
         } catch {
-            showWelcomeMessage('Unable to start chat. Please refresh and try again.');
+            showWelcomeMessage(t("Unable to start chat. Please refresh and try again."));
             state.conversation_id = null;
             delete state.welcome_message;
             localStorage.setItem(storageKey, JSON.stringify(state));
@@ -689,7 +707,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
 
     async function loadRemoteConfig() {
         try {
-            const url = apiBase + '/widget-config?bot_public_key=' + encodeURIComponent(botKey);
+            const url = apiBase + '/widget-config?bot_public_key=' + encodeURIComponent(botKey) + (script?.dataset.locale ? '&locale=' + encodeURIComponent(script.dataset.locale) : '');
             const response = await fetch(url, { headers: { Accept: 'application/json' } });
             if (!response.ok) return {};
             return await response.json();
@@ -698,7 +716,21 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         }
     }
 
+    function applyLocalization(localization) {
+        if (!localization) return;
+        widgetLocalization.set(localization);
+        crmRoot.lang = widgetLocalization.locale();
+        crmRoot.dir = widgetLocalization.direction();
+        crmRoot.querySelectorAll('[data-i18n]').forEach((element) => {
+            element.textContent = t(element.dataset.i18n);
+        });
+        crmRoot.querySelectorAll('[data-i18n-aria-label]').forEach((element) => {
+            element.setAttribute('aria-label', t(element.dataset.i18nAriaLabel));
+        });
+    }
+
     function applyRemoteConfig(remote) {
+        applyLocalization(remote.localization);
         config = mergeConfig(config, remote.widget || {});
         applyConfig(config);
         applyRemoteContactConfig(remote);
@@ -849,7 +881,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         }
 
         if (!hasContent) {
-            setBubbleText(node, 'Sorry, I could not generate a response.');
+            setBubbleText(node, t("Sorry, I could not generate a response."));
         }
     }
 
@@ -886,13 +918,13 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         crmRoot.dataset.themeDefaults = usesDefaultTheme ? 'true' : 'false';
 
         const title = next.title || DEFAULT_CONFIG.title;
-        headTitle.textContent = title;
+        headTitle.textContent = title === DEFAULT_CONFIG.title ? t(title) : title;
         setAvatarContent(headAvatar, next.avatar_url, titleInitial(title), 'crm-ai-head-initial');
-        headSub.textContent = next.subtitle || DEFAULT_CONFIG.subtitle || 'Online';
-        launcherLabel.textContent = next.launcher_label || '';
+        headSub.textContent = (next.subtitle || DEFAULT_CONFIG.subtitle || 'Online') === DEFAULT_CONFIG.subtitle ? t(DEFAULT_CONFIG.subtitle) : (next.subtitle || DEFAULT_CONFIG.subtitle || 'Online');
+        launcherLabel.textContent = (next.launcher_label || '') === DEFAULT_CONFIG.launcher_label ? t(DEFAULT_CONFIG.launcher_label) : (next.launcher_label || '');
         launcherLabel.classList.toggle('is-visible', Boolean(next.launcher_label));
-        input.placeholder = next.input_placeholder || DEFAULT_CONFIG.input_placeholder;
-        sendBtn.setAttribute('aria-label', next.send_button_label || DEFAULT_CONFIG.send_button_label);
+        input.placeholder = (next.input_placeholder || DEFAULT_CONFIG.input_placeholder) === DEFAULT_CONFIG.input_placeholder ? t(DEFAULT_CONFIG.input_placeholder) : (next.input_placeholder || DEFAULT_CONFIG.input_placeholder);
+        sendBtn.setAttribute('aria-label', next.send_button_label === DEFAULT_CONFIG.send_button_label ? t(DEFAULT_CONFIG.send_button_label) : next.send_button_label);
         config.suggested_prompts = parseSuggestedPrompts(next.suggested_prompts);
 
         iconChat.innerHTML = LAUNCHER_ICONS[next.launcher_icon] || LAUNCHER_ICONS.chat;
@@ -1024,8 +1056,8 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
                 '<span class="crm-ai-contact-success-icon" aria-hidden="true">' +
                 '<svg viewBox="0 0 24 24"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>' +
                 '</span>' +
-                '<p class="crm-ai-contact-success-title">Details saved</p>' +
-                '<p class="crm-ai-contact-success-text">Thanks — our team can follow up when needed.</p>' +
+                ("<p class=\"crm-ai-contact-success-title\">" + escapeHtml(t("Details saved")) + "</p>") +
+                '<p class="crm-ai-contact-success-text">' + escapeHtml(t('Thanks — our team can follow up when needed.')) + '</p>' +
                 '</div>';
         }
 
@@ -1085,7 +1117,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
             return;
         }
 
-        const copy = contactCopy(contactConfig.reason || 'fallback');
+        const copy = Object.fromEntries(Object.entries(contactCopy(contactConfig.reason || 'fallback')).map(([key, value]) => [key, t(value)]));
         const fieldDefs = {
             name: {
                 name: 'visitor_name',
@@ -1121,22 +1153,22 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
                 const describedBy = error ? ' aria-describedby="crm-ai-error-' + def.name + '"' : '';
 
                 const phoneControl = field === 'phone'
-                    ? '<div class="crm-ai-phone-control"><select name="visitor_phone_country" aria-label="Phone country">' + countryOptions(contactConfig.countryCode) + '</select>'
+                    ? ("<div class=\"crm-ai-phone-control\"><select name=\"visitor_phone_country\" aria-label=\"" + escapeAttr(t("Phone country")) + "\">") + countryOptions(contactConfig.countryCode) + '</select>'
                     : '';
                 const phoneControlEnd = field === 'phone' ? '</div>' : '';
                 return (
                     '<label class="crm-ai-field">' +
                     '<span class="crm-ai-field-label">' +
-                    def.label +
+                    escapeHtml(t(def.label)) +
                     (isRequired ? ' <span class="crm-ai-required">*</span>' : '') +
                     '</span>' +
                     phoneControl +
                     '<input name="' +
                     def.name +
-                    '" type="' +
+                    '" dir="' + (def.type === 'text' ? widgetLocalization.direction() : 'ltr') + '" type="' +
                     def.type +
                     '" placeholder="' +
-                    def.placeholder +
+                    escapeAttr(def.placeholder) +
                     '" autocomplete="' +
                     def.autocomplete +
                     '"' +
@@ -1149,7 +1181,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
                         ? '<span id="crm-ai-error-' +
                           def.name +
                           '" class="crm-ai-field-error" role="alert">' +
-                          escapeHtml(error) +
+                          escapeHtml(t(error)) +
                           '</span>'
                         : '') +
                     '</label>'
@@ -1158,16 +1190,16 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
             .join('');
 
         const formError = contactErrors._form
-            ? '<p class="crm-ai-contact-form-error" role="alert">' + escapeHtml(contactErrors._form) + '</p>'
+            ? '<p class="crm-ai-contact-form-error" role="alert">' + escapeHtml(t(contactErrors._form)) + '</p>'
             : '';
         const canSkip = contactConfig.required.length === 0;
         const skipBtn = canSkip
-            ? '<button type="button" class="crm-ai-contact-skip" data-contact-skip>Not now</button>'
+            ? ("<button type=\"button\" class=\"crm-ai-contact-skip\" data-contact-skip>" + escapeHtml(t("Not now")) + "</button>")
             : '';
 
         contact.innerHTML =
             '<div class="crm-ai-contact-card">' +
-            '<button type="button" class="crm-ai-contact-back" data-contact-back aria-label="Back to chat">← Back to chat</button>' +
+            ("<button type=\"button\" class=\"crm-ai-contact-back\" data-contact-back aria-label=\"" + escapeAttr(t("Back to chat")) + "\">" + escapeHtml(t("Back to chat")) + "</button>") +
             '<div class="crm-ai-contact-header">' +
             '<span class="crm-ai-contact-icon" aria-hidden="true">' +
             '<svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>' +
@@ -1214,6 +1246,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         }
 
         return {
+            locale: script?.dataset.locale || widgetLocalization.locale(),
             visitor_id: state.visitor_id,
             source_url: location.href,
             referrer_url: document.referrer || null,
@@ -1281,7 +1314,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
             const promptButton = document.createElement('button');
             promptButton.type = 'button';
             promptButton.className = 'crm-ai-prompt';
-            promptButton.textContent = text;
+            promptButton.textContent = DEFAULT_SUGGESTED_PROMPTS.includes(text) ? t(text) : text;
             promptButton.addEventListener('click', () => handlePromptClick(text));
             container.appendChild(promptButton);
         });
@@ -1332,7 +1365,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         bubble.className = 'crm-ai-bubble';
 
         if (options.loading) {
-            bubble.innerHTML = '<span class="crm-ai-typing" aria-label="Assistant is typing"><span></span><span></span><span></span></span>';
+            bubble.innerHTML = ("<span class=\"crm-ai-typing\" aria-label=\"" + escapeAttr(t("Assistant is typing")) + "\"><span></span><span></span><span></span></span>");
             bubble.dataset.loading = 'true';
         } else {
             setBubbleContent(bubble, text, role);
@@ -1364,7 +1397,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
         if (node.querySelector('.crm-ai-feedback')) return;
         const feedback = document.createElement('div');
         feedback.className = 'crm-ai-feedback';
-        feedback.innerHTML = '<span class="crm-ai-feedback-label">Was this helpful?</span><button type="button" aria-label="Helpful" aria-pressed="false" data-feedback="up">👍</button><button type="button" aria-label="Not helpful" aria-pressed="false" data-feedback="down">👎</button>';
+        feedback.innerHTML = ("<span class=\"crm-ai-feedback-label\">" + escapeHtml(t("Was this helpful?")) + "</span><button type=\"button\" aria-label=\"" + escapeAttr(t("Helpful")) + "\" aria-pressed=\"false\" data-feedback=\"up\">\ud83d\udc4d</button><button type=\"button\" aria-label=\"" + escapeAttr(t("Not helpful")) + "\" aria-pressed=\"false\" data-feedback=\"down\">\ud83d\udc4e</button>");
         feedback.addEventListener('click', (event) => {
             const button = event.target.closest('[data-feedback]');
             if (!button) return;
@@ -1734,7 +1767,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
             }
             .crm-ai-msg:last-child { margin-bottom: 0; }
             .crm-ai-user {
-                margin-left: auto;
+                margin-inline-start: auto;
                 flex-direction: column;
                 align-items: flex-end;
             }
@@ -1797,7 +1830,7 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
                 font: inherit;
                 font-size: 13px;
                 line-height: 1.35;
-                text-align: left;
+                text-align: start;
                 color: var(--crm-text);
                 background: var(--crm-surface);
                 border: 1px solid var(--crm-border);
@@ -2173,37 +2206,37 @@ function setAvatarContent(element, avatarUrl, fallback, initialClass = '') {
                 }
             }
         </style>
-        <div class="crm-ai-root" data-position="bottom-right" data-theme-defaults="true" data-config-ready="false">
-            <button class="crm-ai-btn" type="button" aria-label="Open support chat" aria-expanded="false">
+        <div class="crm-ai-root" dir="${widgetLocalization.direction()}" lang="${escapeAttr(widgetLocalization.locale())}" data-position="bottom-right" data-theme-defaults="true" data-config-ready="false">
+            <button class="crm-ai-btn" type="button" aria-label="${escapeAttr(t("Open support chat"))}" data-i18n-aria-label="Open support chat" aria-expanded="false">
                 <svg class="crm-ai-icon-chat" viewBox="0 0 24 24" aria-hidden="true"></svg>
                 <svg class="crm-ai-icon-close" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
-                <span class="crm-ai-launcher-badge" aria-label="Unread reply"></span>
+                <span class="crm-ai-launcher-badge" aria-label="${escapeAttr(t("Unread reply"))}" data-i18n-aria-label="Unread reply"></span>
             </button>
             <div class="crm-ai-launcher-label" aria-hidden="true"></div>
-            <section class="crm-ai-panel" role="dialog" aria-label="Support chat" aria-modal="true">
+            <section class="crm-ai-panel" role="dialog" aria-label="${escapeAttr(t("Support chat"))}" data-i18n-aria-label="Support chat" aria-modal="true">
                 <div class="crm-ai-sheet-handle" aria-hidden="true"></div>
                 <header class="crm-ai-head">
                     <div class="crm-ai-head-brand">
                         <div class="crm-ai-head-avatar"><span class="crm-ai-head-initial">S</span></div>
                         <div class="crm-ai-head-info">
-                            <div class="crm-ai-head-title">Support</div>
+                            <div class="crm-ai-head-title">${escapeHtml(t("Support"))}</div>
                             <div class="crm-ai-head-status">
                                 <span class="crm-ai-online-dot" aria-hidden="true"></span>
-                                <span class="crm-ai-head-sub">We typically reply instantly</span>
+                                <span class="crm-ai-head-sub">${escapeHtml(t("We typically reply instantly"))}</span>
                             </div>
                         </div>
                     </div>
-                    <button type="button" class="crm-ai-close" aria-label="Close chat">
+                    <button type="button" class="crm-ai-close" aria-label="${escapeAttr(t("Close chat"))}" data-i18n-aria-label="Close chat">
                         <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
                     </button>
                 </header>
                 <div class="crm-ai-msgs" role="log" aria-live="polite" aria-relevant="additions"></div>
-                <button type="button" class="crm-ai-new-messages">New messages ↓</button>
-                <form class="crm-ai-contact" aria-label="Contact details"></form>
+                <button type="button" class="crm-ai-new-messages" data-i18n="New messages">${escapeHtml(t("New messages"))} ↓</button>
+                <form class="crm-ai-contact" aria-label="${escapeAttr(t("Contact details"))}" data-i18n-aria-label="Contact details"></form>
                 <form class="crm-ai-form">
                     <div class="crm-ai-form-row">
                         <input type="text" maxlength="2000" placeholder="Type your message…" autocomplete="off" />
-                        <button type="submit" class="crm-ai-send" aria-label="Send">
+                        <button type="submit" class="crm-ai-send" aria-label="${escapeAttr(t("Send"))}" data-i18n-aria-label="Send">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
                         </button>
                     </div>

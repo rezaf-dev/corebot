@@ -1,3 +1,4 @@
+import { currentLocale, t } from '@/localization';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, usePage } from '@inertiajs/react';
 import DeleteUserForm from './Partials/DeleteUserForm';
@@ -11,35 +12,33 @@ export default function Edit({ mustVerifyEmail, status }) {
         <AuthenticatedLayout
             header={
                 <div>
-                    <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">Profile</h2>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Manage your account details, password, and security settings.
-                    </p>
+                    <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">{t("Profile")}</h2>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Manage your account details, password, and security settings.")}</p>
                 </div>
             }
         >
-            <Head title="Profile" />
+            <Head title={t("Profile")} />
 
             <div className="mx-auto max-w-3xl space-y-6 p-6">
                 <AccountOverview user={user} />
 
                 <ProfileSection
-                    title="Profile information"
-                    description="Update your name and email address used to sign in."
+                    title={t("Profile information")}
+                    description={t("Update your name and email address used to sign in.")}
                 >
                     <UpdateProfileInformationForm mustVerifyEmail={mustVerifyEmail} status={status} />
                 </ProfileSection>
 
                 <ProfileSection
-                    title="Password"
-                    description="Use a strong, unique password to protect your account."
+                    title={t("Password")}
+                    description={t("Use a strong, unique password to protect your account.")}
                 >
                     <UpdatePasswordForm />
                 </ProfileSection>
 
                 <ProfileSection
-                    title="Delete account"
-                    description="Permanently remove your account and sign out of all devices."
+                    title={t("Delete account")}
+                    description={t("Permanently remove your account and sign out of all devices.")}
                     variant="danger"
                 >
                     <DeleteUserForm />
@@ -72,16 +71,15 @@ function AccountOverview({ user }) {
                         <Badge label={roleLabels[user.role] || user.role} />
                         {user.tenant?.name && <Badge label={user.tenant.name} muted />}
                         {user.email_verified_at ? (
-                            <Badge label="Email verified" success />
+                            <Badge label={t("Email verified")} success />
                         ) : (
-                            <Badge label="Email not verified" warning />
+                            <Badge label={t("Email not verified")} warning />
                         )}
                     </div>
                 </div>
             </div>
             {user.created_at && (
-                <p className="mt-4 border-t border-gray-100 pt-4 text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                    Member since {formatDate(user.created_at)}
+                <p className="mt-4 border-t border-gray-100 pt-4 text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400">{t("Member since")}{' '}{formatDate(user.created_at)}
                 </p>
             )}
         </section>
@@ -104,7 +102,7 @@ function ProfileSection({ title, description, children, variant = 'default' }) {
                     {title}
                 </h3>
                 <p className={`mt-1 text-sm ${isDanger ? 'text-red-700/80 dark:text-red-300/80' : 'text-gray-500 dark:text-gray-400'}`}>
-                    {description}
+                    {t(description)}
                 </p>
             </header>
             <div className="pt-6">{children}</div>
@@ -125,7 +123,7 @@ function Badge({ label, muted = false, success = false, warning = false }) {
 
     return (
         <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${classes}`}>
-            {label}
+            {t(label)}
         </span>
     );
 }
@@ -141,7 +139,7 @@ function initials(name) {
 
 function formatDate(value) {
     try {
-        return new Intl.DateTimeFormat(undefined, { dateStyle: 'long' }).format(new Date(value));
+        return new Intl.DateTimeFormat(currentLocale(), { dateStyle: 'long' }).format(new Date(value));
     } catch {
         return value;
     }

@@ -1,3 +1,4 @@
+import { t } from '@/localization';
 import Checkbox from '@/Components/Checkbox';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
@@ -71,7 +72,7 @@ export default function BotIntegrationsSection({ integrationTypes }) {
     };
 
     const remove = (integration) => {
-        if (!window.confirm(`Remove integration "${integration.name}"?`)) {
+        if (!window.confirm(t("Remove integration \":name\"?", { name: integration.name }))) {
             return;
         }
 
@@ -92,24 +93,18 @@ export default function BotIntegrationsSection({ integrationTypes }) {
         <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
             <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">Integrations</h3>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Actions the chatbot can run during conversations (webhooks, leads, email, API queries).
-                    </p>
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Integrations")}</h3>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Actions the chatbot can run during conversations (webhooks, leads, email, API queries).")}</p>
                 </div>
                 {editingId === null && (
-                    <SecondaryButton type="button" onClick={startCreate} className="!normal-case !tracking-normal">
-                        Add integration
-                    </SecondaryButton>
+                    <SecondaryButton type="button" onClick={startCreate} className="!normal-case !tracking-normal">{t("Add integration")}</SecondaryButton>
                 )}
             </div>
 
             <InputError message={errors?.integration_test} className="mt-4" />
 
             {integrations.length === 0 && editingId === null && (
-                <p className="mt-5 text-sm text-gray-500 dark:text-gray-400">
-                    No integrations yet. Add a webhook, lead capture, email, or API action for the chatbot to use.
-                </p>
+                <p className="mt-5 text-sm text-gray-500 dark:text-gray-400">{t("No integrations yet. Add a webhook, lead capture, email, or API action for the chatbot to use.")}</p>
             )}
 
             {integrations.length > 0 && (
@@ -120,7 +115,7 @@ export default function BotIntegrationsSection({ integrationTypes }) {
                                 <p className="text-sm font-medium text-gray-900 dark:text-white">
                                     {integration.name}
                                     {!integration.enabled && (
-                                        <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">Disabled</span>
+                                        <span className="ms-2 text-xs text-amber-600 dark:text-amber-400">{t("Disabled")}</span>
                                     )}
                                 </p>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -128,15 +123,9 @@ export default function BotIntegrationsSection({ integrationTypes }) {
                                 </p>
                             </div>
                             <div className="flex flex-wrap gap-2">
-                                <SecondaryButton type="button" onClick={() => testConnection(integration)} className="!normal-case !tracking-normal">
-                                    Test
-                                </SecondaryButton>
-                                <SecondaryButton type="button" onClick={() => startEdit(integration)} className="!normal-case !tracking-normal">
-                                    Edit
-                                </SecondaryButton>
-                                <SecondaryButton type="button" onClick={() => remove(integration)} className="!normal-case !tracking-normal">
-                                    Remove
-                                </SecondaryButton>
+                                <SecondaryButton type="button" onClick={() => testConnection(integration)} className="!normal-case !tracking-normal">{t("Test")}</SecondaryButton>
+                                <SecondaryButton type="button" onClick={() => startEdit(integration)} className="!normal-case !tracking-normal">{t("Edit")}</SecondaryButton>
+                                <SecondaryButton type="button" onClick={() => remove(integration)} className="!normal-case !tracking-normal">{t("Remove")}</SecondaryButton>
                             </div>
                         </li>
                     ))}
@@ -147,7 +136,7 @@ export default function BotIntegrationsSection({ integrationTypes }) {
                 <form onSubmit={submit} className="mt-6 space-y-4 rounded-lg border border-gray-100 p-4 dark:border-gray-700">
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div>
-                            <InputLabel htmlFor="integration_type" value="Type" />
+                            <InputLabel htmlFor="integration_type" value={t("Type")} />
                             <select
                                 id="integration_type"
                                 value={form.data.type}
@@ -156,14 +145,14 @@ export default function BotIntegrationsSection({ integrationTypes }) {
                             >
                                 {integrationTypes.map((option) => (
                                     <option key={option.value} value={option.value}>
-                                        {option.label}
+                                        {t(option.label)}
                                     </option>
                                 ))}
                             </select>
                             <InputError message={form.errors.type} className="mt-1" />
                         </div>
                         <div>
-                            <InputLabel htmlFor="integration_name" value="Name" />
+                            <InputLabel htmlFor="integration_name" value={t("Name")} />
                             <TextInput
                                 id="integration_name"
                                 value={form.data.name}
@@ -175,21 +164,21 @@ export default function BotIntegrationsSection({ integrationTypes }) {
                     </div>
 
                     <div>
-                        <InputLabel htmlFor="integration_description" value="Description for the AI" />
+                        <InputLabel htmlFor="integration_description" value={t("Description for the AI")} />
                         <textarea
                             id="integration_description"
                             rows={2}
                             value={form.data.description}
                             onChange={(e) => form.setData('description', e.target.value)}
                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
-                            placeholder="Create a sales lead when the visitor asks to be contacted."
+                            placeholder={t("Create a sales lead when the visitor asks to be contacted.")}
                         />
                         <InputError message={form.errors.description} className="mt-1" />
                     </div>
 
                     {(showUrl || form.data.type === 'http_get') && (
                         <div>
-                            <InputLabel htmlFor="integration_url" value="URL" />
+                            <InputLabel htmlFor="integration_url" value={t("URL")} />
                             <TextInput
                                 id="integration_url"
                                 value={form.data.config.url}
@@ -202,9 +191,7 @@ export default function BotIntegrationsSection({ integrationTypes }) {
                                 }
                             />
                             {form.data.type === 'http_get' && (
-                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                    Use {'{parameter_name}'} in the path for values the visitor provides (e.g. recommendation ID).
-                                </p>
+                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("Use")}{' '}{t("{parameter_name}")}{' '}{t("in the path for values the visitor provides (e.g. recommendation ID).")}</p>
                             )}
                             <InputError message={form.errors['config.url']} className="mt-1" />
                         </div>
@@ -212,16 +199,16 @@ export default function BotIntegrationsSection({ integrationTypes }) {
 
                     {showMethod && (
                         <div>
-                            <InputLabel htmlFor="integration_method" value="HTTP method" />
+                            <InputLabel htmlFor="integration_method" value={t("HTTP method")} />
                             <select
                                 id="integration_method"
                                 value={form.data.config.method}
                                 onChange={(e) => form.setData('config', { ...form.data.config, method: e.target.value })}
                                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
                             >
-                                <option value="POST">POST</option>
-                                <option value="PUT">PUT</option>
-                                <option value="PATCH">PATCH</option>
+                                <option value="POST">{t("POST")}</option>
+                                <option value="PUT">{t("PUT")}</option>
+                                <option value="PATCH">{t("PATCH")}</option>
                             </select>
                         </div>
                     )}
@@ -229,7 +216,7 @@ export default function BotIntegrationsSection({ integrationTypes }) {
                     {showEmail && (
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div>
-                                <InputLabel htmlFor="integration_to_email" value="Recipient email" />
+                                <InputLabel htmlFor="integration_to_email" value={t("Recipient email")} />
                                 <TextInput
                                     id="integration_to_email"
                                     value={form.data.config.to_email}
@@ -239,7 +226,7 @@ export default function BotIntegrationsSection({ integrationTypes }) {
                                 <InputError message={form.errors['config.to_email']} className="mt-1" />
                             </div>
                             <div>
-                                <InputLabel htmlFor="integration_subject" value="Default subject" />
+                                <InputLabel htmlFor="integration_subject" value={t("Default subject")} />
                                 <TextInput
                                     id="integration_subject"
                                     value={form.data.config.subject}
@@ -252,7 +239,7 @@ export default function BotIntegrationsSection({ integrationTypes }) {
 
                     {(showUrl || form.data.type === 'http_get') && (
                         <div>
-                            <InputLabel htmlFor="integration_allowed_domains" value="Allowed domains (SSRF guard)" />
+                            <InputLabel htmlFor="integration_allowed_domains" value={t("Allowed domains (SSRF guard)")} />
                             <textarea
                                 id="integration_allowed_domains"
                                 rows={2}
@@ -267,14 +254,14 @@ export default function BotIntegrationsSection({ integrationTypes }) {
 
                     {(showUrl || form.data.type === 'http_get') && (
                         <div>
-                            <InputLabel htmlFor="integration_bearer" value="Bearer token (optional)" />
+                            <InputLabel htmlFor="integration_bearer" value={t("Bearer token (optional)")} />
                             <TextInput
                                 id="integration_bearer"
                                 type="password"
                                 value={form.data.credentials.bearer_token}
                                 onChange={(e) => form.setData('credentials', { bearer_token: e.target.value })}
                                 className="mt-1 block w-full"
-                                placeholder={editingId !== 'new' ? 'Leave blank to keep existing' : ''}
+                                placeholder={editingId !== 'new' ? t("Leave blank to keep existing") : ''}
                             />
                         </div>
                     )}
@@ -284,16 +271,14 @@ export default function BotIntegrationsSection({ integrationTypes }) {
                             checked={form.data.enabled}
                             onChange={(e) => form.setData('enabled', e.target.checked)}
                         />
-                        <span className="text-sm text-gray-900 dark:text-white">Enabled</span>
+                        <span className="text-sm text-gray-900 dark:text-white">{t("Enabled")}</span>
                     </label>
 
                     <div className="flex flex-wrap gap-2">
                         <PrimaryButton disabled={form.processing}>
-                            {editingId === 'new' ? 'Add integration' : 'Save integration'}
+                            {editingId === 'new' ? t("Add integration") : t("Save integration")}
                         </PrimaryButton>
-                        <SecondaryButton type="button" onClick={cancelEdit} className="!normal-case !tracking-normal">
-                            Cancel
-                        </SecondaryButton>
+                        <SecondaryButton type="button" onClick={cancelEdit} className="!normal-case !tracking-normal">{t("Cancel")}</SecondaryButton>
                     </div>
                 </form>
             )}

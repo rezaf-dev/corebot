@@ -1,3 +1,4 @@
+import { t } from '@/localization';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
@@ -48,20 +49,18 @@ export default function Install({ bots, defaults, positions, icons }) {
             setCopied(true);
             window.setTimeout(() => setCopied(false), 2000);
         } catch {
-            window.prompt('Copy this embed code:', snippet);
+            window.prompt(t('Copy this embed code:'), snippet);
         }
     };
 
     if (bots.length === 0) {
         return (
-            <AuthenticatedLayout header={<h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">Widget</h2>}>
-                <Head title="Widget" />
+            <AuthenticatedLayout header={<h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">{t("Widget")}</h2>}>
+                <Head title={t("Widget")} />
                 <div className="mx-auto max-w-3xl p-6">
                     <div className="rounded-lg border border-dashed border-gray-200 bg-white px-6 py-12 text-center dark:border-gray-700 dark:bg-gray-800">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">No active bots</h3>
-                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                            Create and activate a bot before customizing the chat widget.
-                        </p>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t("No active bots")}</h3>
+                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{t("Create and activate a bot before customizing the chat widget.")}</p>
                     </div>
                 </div>
             </AuthenticatedLayout>
@@ -72,14 +71,12 @@ export default function Install({ bots, defaults, positions, icons }) {
         <AuthenticatedLayout
             header={
                 <div>
-                    <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">Widget</h2>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Customize appearance, position, and copy the embed code for each bot.
-                    </p>
+                    <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">{t("Widget")}</h2>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Customize appearance, position, and copy the embed code for each bot.")}</p>
                 </div>
             }
         >
-            <Head title="Widget" />
+            <Head title={t("Widget")} />
 
             <div className="mx-auto max-w-7xl space-y-6 p-6">
                 <div className="flex flex-wrap gap-2">
@@ -102,51 +99,49 @@ export default function Install({ bots, defaults, positions, icons }) {
                 <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
                     <form onSubmit={submit} className="space-y-6">
                         <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Appearance</h3>
-                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                Colors and text shown in the chat header and launcher.
-                            </p>
+                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Appearance")}</h3>
+                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Colors and text shown in the chat header and launcher.")}</p>
                             <div className="mt-5 grid gap-5 sm:grid-cols-2">
-                                <TextField id="title" label="Title" value={data.title} onChange={(v) => setData('title', v)} error={errors.title} />
-                                <TextField id="subtitle" label="Subtitle" value={data.subtitle} onChange={(v) => setData('subtitle', v)} error={errors.subtitle} />
+                                <TextField id="title" label={t("Title")} value={data.title} onChange={(v) => setData('title', v)} error={errors.title} />
+                                <TextField id="subtitle" label={t("Subtitle")} value={data.subtitle} onChange={(v) => setData('subtitle', v)} error={errors.subtitle} />
                                 <div>
-                                    <InputLabel htmlFor="avatar" value="Support avatar" />
+                                    <InputLabel htmlFor="avatar" value={t("Support avatar")} />
                                     <input
                                         id="avatar"
                                         type="file"
                                         accept="image/jpeg,image/png,image/webp"
                                         onChange={(event) => setData('avatar', event.target.files?.[0] || null)}
-                                        className="mt-1 block w-full text-sm text-gray-700 file:mr-4 file:rounded-md file:border-0 file:bg-indigo-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100 dark:text-gray-300 dark:file:bg-indigo-950/50 dark:file:text-indigo-300 dark:hover:file:bg-indigo-950"
+                                        className="mt-1 block w-full text-sm text-gray-700 file:me-4 file:rounded-md file:border-0 file:bg-indigo-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100 dark:text-gray-300 dark:file:bg-indigo-950/50 dark:file:text-indigo-300 dark:hover:file:bg-indigo-950"
                                     />
-                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">JPEG, PNG, or WebP up to 2 MB.</p>
+                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("JPEG, PNG, or WebP up to 2 MB.")}</p>
                                     <InputError message={errors.avatar} className="mt-1" />
                                 </div>
                                 <div className="sm:col-span-2">
-                                    <TextField id="launcher_label" label="Launcher callout" value={data.launcher_label} onChange={(v) => setData('launcher_label', v)} error={errors.launcher_label} />
+                                    <TextField id="launcher_label" label={t("Launcher callout")} value={data.launcher_label} onChange={(v) => setData('launcher_label', v)} error={errors.launcher_label} />
                                     <div className="mt-2 flex flex-wrap gap-2">
                                         {launcherTemplates.map((template) => (
                                             <button
-                                                key={template}
+                                                key={t(template)}
                                                 type="button"
-                                                onClick={() => setData('launcher_label', template)}
+                                                onClick={() => setData('launcher_label', t(template))}
                                                 className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                                                    data.launcher_label === template
+                                                    data.launcher_label === t(template)
                                                         ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-950/50 dark:text-indigo-300'
                                                         : 'border-gray-200 bg-white text-gray-600 hover:border-indigo-300 hover:text-indigo-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-indigo-500 dark:hover:text-indigo-300'
                                                 }`}
                                             >
-                                                {template}
+                                                {t(template)}
                                             </button>
                                         ))}
                                     </div>
                                 </div>
-                                <ColorField id="primary_color" label="Header & buttons" value={data.primary_color} onChange={(v) => setData('primary_color', v)} error={errors.primary_color} />
-                                <ColorField id="accent_color" label="User messages" value={data.accent_color} onChange={(v) => setData('accent_color', v)} error={errors.accent_color} />
-                                <ColorField id="background_color" label="Messages background" value={data.background_color} onChange={(v) => setData('background_color', v)} error={errors.background_color} />
-                                <ColorField id="surface_color" label="Panel surface" value={data.surface_color} onChange={(v) => setData('surface_color', v)} error={errors.surface_color} />
-                                <ColorField id="text_color" label="Text color" value={data.text_color} onChange={(v) => setData('text_color', v)} error={errors.text_color} />
+                                <ColorField id="primary_color" label={t("Header & buttons")} value={data.primary_color} onChange={(v) => setData('primary_color', v)} error={errors.primary_color} />
+                                <ColorField id="accent_color" label={t("User messages")} value={data.accent_color} onChange={(v) => setData('accent_color', v)} error={errors.accent_color} />
+                                <ColorField id="background_color" label={t("Messages background")} value={data.background_color} onChange={(v) => setData('background_color', v)} error={errors.background_color} />
+                                <ColorField id="surface_color" label={t("Panel surface")} value={data.surface_color} onChange={(v) => setData('surface_color', v)} error={errors.surface_color} />
+                                <ColorField id="text_color" label={t("Text color")} value={data.text_color} onChange={(v) => setData('text_color', v)} error={errors.text_color} />
                                 <div>
-                                    <InputLabel htmlFor="launcher_icon" value="Launcher icon" />
+                                    <InputLabel htmlFor="launcher_icon" value={t("Launcher icon")} />
                                     <select
                                         id="launcher_icon"
                                         value={data.launcher_icon}
@@ -154,8 +149,8 @@ export default function Install({ bots, defaults, positions, icons }) {
                                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
                                     >
                                         {icons.map((icon) => (
-                                            <option key={icon} value={icon}>
-                                                {icon}
+                                            <option key={t(icon === 'help' ? 'Help' : icon === 'assistant' ? 'Assistant' : icon.charAt(0).toUpperCase() + icon.slice(1))} value={t(icon === 'help' ? 'Help' : icon === 'assistant' ? 'Assistant' : icon.charAt(0).toUpperCase() + icon.slice(1))}>
+                                                {t(icon === 'help' ? 'Help' : icon === 'assistant' ? 'Assistant' : icon.charAt(0).toUpperCase() + icon.slice(1))}
                                             </option>
                                         ))}
                                     </select>
@@ -165,10 +160,10 @@ export default function Install({ bots, defaults, positions, icons }) {
                         </section>
 
                         <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Layout</h3>
+                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Layout")}</h3>
                             <div className="mt-5 grid gap-5 sm:grid-cols-2">
                                 <div>
-                                    <InputLabel htmlFor="position" value="Position" />
+                                    <InputLabel htmlFor="position" value={t("Position")} />
                                     <select
                                         id="position"
                                         value={data.position}
@@ -177,7 +172,7 @@ export default function Install({ bots, defaults, positions, icons }) {
                                     >
                                         {positions.map((position) => (
                                             <option key={position} value={position}>
-                                                {position.replace('-', ' ')}
+                                                {t(position.split('-').map((word, index) => index ? word : word.charAt(0).toUpperCase() + word.slice(1)).join(' '))}
                                             </option>
                                         ))}
                                     </select>
@@ -185,7 +180,7 @@ export default function Install({ bots, defaults, positions, icons }) {
                                 </div>
                                 <RangeField
                                     id="panel_width"
-                                    label="Panel width (px)"
+                                    label={t("Panel width (px)")}
                                     value={data.panel_width}
                                     min={320}
                                     max={480}
@@ -194,7 +189,7 @@ export default function Install({ bots, defaults, positions, icons }) {
                                 />
                                 <RangeField
                                     id="launcher_size"
-                                    label="Launcher size (px)"
+                                    label={t("Launcher size (px)")}
                                     value={data.launcher_size}
                                     min={44}
                                     max={72}
@@ -203,7 +198,7 @@ export default function Install({ bots, defaults, positions, icons }) {
                                 />
                                 <RangeField
                                     id="border_radius"
-                                    label="Corner radius (px)"
+                                    label={t("Corner radius (px)")}
                                     value={data.border_radius}
                                     min={0}
                                     max={32}
@@ -212,7 +207,7 @@ export default function Install({ bots, defaults, positions, icons }) {
                                 />
                                 <RangeField
                                     id="offset_x"
-                                    label="Horizontal offset (px)"
+                                    label={t("Horizontal offset (px)")}
                                     value={data.offset_x}
                                     min={0}
                                     max={80}
@@ -221,7 +216,7 @@ export default function Install({ bots, defaults, positions, icons }) {
                                 />
                                 <RangeField
                                     id="offset_y"
-                                    label="Vertical offset (px)"
+                                    label={t("Vertical offset (px)")}
                                     value={data.offset_y}
                                     min={0}
                                     max={80}
@@ -229,29 +224,25 @@ export default function Install({ bots, defaults, positions, icons }) {
                                     error={errors.offset_y}
                                 />
                                 <div>
-                                    <InputLabel htmlFor="initial_open" value="Initial state" />
+                                    <InputLabel htmlFor="initial_open" value={t("Initial state")} />
                                     <select
                                         id="initial_open"
                                         value={data.initial_open ? 'open' : 'closed'}
                                         onChange={(e) => setData('initial_open', e.target.value === 'open')}
                                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
                                     >
-                                        <option value="closed">Closed (launcher only)</option>
-                                        <option value="open">Open (chat panel visible)</option>
+                                        <option value="closed">{t("Closed (launcher only)")}</option>
+                                        <option value="open">{t("Open (chat panel visible)")}</option>
                                     </select>
-                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                        When open, visitors see the welcome message immediately on page load.
-                                    </p>
+                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("When open, visitors see the welcome message immediately on page load.")}</p>
                                     <InputError message={errors.initial_open} className="mt-1" />
                                 </div>
                             </div>
                         </section>
 
                         <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Conversation starters</h3>
-                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                Short prompt buttons shown before the visitor sends their first message. Leave empty to use defaults.
-                            </p>
+                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Conversation starters")}</h3>
+                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Short prompt buttons shown before the visitor sends their first message. Leave empty to use defaults.")}</p>
                             <div className="mt-5 space-y-3">
                                 {((data.suggested_prompts?.length ? data.suggested_prompts : ['']).slice(0, 4)).map((prompt, index, rows) => (
                                     <div key={index} className="flex gap-2">
@@ -264,7 +255,7 @@ export default function Install({ bots, defaults, positions, icons }) {
                                                 setData('suggested_prompts', next);
                                             }}
                                             className="block w-full"
-                                            placeholder={index === 0 ? 'How do I get started?' : 'Optional prompt'}
+                                            placeholder={index === 0 ? t("How do I get started?") : t("Optional prompt")}
                                         />
                                         {rows.length > 1 && (
                                             <button
@@ -276,9 +267,7 @@ export default function Install({ bots, defaults, positions, icons }) {
                                                     );
                                                 }}
                                                 className="shrink-0 rounded-md border border-gray-200 px-3 text-sm text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                                            >
-                                                Remove
-                                            </button>
+                                            >{t("Remove")}</button>
                                         )}
                                     </div>
                                 ))}
@@ -289,27 +278,25 @@ export default function Install({ bots, defaults, positions, icons }) {
                                             setData('suggested_prompts', [...(data.suggested_prompts || []), ''])
                                         }
                                         className="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
-                                    >
-                                        Add prompt
-                                    </button>
+                                    >{t("Add prompt")}</button>
                                 )}
                                 <InputError message={errors['suggested_prompts.0'] || errors.suggested_prompts} className="mt-1" />
                             </div>
                         </section>
 
                         <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Labels</h3>
+                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Labels")}</h3>
                             <div className="mt-5 grid gap-5 sm:grid-cols-2">
                                 <TextField
                                     id="input_placeholder"
-                                    label="Input placeholder"
+                                    label={t("Input placeholder")}
                                     value={data.input_placeholder}
                                     onChange={(v) => setData('input_placeholder', v)}
                                     error={errors.input_placeholder}
                                 />
                                 <TextField
                                     id="send_button_label"
-                                    label="Send button"
+                                    label={t("Send button")}
                                     value={data.send_button_label}
                                     onChange={(v) => setData('send_button_label', v)}
                                     error={errors.send_button_label}
@@ -318,9 +305,9 @@ export default function Install({ bots, defaults, positions, icons }) {
                         </section>
 
                         <div className="flex flex-wrap items-center gap-3">
-                            <PrimaryButton disabled={processing}>{processing ? 'Saving…' : 'Save widget settings'}</PrimaryButton>
+                            <PrimaryButton disabled={processing}>{processing ? t("Saving…") : t("Save widget settings")}</PrimaryButton>
                             {recentlySuccessful && (
-                                <span className="text-sm text-emerald-600 dark:text-emerald-400">Saved.</span>
+                                <span className="text-sm text-emerald-600 dark:text-emerald-400">{t("Saved.")}</span>
                             )}
                         </div>
                     </form>
@@ -330,10 +317,8 @@ export default function Install({ bots, defaults, positions, icons }) {
                         <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
-                                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">Embed code</h3>
-                                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                        Paste before <code className="text-xs">&lt;/body&gt;</code>. Settings are saved on your bot and loaded by the widget automatically.
-                                    </p>
+                                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Embed code")}</h3>
+                                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Paste before")}{' '}<code className="text-xs">{t("&lt;/body&gt;")}</code>{t(". Settings are saved on your bot and loaded by the widget automatically.")}</p>
                                     <p className="mt-2 font-mono text-xs text-gray-500 dark:text-gray-400">
                                         {selectedBot?.public_key}
                                     </p>
@@ -343,13 +328,11 @@ export default function Install({ bots, defaults, positions, icons }) {
                                     onClick={copySnippet}
                                     className="shrink-0 text-xs font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
                                 >
-                                    {copied ? 'Copied' : 'Copy'}
+                                    {copied ? t("Copied") : t("Copy")}
                                 </button>
                             </div>
                             <pre className="mt-4 max-h-64 overflow-auto rounded-lg bg-gray-950 p-4 text-xs text-gray-100">{snippet}</pre>
-                            <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                                The script tag includes your current settings as data attributes. The widget also fetches saved settings from the server on load.
-                            </p>
+                            <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">{t("The script tag includes your current settings as data attributes. The widget also fetches saved settings from the server on load.")}</p>
                         </section>
                     </aside>
                 </div>
@@ -374,8 +357,8 @@ function WidgetPreview({ config, initialOpen }) {
 
     return (
         <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Preview</h3>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Approximate look on your site (desktop).</p>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Preview")}</h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Approximate look on your site (desktop).")}</p>
             <div
                 className={`relative mt-4 flex h-96 overflow-hidden rounded-xl border border-gray-200 bg-gradient-to-br from-slate-100 to-slate-200 p-4 dark:border-gray-700 dark:from-gray-900 dark:to-gray-800 ${positionClass}`}
             >
@@ -404,7 +387,7 @@ function WidgetPreview({ config, initialOpen }) {
                             <div className="truncate text-sm font-semibold">{config.title}</div>
                             <div className="flex items-center gap-1.5 text-[11px]" style={{ color: config.text_color + '88' }}>
                                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                                {config.subtitle || 'Online'}
+                                {config.subtitle || t("Online")}
                             </div>
                         </div>
                     </div>
@@ -419,11 +402,9 @@ function WidgetPreview({ config, initialOpen }) {
                             <div
                                 className="max-w-[85%] rounded-2xl border px-3 py-2 text-xs"
                                 style={{ background: config.surface_color, borderColor: config.text_color + '22', color: config.text_color }}
-                            >
-                                Welcome! How can I help?
-                            </div>
+                            >{t("Welcome! How can I help?")}</div>
                         </div>
-                        <div className="ml-7 flex flex-wrap gap-1.5">
+                        <div className="ms-7 flex flex-wrap gap-1.5">
                             {previewPrompts.map((prompt) => (
                                 <span
                                     key={prompt}
@@ -505,7 +486,7 @@ function LauncherIcon({ icon }) {
 function TextField({ id, label, value, onChange, error, placeholder }) {
     return (
         <div>
-            <InputLabel htmlFor={id} value={label} />
+            <InputLabel htmlFor={id} value={t(label)} />
             <TextInput id={id} value={value} onChange={(e) => onChange(e.target.value)} className="mt-1 block w-full" placeholder={placeholder} />
             <InputError message={error} className="mt-1" />
         </div>
@@ -515,7 +496,7 @@ function TextField({ id, label, value, onChange, error, placeholder }) {
 function ColorField({ id, label, value, onChange, error }) {
     return (
         <div>
-            <InputLabel htmlFor={id} value={label} />
+            <InputLabel htmlFor={id} value={t(label)} />
             <div className="mt-1 flex gap-2">
                 <input
                     type="color"
@@ -535,7 +516,7 @@ function RangeField({ id, label, value, min, max, onChange, error }) {
     return (
         <div>
             <div className="flex items-center justify-between">
-                <InputLabel htmlFor={id} value={label} />
+                <InputLabel htmlFor={id} value={t(label)} />
                 <span className="font-mono text-sm text-gray-700 dark:text-gray-300">{value}</span>
             </div>
             <input

@@ -1,3 +1,4 @@
+import { t } from '@/localization';
 export default function ApplicationLogo({
     showWordmark = false,
     markClassName = 'h-9 w-9',
@@ -48,9 +49,7 @@ export default function ApplicationLogo({
             {showWordmark && (
                 <span
                     className={`font-semibold leading-none tracking-normal ${wordmarkClassName}`}
-                >
-                    corebot
-                </span>
+                >{t("corebot")}</span>
             )}
         </span>
     );

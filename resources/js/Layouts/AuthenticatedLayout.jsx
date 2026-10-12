@@ -1,3 +1,5 @@
+import { t } from '@/localization';
+import LanguageSelector from '@/Components/LanguageSelector';
 import ApplicationLogo from '@/Components/ApplicationLogo';
 import Dropdown from '@/Components/Dropdown';
 import NavLink from '@/Components/NavLink';
@@ -16,7 +18,10 @@ export default function AuthenticatedLayout({ header, children }) {
         ['conversations.index', 'Conversations'],
         ['widget.install', 'Widget'],
     ];
-    if (user?.role === 'super_admin') links.splice(1, 0, ['tenants.index', 'Tenants']);
+    if (user?.role === 'super_admin') {
+        links.splice(1, 0, ['tenants.index', 'Tenants']);
+        links.push(['language-settings.edit', 'Language settings']);
+    }
 
     const [showingNavigationDropdown, setShowingNavigationDropdown] =
         useState(false);
@@ -31,7 +36,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                 <Link
                                     href={route('home')}
                                     className="inline-flex items-center"
-                                    aria-label="corebot home"
+                                    aria-label={t("corebot home")}
                                 >
                                     <ApplicationLogo
                                         showWordmark
@@ -41,16 +46,17 @@ export default function AuthenticatedLayout({ header, children }) {
                                 </Link>
                             </div>
 
-                            <div className="hidden space-x-6 sm:-my-px sm:ms-10 sm:flex">
-                                {links.map(([name, label]) => (
+                            <div className="hidden gap-4 xl:-my-px xl:ms-6 xl:flex">
+                                {links.filter(([name]) => name !== 'language-settings.edit').map(([name, label]) => (
                                     <NavLink key={name} href={route(name)} active={route().current(name)}>
-                                        {label}
+                                        {t(label)}
                                     </NavLink>
                                 ))}
                             </div>
                         </div>
 
-                        <div className="hidden sm:ms-6 sm:flex sm:items-center">
+                        <div className="hidden xl:ms-6 xl:flex xl:items-center">
+                            <LanguageSelector />
                             <div className="relative ms-3">
                                 <Dropdown>
                                     <Dropdown.Trigger>
@@ -78,30 +84,32 @@ export default function AuthenticatedLayout({ header, children }) {
                                     </Dropdown.Trigger>
 
                                     <Dropdown.Content>
+                                        {user?.role === 'super_admin' && (
+                                            <Dropdown.Link href={route('language-settings.edit')}>{t('Language settings')}</Dropdown.Link>
+                                        )}
                                         <Dropdown.Link
                                             href={route('profile.edit')}
-                                        >
-                                            Profile
-                                        </Dropdown.Link>
+                                        >{t("Profile")}</Dropdown.Link>
                                         <Dropdown.Link
                                             href={route('logout')}
                                             method="post"
                                             as="button"
-                                        >
-                                            Log Out
-                                        </Dropdown.Link>
+                                        >{t("Log Out")}</Dropdown.Link>
                                     </Dropdown.Content>
                                 </Dropdown>
                             </div>
                         </div>
 
-                        <div className="-me-2 flex items-center sm:hidden">
+                        <div className="-me-2 flex items-center gap-3 xl:hidden">
+                            <LanguageSelector />
                             <button
                                 onClick={() =>
                                     setShowingNavigationDropdown(
                                         (previousState) => !previousState,
                                     )
                                 }
+                                aria-label={t('Toggle navigation')}
+                                aria-expanded={showingNavigationDropdown}
                                 className="inline-flex items-center justify-center rounded-md p-2 text-gray-400 transition duration-150 ease-in-out hover:bg-gray-100 hover:text-gray-500 focus:bg-gray-100 focus:text-gray-500 focus:outline-none dark:text-gray-500 dark:hover:bg-gray-900 dark:hover:text-gray-400 dark:focus:bg-gray-900 dark:focus:text-gray-400"
                             >
                                 <svg
@@ -141,13 +149,13 @@ export default function AuthenticatedLayout({ header, children }) {
                 <div
                     className={
                         (showingNavigationDropdown ? 'block' : 'hidden') +
-                        ' sm:hidden'
+                        ' xl:hidden'
                     }
                 >
                     <div className="space-y-1 pb-3 pt-2">
                         {links.map(([name, label]) => (
                             <ResponsiveNavLink key={name} href={route(name)} active={route().current(name)}>
-                                {label}
+                                {t(label)}
                             </ResponsiveNavLink>
                         ))}
                     </div>
@@ -163,16 +171,12 @@ export default function AuthenticatedLayout({ header, children }) {
                         </div>
 
                         <div className="mt-3 space-y-1">
-                            <ResponsiveNavLink href={route('profile.edit')}>
-                                Profile
-                            </ResponsiveNavLink>
+                            <ResponsiveNavLink href={route('profile.edit')}>{t("Profile")}</ResponsiveNavLink>
                             <ResponsiveNavLink
                                 method="post"
                                 href={route('logout')}
                                 as="button"
-                            >
-                                Log Out
-                            </ResponsiveNavLink>
+                            >{t("Log Out")}</ResponsiveNavLink>
                         </div>
                     </div>
                 </div>
@@ -190,7 +194,7 @@ export default function AuthenticatedLayout({ header, children }) {
                 {(flash.success || flash.error) && (
                     <div className="mx-auto mt-6 max-w-7xl px-4 sm:px-6 lg:px-8">
                         <div className={`rounded border px-4 py-3 text-sm ${flash.error ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
-                            {flash.error || flash.success}
+                            {t(flash.error || flash.success)}
                         </div>
                     </div>
                 )}

@@ -1,3 +1,4 @@
+import { currentLocale, t } from '@/localization';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head } from '@inertiajs/react';
 
@@ -6,7 +7,7 @@ function formatTokens(value) {
         return '-';
     }
 
-    return Number(value).toLocaleString();
+    return Number(value).toLocaleString(currentLocale());
 }
 
 export default function Dashboard({ stats }) {
@@ -19,13 +20,13 @@ export default function Dashboard({ stats }) {
     ].filter(([, value]) => value !== null);
 
     return (
-        <AuthenticatedLayout header={<h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">Dashboard</h2>}>
-            <Head title="Dashboard" />
+        <AuthenticatedLayout header={<h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">{t("Dashboard")}</h2>}>
+            <Head title={t("Dashboard")} />
             <div className="mx-auto max-w-7xl space-y-6 p-6">
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                     {cards.map(([label, value]) => (
-                        <div key={label} className="rounded-lg bg-white p-5 shadow dark:bg-gray-800">
-                            <div className="text-sm text-gray-500 dark:text-gray-400">{label}</div>
+                        <div key={t(label)} className="rounded-lg bg-white p-5 shadow dark:bg-gray-800">
+                            <div className="text-sm text-gray-500 dark:text-gray-400">{t(label)}</div>
                             <div className="mt-2 text-3xl font-semibold text-gray-900 dark:text-white">
                                 {label === 'Total tokens' ? formatTokens(value) : value}
                             </div>
@@ -34,19 +35,17 @@ export default function Dashboard({ stats }) {
                 </div>
 
                 <div className="rounded-lg bg-white p-5 shadow dark:bg-gray-800">
-                    <h3 className="font-semibold text-gray-900 dark:text-white">Token usage by bot</h3>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Cumulative tokens from chat completions and embeddings for each bot.
-                    </p>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">{t("Token usage by bot")}</h3>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Cumulative tokens from chat completions and embeddings for each bot.")}</p>
                     <div className="mt-4 overflow-x-auto text-sm">
                         {stats.bot_token_usage?.length ? (
-                            <table className="w-full text-left">
+                            <table className="w-full text-start">
                                 <thead className="text-gray-500 dark:text-gray-400">
                                     <tr>
-                                        <th className="pb-2">Bot</th>
-                                        <th className="pb-2">Input</th>
-                                        <th className="pb-2">Output</th>
-                                        <th className="pb-2">Total</th>
+                                        <th className="pb-2">{t("Bot")}</th>
+                                        <th className="pb-2">{t("Input")}</th>
+                                        <th className="pb-2">{t("Output")}</th>
+                                        <th className="pb-2">{t("Total")}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y dark:divide-gray-700">
@@ -61,22 +60,22 @@ export default function Dashboard({ stats }) {
                                 </tbody>
                             </table>
                         ) : (
-                            <p className="text-gray-500 dark:text-gray-400">No bots yet. Token usage will appear after AI requests run.</p>
+                            <p className="text-gray-500 dark:text-gray-400">{t("No bots yet. Token usage will appear after AI requests run.")}</p>
                         )}
                     </div>
                 </div>
 
                 <div className="rounded-lg bg-white p-5 shadow dark:bg-gray-800">
-                    <h3 className="font-semibold text-gray-900 dark:text-white">Recent AI usage</h3>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">{t("Recent AI usage")}</h3>
                     <div className="mt-4 overflow-x-auto text-sm">
-                        <table className="w-full text-left">
+                        <table className="w-full text-start">
                             <thead className="text-gray-500 dark:text-gray-400">
                                 <tr>
-                                    <th>Bot</th>
-                                    <th>Type</th>
-                                    <th>Model</th>
-                                    <th>Tokens</th>
-                                    <th>Error</th>
+                                    <th>{t("Bot")}</th>
+                                    <th>{t("Type")}</th>
+                                    <th>{t("Model")}</th>
+                                    <th>{t("Tokens")}</th>
+                                    <th>{t("Error")}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y dark:divide-gray-700">
@@ -92,9 +91,7 @@ export default function Dashboard({ stats }) {
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan={5} className="py-4 text-gray-500 dark:text-gray-400">
-                                            No AI usage recorded yet.
-                                        </td>
+                                        <td colSpan={5} className="py-4 text-gray-500 dark:text-gray-400">{t("No AI usage recorded yet.")}</td>
                                     </tr>
                                 )}
                             </tbody>

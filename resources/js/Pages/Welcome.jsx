@@ -1,3 +1,5 @@
+import { t } from '@/localization';
+import LanguageSelector from '@/Components/LanguageSelector';
 import ApplicationLogo from '@/Components/ApplicationLogo';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
@@ -37,11 +39,11 @@ export default function Welcome({ auth }) {
 
     return (
         <>
-            <Head title="corebot — Open-source CRM AI support bot" />
+            <Head title={t("corebot — Open-source CRM AI support bot")} />
 
             <main className="min-h-screen bg-slate-950 text-white">
                 <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-                    <Link href={route('home')} aria-label="corebot home">
+                    <Link href={route('home')} aria-label={t("corebot home")}>
                         <ApplicationLogo
                             showWordmark
                             className="text-white"
@@ -51,43 +53,36 @@ export default function Welcome({ auth }) {
                     </Link>
 
                     <nav className="flex flex-wrap items-center justify-end gap-2 text-sm">
+                        <LanguageSelector />
                         <a
                             href={GITHUB_URL}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-slate-300 transition hover:bg-slate-800 hover:text-white"
-                            aria-label="View corebot on GitHub"
+                            aria-label={t("View corebot on GitHub")}
                         >
                             <GitHubIcon className="h-5 w-5" />
-                            <span className="hidden sm:inline">GitHub</span>
+                            <span className="hidden sm:inline">{t("GitHub")}</span>
                         </a>
                         <a
                             href={demoUrl}
                             className="rounded-md px-3 py-2 text-slate-300 hover:bg-slate-800 hover:text-white"
-                        >
-                            Live demo
-                        </a>
+                        >{t("Live demo")}</a>
                         {auth.user ? (
                             <Link
                                 href={route('dashboard')}
                                 className="rounded-md bg-white px-4 py-2 font-medium text-slate-950"
-                            >
-                                Dashboard
-                            </Link>
+                            >{t("Dashboard")}</Link>
                         ) : (
                             <>
                                 <Link
                                     href={route('login')}
                                     className="rounded-md px-4 py-2 text-slate-200 hover:text-white"
-                                >
-                                    Log in
-                                </Link>
+                                >{t("Log in")}</Link>
                                 <Link
                                     href={route('register')}
                                     className="rounded-md bg-white px-4 py-2 font-medium text-slate-950"
-                                >
-                                    Register
-                                </Link>
+                                >{t("Register")}</Link>
                             </>
                         )}
                     </nav>
@@ -95,82 +90,54 @@ export default function Welcome({ auth }) {
 
                 <section className="mx-auto grid max-w-6xl items-center gap-10 px-6 py-16 lg:grid-cols-[1.1fr_0.9fr]">
                     <div>
-                        <p className="text-sm font-medium uppercase tracking-[0.18em] text-cyan-300">
-                            Open source · Multi-tenant CRM support
-                        </p>
-                        <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight sm:text-6xl">
-                            corebot answers from your approved CRM knowledge.
-                        </h1>
-                        <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">
-                            Self-host a Laravel admin app, connect each client&apos;s OpenAI key, index CRM
-                            documentation, and embed a customizable chat widget on any site — without inventing
-                            policies or account-specific answers.
-                        </p>
+                        <p className="text-sm font-medium uppercase tracking-[0.18em] text-cyan-300">{t("Open source · Multi-tenant CRM support")}</p>
+                        <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight sm:text-6xl">{t("corebot answers from your approved CRM knowledge.")}</h1>
+                        <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">{t("Self-host a Laravel admin app, connect each client&apos;s OpenAI key, index CRM documentation, and embed a customizable chat widget on any site — without inventing policies or account-specific answers.")}</p>
 
                         <div className="mt-8 flex flex-wrap gap-3">
                             <Link
                                 href={auth.user ? route('dashboard') : route('login')}
                                 className="rounded-md bg-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950"
-                            >
-                                Open dashboard
-                            </Link>
+                            >{t("Open dashboard")}</Link>
                             <a
                                 href={demoUrl}
                                 className="rounded-md border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-100 hover:border-slate-500"
-                            >
-                                Try live demo
-                            </a>
+                            >{t("Try live demo")}</a>
                             <a
                                 href={GITHUB_URL}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-2 rounded-md border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-100 hover:border-slate-500"
                             >
-                                <GitHubIcon className="h-4 w-4" />
-                                Source code
-                            </a>
+                                <GitHubIcon className="h-4 w-4" />{t("Source code")}</a>
                         </div>
 
-                        <p className="mt-6 text-sm text-slate-400">
-                            Need installation, integrations, or a tailored rollout?{' '}
+                        <p className="mt-6 text-sm text-slate-400">{t("Need installation, integrations, or a tailored rollout?")}{' '}
                             <a
                                 href={UPWORK_URL}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="font-medium text-cyan-300 hover:text-cyan-200"
-                            >
-                                Get in touch on Upwork
-                            </a>{' '}
-                            or send a message below.
-                        </p>
+                            >{t("Get in touch on Upwork")}</a>{' '}{t("or send a message below.")}</p>
                     </div>
 
                     <div className="rounded-lg border border-slate-800 bg-slate-900 p-5 shadow-2xl">
                         <div className="rounded-md bg-slate-950 p-4">
                             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                                <span className="text-sm font-semibold">CRM Support</span>
-                                <span className="rounded-full bg-emerald-400/10 px-2 py-1 text-xs text-emerald-300">
-                                    RAG · Streaming
-                                </span>
+                                <span className="text-sm font-semibold">{t("CRM Support")}</span>
+                                <span className="rounded-full bg-emerald-400/10 px-2 py-1 text-xs text-emerald-300">{t("RAG · Streaming")}</span>
                             </div>
                             <div className="space-y-3 py-5 text-sm">
-                                <div className="max-w-[85%] rounded-md bg-slate-800 p-3 text-slate-200">
-                                    How do I change an order from Processing to Completed?
-                                </div>
-                                <div className="ml-auto max-w-[90%] rounded-md bg-cyan-300 p-3 text-slate-950">
-                                    Completed orders are locked for editing except by managers. Confirm the order
-                                    is ready, then update the status from the Orders tab.
-                                </div>
+                                <div className="max-w-[85%] rounded-md bg-slate-800 p-3 text-slate-200">{t("How do I change an order from Processing to Completed?")}</div>
+                                <div className="ms-auto max-w-[90%] rounded-md bg-cyan-300 p-3 text-slate-950">{t("Completed orders are locked for editing except by managers. Confirm the order is ready, then update the status from the Orders tab.")}</div>
                             </div>
-                            <div className="rounded-md border border-slate-800 px-3 py-2 text-sm text-slate-500">
-                                Answers grounded in your knowledge base only
-                            </div>
+                            <div className="rounded-md border border-slate-800 px-3 py-2 text-sm text-slate-500">{t("Answers grounded in your knowledge base only")}</div>
                         </div>
                     </div>
                 </section>
 
                 <section className="mx-auto max-w-6xl px-6 pb-12">
-                    <h2 className="text-center text-2xl font-semibold">What you get</h2>
+                    <h2 className="text-center text-2xl font-semibold">{t("What you get")}</h2>
                     <div className="mt-8 grid gap-5 sm:grid-cols-2">
                         {[
                             {
@@ -199,8 +166,8 @@ export default function Welcome({ auth }) {
                             },
                         ].map(({ title, body }) => (
                             <div key={title} className="rounded-lg border border-slate-800 bg-slate-900/80 p-5">
-                                <h3 className="font-semibold text-cyan-200">{title}</h3>
-                                <p className="mt-2 text-sm leading-6 text-slate-400">{body}</p>
+                                <h3 className="font-semibold text-cyan-200">{t(title)}</h3>
+                                <p className="mt-2 text-sm leading-6 text-slate-400">{t(body)}</p>
                             </div>
                         ))}
                     </div>
@@ -208,12 +175,8 @@ export default function Welcome({ auth }) {
 
                 <section id="support" className="mx-auto max-w-3xl px-6 pb-20">
                     <div className="rounded-lg border border-slate-800 bg-slate-900 p-6 sm:p-8">
-                        <h2 className="text-2xl font-semibold">Work with us</h2>
-                        <p className="mt-2 text-sm leading-6 text-slate-400">
-                            Whether you need help installing corebot, adapting it to your stack, white-labeling the
-                            widget, or building custom CRM integrations — we&apos;d like to hear from you. Share a
-                            few details and we&apos;ll respond by email.
-                        </p>
+                        <h2 className="text-2xl font-semibold">{t("Work with us")}</h2>
+                        <p className="mt-2 text-sm leading-6 text-slate-400">{t("Whether you need help installing corebot, adapting it to your stack, white-labeling the widget, or building custom CRM integrations — we&apos;d like to hear from you. Share a few details and we&apos;ll respond by email.")}</p>
 
                         {(flash?.success || flash?.error) && (
                             <div
@@ -223,14 +186,14 @@ export default function Welcome({ auth }) {
                                         : 'border-emerald-800/60 bg-emerald-950/40 text-emerald-200'
                                 }`}
                             >
-                                {flash.error || flash.success}
+                                {t(flash.error || flash.success)}
                             </div>
                         )}
 
                         <form onSubmit={submitSupport} className="mt-6 space-y-5">
                             <div className="grid gap-5 sm:grid-cols-2">
                                 <div>
-                                    <InputLabel htmlFor="support_name" value="Name" className="text-slate-200" />
+                                    <InputLabel htmlFor="support_name" value={t("Name")} className="text-slate-200" />
                                     <TextInput
                                         id="support_name"
                                         value={data.name}
@@ -241,7 +204,7 @@ export default function Welcome({ auth }) {
                                     <InputError message={errors.name} className="mt-1" />
                                 </div>
                                 <div>
-                                    <InputLabel htmlFor="support_email" value="Email" className="text-slate-200" />
+                                    <InputLabel htmlFor="support_email" value={t("Email")} className="text-slate-200" />
                                     <TextInput
                                         id="support_email"
                                         type="email"
@@ -256,7 +219,7 @@ export default function Welcome({ auth }) {
 
                             <div className="grid gap-5 sm:grid-cols-2">
                                 <div>
-                                    <InputLabel htmlFor="support_company" value="Company (optional)" className="text-slate-200" />
+                                    <InputLabel htmlFor="support_company" value={t("Company (optional)")} className="text-slate-200" />
                                     <TextInput
                                         id="support_company"
                                         value={data.company}
@@ -266,7 +229,7 @@ export default function Welcome({ auth }) {
                                     <InputError message={errors.company} className="mt-1" />
                                 </div>
                                 <div>
-                                    <InputLabel htmlFor="support_type" value="Request type" className="text-slate-200" />
+                                    <InputLabel htmlFor="support_type" value={t("Request type")} className="text-slate-200" />
                                     <select
                                         id="support_type"
                                         value={data.type}
@@ -275,7 +238,7 @@ export default function Welcome({ auth }) {
                                     >
                                         {REQUEST_TYPES.map((option) => (
                                             <option key={option.value} value={option.value}>
-                                                {option.label}
+                                                {t(option.label)}
                                             </option>
                                         ))}
                                     </select>
@@ -284,7 +247,7 @@ export default function Welcome({ auth }) {
                             </div>
 
                             <div>
-                                <InputLabel htmlFor="support_message" value="How can we help?" className="text-slate-200" />
+                                <InputLabel htmlFor="support_message" value={t("How can we help?")} className="text-slate-200" />
                                 <textarea
                                     id="support_message"
                                     rows={5}
@@ -292,17 +255,17 @@ export default function Welcome({ auth }) {
                                     onChange={(e) => setData('message', e.target.value)}
                                     required
                                     className="mt-1 block w-full rounded-md border-slate-700 bg-slate-950 text-white shadow-sm focus:border-cyan-500 focus:ring-cyan-500"
-                                    placeholder="Tell us about your CRM, timeline, and what you need…"
+                                    placeholder={t("Tell us about your CRM, timeline, and what you need…")}
                                 />
                                 <InputError message={errors.message} className="mt-1" />
                             </div>
 
                             <div className="flex flex-wrap items-center gap-3">
                                 <PrimaryButton disabled={processing} className="!normal-case !tracking-normal">
-                                    {processing ? 'Sending…' : 'Send message'}
+                                    {processing ? t("Sending…") : t("Send message")}
                                 </PrimaryButton>
                                 {recentlySuccessful && (
-                                    <span className="text-sm text-emerald-400">Thank you — we&apos;ll be in touch.</span>
+                                    <span className="text-sm text-emerald-400">{t("Thank you — we&apos;ll be in touch.")}</span>
                                 )}
                             </div>
                         </form>
@@ -313,26 +276,20 @@ export default function Welcome({ auth }) {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-cyan-300 hover:text-cyan-200"
-                            >
-                                Upwork →
-                            </a>
+                            >{t("Upwork →")}</a>
                             <a
                                 href={GITHUB_URL}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1.5 text-cyan-300 hover:text-cyan-200"
                             >
-                                <GitHubIcon className="h-4 w-4" />
-                                GitHub
-                            </a>
+                                <GitHubIcon className="h-4 w-4" />{t("GitHub")}</a>
                             <a
                                 href={PRODUCT_URL}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-cyan-300 hover:text-cyan-200"
-                            >
-                                CoreFix Lab →
-                            </a>
+                            >{t("CoreFix Lab →")}</a>
                         </div>
                     </div>
                 </section>

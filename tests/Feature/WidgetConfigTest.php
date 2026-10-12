@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\ApplicationSetting;
 use App\Models\Bot;
 use App\Models\Tenant;
 use App\Models\User;
@@ -49,6 +50,34 @@ it('includes widget config when starting a conversation', function () {
         ->assertSuccessful()
         ->assertJsonPath('widget.accent_color', '#00ff00');
 });
+
+it('returns the global language default in widget config and conversation startup', function () {
+    ApplicationSetting::factory()->create(['default_locale' => 'fa']);
+    $tenant = Tenant::create(['name' => 'Demo', 'slug' => 'widget-language', 'status' => 'active']);
+    $bot = Bot::create(['tenant_id' => $tenant->id, 'name' => 'Bot']);
+
+    $this->getJson('/api/public/chat/widget-config?bot_public_key='.$bot->public_key)
+        ->assertSuccessful()
+        ->assertJsonPath('localization.locale', 'fa')
+        ->assertJsonPath('localization.direction', 'rtl')
+        ->assertJsonStructure(['localization' => ['translations']]);
+
+    $this->postJson('/api/public/chat/start', ['bot_public_key' => $bot->public_key])
+        ->assertSuccessful()
+        ->assertJsonPath('localization.locale', 'fa')
+        ->assertJsonPath('localization.direction', 'rtl');
+});
+
+it('resolves widget locale overrides only for enabled languages', function (string $preferred, string $expected) {
+    ApplicationSetting::factory()->create(['default_locale' => 'ar', 'enabled_locales' => ['en', 'ar', 'tr']]);
+    $tenant = Tenant::create(['name' => 'Demo', 'slug' => 'widget-language-override', 'status' => 'active']);
+    $bot = Bot::create(['tenant_id' => $tenant->id, 'name' => 'Bot']);
+
+    $this->getJson('/api/public/chat/widget-config?bot_public_key='.$bot->public_key.'&locale='.$preferred)
+        ->assertSuccessful()->assertJsonPath('localization.locale', $expected);
+    $this->postJson('/api/public/chat/start', ['bot_public_key' => $bot->public_key, 'locale' => $preferred])
+        ->assertSuccessful()->assertJsonPath('localization.locale', $expected);
+})->with(['enabled' => ['tr', 'tr'], 'disabled' => ['fa', 'ar'], 'unsupported' => ['xx', 'ar']]);
 
 it('saves widget settings for tenant admins', function () {
     $tenant = Tenant::create(['name' => 'Demo', 'slug' => 'widget-save', 'status' => 'active']);

@@ -1,3 +1,4 @@
+import { t } from '@/localization';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import Modal from '@/Components/Modal';
@@ -53,41 +54,33 @@ export default function Index({ sources, bots, filters, stats, hasActiveSources,
         <AuthenticatedLayout
             header={
                 <div>
-                    <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">Knowledge</h2>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Add content for your bots to retrieve during conversations. Sources are chunked and embedded automatically.
-                    </p>
+                    <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">{t("Knowledge")}</h2>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Add content for your bots to retrieve during conversations. Sources are chunked and embedded automatically.")}</p>
                 </div>
             }
         >
-            <Head title="Knowledge" />
+            <Head title={t("Knowledge")} />
 
             <div className="mx-auto max-w-7xl space-y-6 p-6">
                 {hasActiveSources && (
                     <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200">
-                        <span className="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-blue-600 border-t-transparent dark:border-blue-300" />
-                        Sources are indexing in the background. This page refreshes every few seconds until they finish.
-                    </div>
+                        <span className="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-blue-600 border-t-transparent dark:border-blue-300" />{t("Sources are indexing in the background. This page refreshes every few seconds until they finish.")}</div>
                 )}
 
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <StatCard label="Total sources" value={stats.total} />
-                    <StatCard label="Ready" value={stats.ready} />
-                    <StatCard label="In progress" value={stats.processing} hint={stats.failed ? `${stats.failed} failed` : undefined} />
-                    <StatCard label="Indexed chunks" value={stats.chunks} />
+                    <StatCard label={t("Total sources")} value={stats.total} />
+                    <StatCard label={t("Ready")} value={stats.ready} />
+                    <StatCard label={t("In progress")} value={stats.processing} hint={stats.failed ? `${stats.failed} failed` : undefined} />
+                    <StatCard label={t("Indexed chunks")} value={stats.chunks} />
                 </div>
 
                 {!canAddSources && (
                     <section className="rounded-lg border border-dashed border-amber-200 bg-amber-50 px-5 py-4 dark:border-amber-900/50 dark:bg-amber-950/30">
-                        <p className="text-sm text-amber-900 dark:text-amber-200">
-                            Create an active bot before adding knowledge sources.
-                        </p>
+                        <p className="text-sm text-amber-900 dark:text-amber-200">{t("Create an active bot before adding knowledge sources.")}</p>
                         <Link
                             href={route('bots.create')}
                             className="mt-3 inline-flex text-sm font-semibold text-amber-800 hover:text-amber-700 dark:text-amber-300"
-                        >
-                            Create bot →
-                        </Link>
+                        >{t("Create bot →")}</Link>
                     </section>
                 )}
 
@@ -121,9 +114,9 @@ export default function Index({ sources, bots, filters, stats, hasActiveSources,
 function StatCard({ label, value, hint }) {
     return (
         <div className="rounded-lg bg-white p-5 shadow dark:bg-gray-800">
-            <div className="text-sm text-gray-500 dark:text-gray-400">{label}</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">{t(label)}</div>
             <div className="mt-2 text-3xl font-semibold text-gray-900 dark:text-white">{value}</div>
-            {hint && <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{hint}</div>}
+            {hint && <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t(hint)}</div>}
         </div>
     );
 }
@@ -169,15 +162,13 @@ function AddSourceModal({ show, onClose, bots, crawler }) {
         <Modal show={show} onClose={close} maxWidth="3xl">
             <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
                 <div className="shrink-0 border-b border-gray-100 px-4 py-4 sm:px-6 dark:border-gray-700">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add knowledge source</h3>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Content is queued for chunking and embedding after you submit.
-                    </p>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t("Add knowledge source")}</h3>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Content is queued for chunking and embedding after you submit.")}</p>
                 </div>
 
                 <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:px-6">
                     <div>
-                        <InputLabel htmlFor="add-bot_id" value="Bot" />
+                        <InputLabel htmlFor="add-bot_id" value={t("Bot")} />
                         <select
                             id="add-bot_id"
                             value={data.bot_id}
@@ -194,21 +185,21 @@ function AddSourceModal({ show, onClose, bots, crawler }) {
                     </div>
 
                     <div>
-                        <InputLabel value="Source type" />
+                        <InputLabel value={t("Source type")} />
                         <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                             {SOURCE_TYPES.map((type) => (
                                 <button
                                     key={type.value}
                                     type="button"
                                     onClick={() => setData('type', type.value)}
-                                    className={`rounded-lg border px-3 py-3 text-left transition ${
+                                    className={`rounded-lg border px-3 py-3 text-start transition ${
                                         data.type === type.value
                                             ? 'border-indigo-500 bg-indigo-50 dark:border-indigo-500 dark:bg-indigo-950/40'
                                             : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
                                     }`}
                                 >
-                                    <span className="block text-sm font-semibold text-gray-900 dark:text-white">{type.label}</span>
-                                    <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">{type.description}</span>
+                                    <span className="block text-sm font-semibold text-gray-900 dark:text-white">{t(type.label)}</span>
+                                    <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">{t(type.description)}</span>
                                 </button>
                             ))}
                         </div>
@@ -216,13 +207,13 @@ function AddSourceModal({ show, onClose, bots, crawler }) {
                     </div>
 
                     <div>
-                        <InputLabel htmlFor="add-title" value="Title" />
+                        <InputLabel htmlFor="add-title" value={t("Title")} />
                         <TextInput
                             id="add-title"
                             value={data.title}
                             onChange={(e) => setData('title', e.target.value)}
                             className="mt-1 block w-full"
-                            placeholder="e.g. Returns policy"
+                            placeholder={t("e.g. Returns policy")}
                         />
                         <InputError message={errors.title} className="mt-1" />
                     </div>
@@ -230,31 +221,31 @@ function AddSourceModal({ show, onClose, bots, crawler }) {
                     {data.type === 'text' && (
                         <TextAreaField
                             id="add-raw_text"
-                            label="Content"
+                            label={t("Content")}
                             value={data.raw_text}
                             onChange={(value) => setData('raw_text', value)}
                             error={errors.raw_text}
                             rows={6}
-                            placeholder="Paste the knowledge text here…"
+                            placeholder={t("Paste the knowledge text here…")}
                         />
                     )}
 
                     {data.type === 'faq' && (
                         <>
                             <div>
-                                <InputLabel htmlFor="add-question" value="Question" />
+                                <InputLabel htmlFor="add-question" value={t("Question")} />
                                 <TextInput
                                     id="add-question"
                                     value={data.question}
                                     onChange={(e) => setData('question', e.target.value)}
                                     className="mt-1 block w-full"
-                                    placeholder="How do I reset my password?"
+                                    placeholder={t("How do I reset my password?")}
                                 />
                                 <InputError message={errors.question} className="mt-1" />
                             </div>
                             <TextAreaField
                                 id="add-answer"
-                                label="Answer"
+                                label={t("Answer")}
                                 value={data.answer}
                                 onChange={(value) => setData('answer', value)}
                                 error={errors.answer}
@@ -266,7 +257,7 @@ function AddSourceModal({ show, onClose, bots, crawler }) {
                     {data.type === 'website' && (
                         <div className="grid gap-4 sm:grid-cols-[1fr_10rem]">
                             <div>
-                                <InputLabel htmlFor="add-source_url" value="Website URL" />
+                                <InputLabel htmlFor="add-source_url" value={t("Website URL")} />
                                 <TextInput
                                     id="add-source_url"
                                     type="url"
@@ -275,13 +266,11 @@ function AddSourceModal({ show, onClose, bots, crawler }) {
                                     className="mt-1 block w-full"
                                     placeholder="https://example.com/docs"
                                 />
-                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                    Same-site pages are crawled. Useful external and download links are preserved for bot answers.
-                                </p>
+                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("Same-site pages are crawled. Useful external and download links are preserved for bot answers.")}</p>
                                 <InputError message={errors.source_url} className="mt-1" />
                             </div>
                             <div>
-                                <InputLabel htmlFor="add-crawl_page_limit" value="Max pages" />
+                                <InputLabel htmlFor="add-crawl_page_limit" value={t("Max pages")} />
                                 <TextInput
                                     id="add-crawl_page_limit"
                                     type="number"
@@ -298,7 +287,7 @@ function AddSourceModal({ show, onClose, bots, crawler }) {
 
                     {(data.type === 'pdf' || data.type === 'docx') && (
                         <div>
-                            <InputLabel htmlFor="add-file" value="File" />
+                            <InputLabel htmlFor="add-file" value={t("File")} />
                             <input
                                 id="add-file"
                                 type="file"
@@ -308,12 +297,11 @@ function AddSourceModal({ show, onClose, bots, crawler }) {
                                         : '.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
                                 }
                                 onChange={(e) => setData('file', e.target.files[0] || null)}
-                                className="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-2.5 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200 dark:text-gray-300 dark:file:bg-gray-700 dark:file:text-gray-200"
+                                className="mt-1 block w-full text-sm text-gray-600 file:me-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-2.5 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200 dark:text-gray-300 dark:file:bg-gray-700 dark:file:text-gray-200"
                             />
                             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{selectedType?.description}</p>
                             {data.file && (
-                                <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
-                                    Selected: {data.file.name} ({formatFileSize(data.file.size)})
+                                <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">{t("Selected:")}{' '}{data.file.name} ({formatFileSize(data.file.size)})
                                 </p>
                             )}
                             <InputError message={errors.file} className="mt-1" />
@@ -327,11 +315,9 @@ function AddSourceModal({ show, onClose, bots, crawler }) {
                         onClick={close}
                         disabled={processing}
                         className="w-full justify-center !normal-case !tracking-normal sm:w-auto"
-                    >
-                        Cancel
-                    </SecondaryButton>
+                    >{t("Cancel")}</SecondaryButton>
                     <PrimaryButton disabled={processing} className="w-full justify-center sm:w-auto">
-                        {processing ? 'Queuing…' : 'Add & index'}
+                        {processing ? t("Queuing…") : t("Add & index")}
                     </PrimaryButton>
                 </div>
             </form>
@@ -347,10 +333,10 @@ function SourcesList({ sources, pagination, filters, canAdd, onAddSource, onRese
             <div className="flex flex-col gap-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">Sources</h3>
+                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Sources")}</h3>
                         <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
                             {pagination.total} {pagination.total === 1 ? 'source' : 'sources'}
-                            {hasSearch ? ' matching your search' : ''}
+                            {hasSearch ? t(" matching your search") : ''}
                         </p>
                     </div>
                     {canAdd && (
@@ -359,16 +345,12 @@ function SourcesList({ sources, pagination, filters, canAdd, onAddSource, onRese
                                 type="button"
                                 onClick={onResearch}
                                 className="w-full justify-center sm:w-auto"
-                            >
-                                Research web
-                            </SecondaryButton>
+                            >{t("Research web")}</SecondaryButton>
                             <PrimaryButton
                                 type="button"
                                 onClick={onAddSource}
                                 className="w-full justify-center sm:w-auto"
-                            >
-                                + Add source
-                            </PrimaryButton>
+                            >{t("+ Add source")}</PrimaryButton>
                         </div>
                     )}
                 </div>
@@ -378,24 +360,20 @@ function SourcesList({ sources, pagination, filters, canAdd, onAddSource, onRese
             {sources.length === 0 ? (
                 <div className="flex min-h-[280px] flex-col items-center justify-center rounded-lg border border-dashed border-gray-200 bg-white px-6 py-12 text-center dark:border-gray-700 dark:bg-gray-800">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                        {hasSearch ? 'No matching sources' : 'No knowledge sources yet'}
+                        {hasSearch ? t("No matching sources") : t("No knowledge sources yet")}
                     </h3>
                     <p className="mx-auto mt-2 max-w-md text-sm text-gray-500 dark:text-gray-400">
                         {hasSearch
-                            ? 'Try a different search term, or clear the search to see all sources.'
-                            : 'Add text, FAQs, or documents. They will appear here once queued for indexing.'}
+                            ? t("Try a different search term, or clear the search to see all sources.")
+                            : t("Add text, FAQs, or documents. They will appear here once queued for indexing.")}
                     </p>
                     {hasSearch ? (
                         <ClearSearchButton className="mt-4" />
                     ) : (
                         canAdd && (
                             <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                                <SecondaryButton type="button" onClick={onResearch}>
-                                    Research web
-                                </SecondaryButton>
-                                <PrimaryButton type="button" onClick={onAddSource}>
-                                    Add your first source
-                                </PrimaryButton>
+                                <SecondaryButton type="button" onClick={onResearch}>{t("Research web")}</SecondaryButton>
+                                <PrimaryButton type="button" onClick={onAddSource}>{t("Add your first source")}</PrimaryButton>
                             </div>
                         )
                     )}
@@ -404,15 +382,15 @@ function SourcesList({ sources, pagination, filters, canAdd, onAddSource, onRese
                 <>
 
             <div className="hidden overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800 lg:block">
-                <table className="w-full text-left text-sm">
+                <table className="w-full text-start text-sm">
                     <thead className="border-b border-gray-100 bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:bg-gray-900/50 dark:text-gray-400">
                         <tr>
-                            <th className="px-5 py-3">Title</th>
-                            <th className="px-5 py-3">Bot</th>
-                            <th className="px-5 py-3">Type</th>
-                            <th className="px-5 py-3">Status</th>
-                            <th className="px-5 py-3">Chunks</th>
-                            <th className="px-5 py-3 text-right">Actions</th>
+                            <th className="px-5 py-3">{t("Title")}</th>
+                            <th className="px-5 py-3">{t("Bot")}</th>
+                            <th className="px-5 py-3">{t("Type")}</th>
+                            <th className="px-5 py-3">{t("Status")}</th>
+                            <th className="px-5 py-3">{t("Chunks")}</th>
+                            <th className="px-5 py-3 text-end">{t("Actions")}</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -469,24 +447,22 @@ function SourcesSearch({ filters }) {
 
     return (
         <div className="w-full sm:max-w-md">
-            <InputLabel htmlFor="source-search" value="Search" className="sr-only" />
+            <InputLabel htmlFor="source-search" value={t("Search")} className="sr-only" />
             <div className="relative">
                 <TextInput
                     id="source-search"
                     type="search"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search by title, bot, type…"
-                    className="block w-full pr-20"
+                    placeholder={t("Search by title, bot, type…")}
+                    className="block w-full pe-20"
                 />
                 {search && (
                     <button
                         type="button"
                         onClick={() => setSearch('')}
-                        className="absolute inset-y-0 right-2 my-auto rounded px-2 py-1 text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                    >
-                        Clear
-                    </button>
+                        className="absolute inset-y-0 end-2 my-auto rounded px-2 py-1 text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    >{t("Clear")}</button>
                 )}
             </div>
         </div>
@@ -506,9 +482,7 @@ function ClearSearchButton({ className = '' }) {
                 })
             }
             className={`text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 ${className}`}
-        >
-            Clear search
-        </button>
+        >{t("Clear search")}</button>
     );
 }
 
@@ -531,7 +505,7 @@ function SourceRow({ source, layout }) {
             return;
         }
 
-        if (!window.confirm(`Reindex "${source.title}"? This replaces its existing search index.`)) {
+        if (!window.confirm(t("Reindex \":name\"? This replaces its existing search index.", { name: source.title }))) {
             return;
         }
 
@@ -539,7 +513,7 @@ function SourceRow({ source, layout }) {
     };
 
     const cancel = () => {
-        if (!window.confirm(`Cancel indexing for "${source.title}"?`)) {
+        if (!window.confirm(t("Cancel indexing for \":name\"?", { name: source.title }))) {
             return;
         }
 
@@ -547,7 +521,7 @@ function SourceRow({ source, layout }) {
     };
 
     const destroy = () => {
-        if (!window.confirm(`Delete "${source.title}"? This cannot be undone.`)) {
+        if (!window.confirm(t("Delete \":name\"? This cannot be undone.", { name: source.title }))) {
             return;
         }
 
@@ -557,7 +531,7 @@ function SourceRow({ source, layout }) {
     const statusCell = (
         <div className="space-y-2">
             <StatusBadge status={source.status} />
-            {inProgress && <ProcessingProgress status={status} />}
+            {inProgress && <ProcessingProgress status={t(status?.charAt(0).toUpperCase() + status?.slice(1))} />}
         </div>
     );
 
@@ -576,10 +550,10 @@ function SourceRow({ source, layout }) {
                     </div>
                     <StatusBadge status={source.status} />
                 </div>
-                {inProgress && <ProcessingProgress status={status} className="mt-3" />}
+                {inProgress && <ProcessingProgress status={t(status?.charAt(0).toUpperCase() + status?.slice(1))} className="mt-3" />}
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                     <TypeBadge type={source.type} />
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{source.chunks_count} chunks</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">{source.chunks_count}{' '}{t("chunks")}</span>
                 </div>
                 {source.error_message && (
                     <p className="mt-2 text-xs text-red-600 dark:text-red-400 line-clamp-2">{source.error_message}</p>
@@ -623,7 +597,7 @@ function SourceRow({ source, layout }) {
                 </td>
                 <td className="px-5 py-4">{statusCell}</td>
                 <td className="px-5 py-4 text-gray-700 dark:text-gray-300">{source.chunks_count}</td>
-                <td className="px-5 py-4 text-right">
+                <td className="px-5 py-4 text-end">
                     <SourceActions
                         source={source}
                         busy={busy}
@@ -656,9 +630,7 @@ function SourceActions({ source, busy, editing, onToggleEdit, onReprocess, onCan
             <Link
                 href={route('knowledge-sources.show', source.id)}
                 className="text-xs font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
-            >
-                View
-            </Link>
+            >{t("View")}</Link>
             {showEdit && (
                 <button
                     type="button"
@@ -666,7 +638,7 @@ function SourceActions({ source, busy, editing, onToggleEdit, onReprocess, onCan
                     onClick={onToggleEdit}
                     className="text-xs font-medium text-indigo-600 hover:text-indigo-500 disabled:opacity-50 dark:text-indigo-400"
                 >
-                    {editing ? 'Close' : 'Edit'}
+                    {editing ? t("Close") : t("Edit")}
                 </button>
             )}
             {showReprocess && (
@@ -676,7 +648,7 @@ function SourceActions({ source, busy, editing, onToggleEdit, onReprocess, onCan
                     onClick={onReprocess}
                     className="text-xs font-medium text-indigo-600 hover:text-indigo-500 disabled:opacity-50 dark:text-indigo-400"
                 >
-                    {busy ? 'Working…' : 'Reindex'}
+                    {busy ? t("Working…") : t("Reindex")}
                 </button>
             )}
             {showCancel && (
@@ -685,18 +657,14 @@ function SourceActions({ source, busy, editing, onToggleEdit, onReprocess, onCan
                     disabled={busy}
                     onClick={onCancel}
                     className="text-xs font-medium text-amber-700 hover:text-amber-600 disabled:opacity-50 dark:text-amber-300"
-                >
-                    Cancel
-                </button>
+                >{t("Cancel")}</button>
             )}
             <button
                 type="button"
                 disabled={busy}
                 onClick={onDelete}
                 className="text-xs font-medium text-red-600 hover:text-red-500 disabled:opacity-50 dark:text-red-400"
-            >
-                Delete
-            </button>
+            >{t("Delete")}</button>
         </div>
     );
 }
@@ -720,9 +688,9 @@ function EditSourceForm({ source, onClose, className = '' }) {
 
     return (
         <form onSubmit={submit} className={`space-y-3 ${className}`}>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Saving will requeue this source for indexing.</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{t("Saving will requeue this source for indexing.")}</p>
             <div>
-                <InputLabel htmlFor={`edit-title-${source.id}`} value="Title" />
+                <InputLabel htmlFor={`edit-title-${source.id}`} value={t("Title")} />
                 <TextInput
                     id={`edit-title-${source.id}`}
                     value={data.title}
@@ -734,7 +702,7 @@ function EditSourceForm({ source, onClose, className = '' }) {
             {source.type === 'text' && (
                 <TextAreaField
                     id={`edit-text-${source.id}`}
-                    label="Content"
+                    label={t("Content")}
                     value={data.raw_text}
                     onChange={(value) => setData('raw_text', value)}
                     error={errors.raw_text}
@@ -744,7 +712,7 @@ function EditSourceForm({ source, onClose, className = '' }) {
             {source.type === 'faq' && (
                 <>
                     <div>
-                        <InputLabel htmlFor={`edit-q-${source.id}`} value="Question" />
+                        <InputLabel htmlFor={`edit-q-${source.id}`} value={t("Question")} />
                         <TextInput
                             id={`edit-q-${source.id}`}
                             value={data.question}
@@ -755,7 +723,7 @@ function EditSourceForm({ source, onClose, className = '' }) {
                     </div>
                     <TextAreaField
                         id={`edit-a-${source.id}`}
-                        label="Answer"
+                        label={t("Answer")}
                         value={data.answer}
                         onChange={(value) => setData('answer', value)}
                         error={errors.answer}
@@ -765,12 +733,10 @@ function EditSourceForm({ source, onClose, className = '' }) {
             )}
             <div className="flex flex-wrap items-center gap-2">
                 <PrimaryButton disabled={processing} className="!text-xs">
-                    {processing ? 'Saving…' : 'Save & reindex'}
+                    {processing ? t("Saving…") : t("Save & reindex")}
                 </PrimaryButton>
-                <button type="button" onClick={onClose} className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400">
-                    Cancel
-                </button>
-                {recentlySuccessful && <span className="text-xs text-emerald-600 dark:text-emerald-400">Saved.</span>}
+                <button type="button" onClick={onClose} className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400">{t("Cancel")}</button>
+                {recentlySuccessful && <span className="text-xs text-emerald-600 dark:text-emerald-400">{t("Saved.")}</span>}
             </div>
         </form>
     );
@@ -782,12 +748,12 @@ function StatusBadge({ status }) {
     return (
         <span
             className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${statusStyles(status)}`}
-            title={statusDescription(status)}
+            title={t(statusDescription(status))}
         >
             {isInProgress(status) && (
                 <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-current opacity-80" />
             )}
-            {statusLabel(status)}
+            {t(statusLabel(status))}
         </span>
     );
 }
@@ -802,7 +768,7 @@ function ProcessingProgress({ status, className = '' }) {
                     className={`h-full rounded-full bg-indigo-500 ${isIndexing ? 'w-2/3 animate-pulse' : 'w-1/3'}`}
                 />
             </div>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{statusDescription(status)}</p>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t(statusDescription(status))}</p>
         </div>
     );
 }
@@ -812,7 +778,7 @@ function TypeBadge({ type }) {
 
     return (
         <span className="inline-flex rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300">
-            {labels[type] || type}
+            {t(labels[type] || type)}
         </span>
     );
 }
@@ -820,7 +786,7 @@ function TypeBadge({ type }) {
 function TextAreaField({ id, label, value, onChange, error, rows = 4, placeholder }) {
     return (
         <div>
-            <InputLabel htmlFor={id} value={label} />
+            <InputLabel htmlFor={id} value={t(label)} />
             <textarea
                 id={id}
                 rows={rows}
@@ -940,62 +906,55 @@ function ResearchKnowledgeModal({ show, onClose, bots, research }) {
         <Modal show={show} onClose={close} maxWidth="3xl">
             <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
                 <div className="shrink-0 border-b border-gray-100 px-4 py-4 sm:px-6 dark:border-gray-700">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Research from the web</h3>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Fetch a page or search the web, edit the extracted text, then save it as a knowledge source.
-                    </p>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t("Research from the web")}</h3>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Fetch a page or search the web, edit the extracted text, then save it as a knowledge source.")}</p>
                 </div>
 
                 <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:px-6">
                     <div>
-                        <InputLabel value="Research mode" />
+                        <InputLabel value={t("Research mode")} />
                         <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                             <button
                                 type="button"
                                 onClick={() => setMode('url')}
-                                className={`rounded-lg border px-3 py-3 text-left transition ${
+                                className={`rounded-lg border px-3 py-3 text-start transition ${
                                     mode === 'url'
                                         ? 'border-indigo-500 bg-indigo-50 dark:border-indigo-500 dark:bg-indigo-950/40'
                                         : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
                                 }`}
                             >
-                                <span className="block text-sm font-semibold text-gray-900 dark:text-white">Fetch URL</span>
-                                <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
-                                    Extract readable content from a specific page.
-                                </span>
+                                <span className="block text-sm font-semibold text-gray-900 dark:text-white">{t("Fetch URL")}</span>
+                                <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">{t("Extract readable content from a specific page.")}</span>
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setMode('search')}
-                                className={`rounded-lg border px-3 py-3 text-left transition ${
+                                className={`rounded-lg border px-3 py-3 text-start transition ${
                                     mode === 'search'
                                         ? 'border-indigo-500 bg-indigo-50 dark:border-indigo-500 dark:bg-indigo-950/40'
                                         : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
                                 }`}
                             >
-                                <span className="block text-sm font-semibold text-gray-900 dark:text-white">Search web</span>
-                                <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
-                                    Search and combine content from top results.
-                                </span>
+                                <span className="block text-sm font-semibold text-gray-900 dark:text-white">{t("Search web")}</span>
+                                <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">{t("Search and combine content from top results.")}</span>
                             </button>
                         </div>
                         {mode === 'search' && (
-                            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                Search uses {research?.search_provider === 'tavily' ? 'Tavily' : 'DuckDuckGo'}.
-                                {research?.search_provider !== 'tavily' && ' Set TAVILY_API_KEY for higher-quality results.'}
+                            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{t("Search uses")}{' '}{research?.search_provider === 'tavily' ? t("Tavily") : t("DuckDuckGo")}.
+                                {research?.search_provider !== 'tavily' && t(" Set TAVILY_API_KEY for higher-quality results.")}
                             </p>
                         )}
                     </div>
 
                     <div>
-                        <InputLabel htmlFor="research-query" value={mode === 'url' ? 'Page URL' : 'Search query'} />
+                        <InputLabel htmlFor="research-query" value={mode === 'url' ? t("Page URL") : t("Search query")} />
                         <div className="mt-1 flex flex-col gap-2 sm:flex-row">
                             <TextInput
                                 id="research-query"
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
                                 className="block w-full flex-1"
-                                placeholder={mode === 'url' ? 'https://example.com/docs/getting-started' : 'Laravel queue worker setup'}
+                                placeholder={mode === 'url' ? 'https://example.com/docs/getting-started' : t("Laravel queue worker setup")}
                             />
                             <SecondaryButton
                                 type="button"
@@ -1003,7 +962,7 @@ function ResearchKnowledgeModal({ show, onClose, bots, research }) {
                                 disabled={fetching || !query.trim()}
                                 className="w-full shrink-0 justify-center sm:w-auto"
                             >
-                                {fetching ? 'Fetching…' : 'Fetch content'}
+                                {fetching ? t("Fetching…") : t("Fetch content")}
                             </SecondaryButton>
                         </div>
                         {fetchError && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{fetchError}</p>}
@@ -1012,7 +971,7 @@ function ResearchKnowledgeModal({ show, onClose, bots, research }) {
                     {hasDraft && (
                         <>
                             <div>
-                                <InputLabel htmlFor="research-bot_id" value="Bot" />
+                                <InputLabel htmlFor="research-bot_id" value={t("Bot")} />
                                 <select
                                     id="research-bot_id"
                                     value={data.bot_id}
@@ -1029,7 +988,7 @@ function ResearchKnowledgeModal({ show, onClose, bots, research }) {
                             </div>
 
                             <div>
-                                <InputLabel htmlFor="research-title" value="Title" />
+                                <InputLabel htmlFor="research-title" value={t("Title")} />
                                 <TextInput
                                     id="research-title"
                                     value={data.title}
@@ -1041,17 +1000,17 @@ function ResearchKnowledgeModal({ show, onClose, bots, research }) {
 
                             <TextAreaField
                                 id="research-raw_text"
-                                label="Extracted content"
+                                label={t("Extracted content")}
                                 value={data.raw_text}
                                 onChange={(value) => setData('raw_text', value)}
                                 error={errors.raw_text}
                                 rows={12}
-                                placeholder="Fetched content will appear here for editing…"
+                                placeholder={t("Fetched content will appear here for editing…")}
                             />
 
                             {sources.length > 0 && (
                                 <div>
-                                    <InputLabel value="Sources" />
+                                    <InputLabel value={t("Sources")} />
                                     <ul className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-300">
                                         {sources.map((source) => (
                                             <li key={source.url}>
@@ -1078,11 +1037,9 @@ function ResearchKnowledgeModal({ show, onClose, bots, research }) {
                         onClick={close}
                         disabled={processing}
                         className="w-full justify-center !normal-case !tracking-normal sm:w-auto"
-                    >
-                        Cancel
-                    </SecondaryButton>
+                    >{t("Cancel")}</SecondaryButton>
                     <PrimaryButton disabled={processing || !hasDraft || !data.title.trim()} className="w-full justify-center sm:w-auto">
-                        {processing ? 'Saving…' : 'Save as knowledge'}
+                        {processing ? t("Saving…") : t("Save as knowledge")}
                     </PrimaryButton>
                 </div>
             </form>

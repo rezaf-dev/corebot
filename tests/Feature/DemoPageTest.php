@@ -21,3 +21,15 @@ it('embeds the demo widget when a bot key is configured', function () {
         ->assertSee('/widgets/bot_demo123.js', false)
         ->assertDontSee('data-bot-key', false);
 });
+
+it('renders the demo and widget in the selected rtl language', function () {
+    config(['corebot.demo_bot_public_key' => 'bot_demo123']);
+
+    $this->withSession(['locale' => 'fa'])->get(route('demo'))
+        ->assertSuccessful()
+        ->assertSee('<html lang="fa" dir="rtl">', false)
+        ->assertSee('data-locale="fa"', false)
+        ->assertSee('این پرسش‌ها را امتحان کنید')
+        ->assertSee('این شرکت چه کاری انجام می‌دهد؟')
+        ->assertDontSee('Try asking');
+});

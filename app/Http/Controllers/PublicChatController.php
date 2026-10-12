@@ -9,6 +9,7 @@ use App\Services\GeoIp\MaxMindGeoIpService;
 use App\Services\Leads\LeadCaptureService;
 use App\Services\Rag\ChatAnswerService;
 use App\Support\BotContactConfig;
+use App\Support\Localization;
 use Generator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,7 +18,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PublicChatController extends Controller
 {
-    public function start(Request $request, MaxMindGeoIpService $geoIp, ClientIpResolver $clientIp): JsonResponse
+    public function start(Request $request, MaxMindGeoIpService $geoIp, ClientIpResolver $clientIp, Localization $localization): JsonResponse
     {
         $data = $request->validate([
             'bot_public_key' => ['required', 'string'],
@@ -28,6 +29,7 @@ class PublicChatController extends Controller
             'utm_source' => ['nullable', 'string', 'max:255'],
             'utm_medium' => ['nullable', 'string', 'max:255'],
             'utm_campaign' => ['nullable', 'string', 'max:255'],
+            'locale' => ['nullable', 'string', 'max:10'],
         ]);
 
         $bot = $this->activeBot($data['bot_public_key']);
@@ -70,14 +72,16 @@ class PublicChatController extends Controller
                 'welcome_message' => $bot->welcome_message,
                 'collect_contact_on_start' => (bool) $bot->collect_contact_on_start,
                 'widget' => $bot->resolvedWidgetConfig(),
+                'localization' => $localization->widgetLocalization($data['locale'] ?? null),
             ],
         ));
     }
 
-    public function widgetConfig(Request $request): JsonResponse
+    public function widgetConfig(Request $request, Localization $localization): JsonResponse
     {
         $data = $request->validate([
             'bot_public_key' => ['required', 'string'],
+            'locale' => ['nullable', 'string', 'max:10'],
         ]);
 
         $bot = $this->activeBot($data['bot_public_key']);
@@ -89,6 +93,7 @@ class PublicChatController extends Controller
             'contact_fields' => BotContactConfig::fields($bot),
             'contact_required' => BotContactConfig::required($bot),
             'collect_contact_on_start' => (bool) $bot->collect_contact_on_start,
+            'localization' => $localization->widgetLocalization($data['locale'] ?? null),
         ]);
     }
 

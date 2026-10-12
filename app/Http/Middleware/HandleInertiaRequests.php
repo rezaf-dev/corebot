@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\Localization;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -29,6 +30,9 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $localization = app(Localization::class);
+        $settings = $request->attributes->get('localization_settings') ?? $localization->settings();
+
         return [
             ...parent::share($request),
             'auth' => [
@@ -39,6 +43,13 @@ class HandleInertiaRequests extends Middleware
                 'error' => $request->session()->get('error'),
             ],
             'demo_url' => route('demo'),
+            'localization' => [
+                ...$settings,
+                'locale' => app()->getLocale(),
+                'direction' => $localization->direction(app()->getLocale()),
+                'available_languages' => $localization->availableLanguages(),
+                'translations' => $localization->translations(app()->getLocale()),
+            ],
         ];
     }
 }

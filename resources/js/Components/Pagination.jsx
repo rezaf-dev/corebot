@@ -1,3 +1,4 @@
+import { formatNumber, t } from '@/localization';
 import { Link } from '@inertiajs/react';
 
 export default function Pagination({ links = [], meta }) {
@@ -5,32 +6,31 @@ export default function Pagination({ links = [], meta }) {
         return null;
     }
 
-    const prev = links.find((link) => link.label.includes('Previous'));
-    const next = links.find((link) => link.label.includes('Next'));
-    const pages = links.filter((link) => !link.label.includes('Previous') && !link.label.includes('Next'));
+    const prev = links[0];
+    const next = links.at(-1);
+    const pages = links.slice(1, -1);
 
     return (
-        <nav className="flex flex-wrap items-center justify-between gap-3" aria-label="Pagination">
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-                Showing <span className="font-medium text-gray-700 dark:text-gray-300">{meta.from ?? 0}</span>
+        <nav className="flex flex-wrap items-center justify-between gap-3" aria-label={t("Pagination")}>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{t("Showing")}{' '}<span className="font-medium text-gray-700 dark:text-gray-300">{formatNumber(meta.from ?? 0)}</span>
                 {' – '}
-                <span className="font-medium text-gray-700 dark:text-gray-300">{meta.to ?? 0}</span>
-                {' of '}
-                <span className="font-medium text-gray-700 dark:text-gray-300">{meta.total}</span>
+                <span className="font-medium text-gray-700 dark:text-gray-300">{formatNumber(meta.to ?? 0)}</span>
+                {t(" of ")}
+                <span className="font-medium text-gray-700 dark:text-gray-300">{formatNumber(meta.total)}</span>
             </p>
             <div className="flex flex-wrap items-center gap-1">
-                <PageLink link={prev} label="Previous" />
+                <PageLink link={prev} label={t("Previous")} />
                 {pages.map((link) => (
                     <PageLink key={link.label} link={link} />
                 ))}
-                <PageLink link={next} label="Next" />
+                <PageLink link={next} label={t("Next")} />
             </div>
         </nav>
     );
 }
 
 function PageLink({ link, label }) {
-    const text = label || stripHtml(link?.label);
+    const text = label || (Number.isFinite(Number(link?.label)) ? formatNumber(Number(link.label)) : stripHtml(link?.label));
 
     if (!link?.url) {
         return (
