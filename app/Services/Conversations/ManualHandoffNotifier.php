@@ -11,8 +11,8 @@ class ManualHandoffNotifier
 {
     public function escalate(Bot $bot, ChatConversation $conversation): void
     {
-        if ($conversation->status !== 'escalated') {
-            $conversation->update(['status' => 'escalated']);
+        if ($conversation->status !== 'escalated' || $conversation->support_mode !== 'human') {
+            $conversation->update(['status' => 'escalated', 'support_mode' => 'human', 'resolved_at' => null]);
         }
 
         if ($conversation->manual_handoff_notified_at !== null) {

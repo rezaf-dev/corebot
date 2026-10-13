@@ -163,10 +163,13 @@ class PublicChatController extends Controller
         $conversation = $this->publicConversation($bot, $data['conversation_id'], $data['conversation_token']);
 
         return response()->json([
+            'support_mode' => $conversation->support_mode,
+            'status' => $conversation->status,
             'messages' => $conversation->messages()
                 ->where('role', 'admin')
                 ->where('id', '>', $data['after_id'] ?? 0)
                 ->orderBy('id')
+                ->limit(100)
                 ->get(['id', 'content', 'created_at']),
         ]);
     }

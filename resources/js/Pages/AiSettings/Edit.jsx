@@ -29,10 +29,11 @@ const PROVIDERS = {
     },
 };
 
-export default function Edit({ settings }) {
+export default function Edit({ settings, tenant_id }) {
     const [testing, setTesting] = useState(false);
 
     const { data, setData, put, processing, errors, recentlySuccessful } = useForm({
+        tenant_id,
         provider: settings.provider ?? 'openai',
         api_key: '',
         base_url: settings.base_url,
@@ -61,7 +62,7 @@ export default function Edit({ settings }) {
     const provider = PROVIDERS[data.provider] ?? PROVIDERS.openai;
 
     const testConnection = () => {
-        router.post(route('ai-settings.test'), {}, {
+        router.post(route('ai-settings.test'), { tenant_id }, {
             preserveScroll: true,
             onStart: () => setTesting(true),
             onFinish: () => setTesting(false),

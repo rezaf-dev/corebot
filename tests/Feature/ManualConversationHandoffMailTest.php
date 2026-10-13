@@ -43,14 +43,14 @@ it('lists conversations needing a reply before open conversations', function () 
     $user = User::factory()->create(['tenant_id' => $tenant->id, 'role' => 'tenant_admin']);
     $bot = Bot::create(['tenant_id' => $tenant->id, 'name' => 'Support']);
     $open = ChatConversation::create(['tenant_id' => $tenant->id, 'bot_id' => $bot->id, 'status' => 'open']);
-    $escalated = ChatConversation::create(['tenant_id' => $tenant->id, 'bot_id' => $bot->id, 'status' => 'escalated']);
+    $escalated = ChatConversation::create(['tenant_id' => $tenant->id, 'bot_id' => $bot->id, 'status' => 'escalated', 'support_mode' => 'human']);
 
     $this->actingAs($user)
         ->get(route('conversations.index'))
         ->assertSuccessful()
         ->assertInertia(fn (Assert $page) => $page
             ->component('Conversations/Index')
-            ->where('conversations.0.id', $escalated->id)
-            ->where('conversations.1.id', $open->id)
+            ->has('conversations.data', 1)
+            ->where('conversations.data.0.id', $escalated->id)
         );
 });

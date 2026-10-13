@@ -52,6 +52,7 @@ test('email verification status is unchanged when the email address is unchanged
 
 test('user can delete their account', function () {
     $user = User::factory()->create();
+    User::factory()->create(['tenant_id' => $user->tenant_id]);
 
     $response = $this
         ->actingAs($user)

@@ -25,6 +25,7 @@ class AiSettingsController extends Controller
         ]);
 
         return Inertia::render('AiSettings/Edit', [
+            'tenant_id' => $tenant->id,
             'settings' => [
                 'provider' => $settings->provider,
                 'masked_api_key' => $settings->maskedApiKey(),

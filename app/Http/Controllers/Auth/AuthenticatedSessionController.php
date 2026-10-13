@@ -33,7 +33,17 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        if ($request->user()->role === 'agent') {
+            $intended = $request->session()->get('url.intended');
+            $path = $intended ? parse_url($intended, PHP_URL_PATH) : null;
+            $allowedPaths = [parse_url(route('conversations.index'), PHP_URL_PATH), parse_url(route('profile.edit'), PHP_URL_PATH)];
+            $allowed = $path && collect($allowedPaths)->contains(fn (string $allowedPath): bool => $path === $allowedPath || str_starts_with($path, $allowedPath.'/'));
+            if ($intended && ! $allowed) {
+                $request->session()->forget('url.intended');
+            }
+        }
+
+        return redirect()->intended(route('conversations.index', absolute: false));
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Services\Rag;
 
 use App\Models\Bot;
 use App\Models\ChatConversation;
+use App\Models\ChatMessage;
 use App\Models\RetrievalLog;
 use App\Services\AI\OpenAIService;
 use App\Services\Conversations\ManualHandoffNotifier;
@@ -12,6 +13,7 @@ use App\Services\Integrations\IntegrationToolFactory;
 use App\Support\BotContactConfig;
 use App\Support\Localization;
 use Generator;
+use Illuminate\Support\Facades\DB;
 use Laravel\Ai\Streaming\Events\TextDelta;
 use Throwable;
 
@@ -30,12 +32,11 @@ class ChatAnswerService
 
     public function answer(Bot $bot, ChatConversation $conversation, string $userMessage, array $pageContext = []): array
     {
-        $conversation->messages()->create([
-            'tenant_id' => $bot->tenant_id,
-            'bot_id' => $bot->id,
-            'role' => 'user',
-            'content' => $userMessage,
-        ]);
+        $this->receiveVisitorMessage($bot, $conversation, $userMessage);
+
+        if ($conversation->support_mode === 'human') {
+            return $this->humanResponse();
+        }
 
         $retrieval = $this->retrieve($bot, $conversation, $userMessage, $pageContext);
 
@@ -55,13 +56,10 @@ class ChatAnswerService
             return $this->fallback($bot, $conversation, $userMessage, 'Chat completion failed.');
         }
 
-        $assistant = $conversation->messages()->create([
-            'tenant_id' => $bot->tenant_id,
-            'bot_id' => $bot->id,
-            'role' => 'assistant',
-            'content' => $answer,
-            'metadata' => ['source_chunk_ids' => $chunks->pluck('id')->all()],
-        ]);
+        $assistant = $this->publishAssistant($bot, $conversation, $answer, ['source_chunk_ids' => $chunks->pluck('id')->all()]);
+        if (! $assistant) {
+            return $this->humanResponse();
+        }
 
         RetrievalLog::create([
             'tenant_id' => $bot->tenant_id,
@@ -91,18 +89,23 @@ class ChatAnswerService
 
     public function stream(Bot $bot, ChatConversation $conversation, string $userMessage, array $pageContext = []): Generator
     {
-        $conversation->messages()->create([
-            'tenant_id' => $bot->tenant_id,
-            'bot_id' => $bot->id,
-            'role' => 'user',
-            'content' => $userMessage,
-        ]);
+        $this->receiveVisitorMessage($bot, $conversation, $userMessage);
+
+        if ($conversation->support_mode === 'human') {
+            yield $this->streamEvent('meta', $this->humanResponse());
+            yield $this->streamEvent('done');
+
+            return;
+        }
 
         $retrieval = $this->retrieve($bot, $conversation, $userMessage, $pageContext);
 
         if (is_array($retrieval)) {
-            yield $this->streamEvent('text_delta', ['delta' => $retrieval['message']]);
+            if (! ($retrieval['human_support'] ?? false)) {
+                yield $this->streamEvent('text_delta', ['delta' => $retrieval['message']]);
+            }
             yield $this->streamEvent('meta', [
+                'human_support' => $retrieval['human_support'] ?? false,
                 'fallback' => true,
                 'needs_contact' => $retrieval['needs_contact'],
                 'chat_message_id' => $retrieval['chat_message_id'],
@@ -117,11 +120,21 @@ class ChatAnswerService
         $context = $this->context($chunks);
         $messages = $this->buildMessages($bot, $conversation, $userMessage, $context);
 
+        $deliveredText = '';
+
         try {
             $stream = $this->openAI->streamChatCompletion($bot->tenant, $messages, $this->chatOptions($bot, $conversation));
 
             foreach ($stream as $event) {
+                if ($conversation->fresh()->support_mode === 'human') {
+                    $this->recordDeliveredText($bot, $conversation, $deliveredText);
+                    yield $this->streamEvent('meta', $this->humanResponse());
+                    yield $this->streamEvent('done');
+
+                    return;
+                }
                 if ($event instanceof TextDelta) {
+                    $deliveredText .= $event->delta;
                     yield $this->streamEvent('text_delta', ['delta' => $event->delta]);
                 }
             }
@@ -130,8 +143,14 @@ class ChatAnswerService
         } catch (Throwable) {
             $fallback = $this->fallback($bot, $conversation, $userMessage, 'Chat completion failed.');
 
-            yield $this->streamEvent('text_delta', ['delta' => $fallback['message']]);
+            if ($fallback['human_support'] ?? false) {
+                $this->recordDeliveredText($bot, $conversation, $deliveredText);
+            }
+            if (! ($fallback['human_support'] ?? false)) {
+                yield $this->streamEvent('text_delta', ['delta' => $fallback['message']]);
+            }
             yield $this->streamEvent('meta', [
+                'human_support' => $fallback['human_support'] ?? false,
                 'fallback' => true,
                 'needs_contact' => $fallback['needs_contact'],
                 'chat_message_id' => $fallback['chat_message_id'],
@@ -142,13 +161,14 @@ class ChatAnswerService
             return;
         }
 
-        $assistant = $conversation->messages()->create([
-            'tenant_id' => $bot->tenant_id,
-            'bot_id' => $bot->id,
-            'role' => 'assistant',
-            'content' => $answer,
-            'metadata' => ['source_chunk_ids' => $chunks->pluck('id')->all()],
-        ]);
+        $assistant = $this->publishAssistant($bot, $conversation, $answer, ['source_chunk_ids' => $chunks->pluck('id')->all()]);
+        if (! $assistant) {
+            $this->recordDeliveredText($bot, $conversation, $deliveredText);
+            yield $this->streamEvent('meta', $this->humanResponse());
+            yield $this->streamEvent('done');
+
+            return;
+        }
 
         $retrievalLog = [
             'tenant_id' => $bot->tenant_id,
@@ -181,6 +201,56 @@ class ChatAnswerService
             'sources' => $meta['sources'],
         ]);
         yield $this->streamEvent('done');
+    }
+
+    private function receiveVisitorMessage(Bot $bot, ChatConversation $conversation, string $message): void
+    {
+        DB::transaction(function () use ($bot, $conversation, $message): void {
+            $current = ChatConversation::query()->lockForUpdate()->findOrFail($conversation->id);
+            $current->messages()->create([
+                'tenant_id' => $bot->tenant_id, 'bot_id' => $bot->id, 'role' => 'user', 'content' => $message,
+            ]);
+            $current->update(['status' => $current->status === 'resolved' ? 'open' : $current->status, 'resolved_at' => null, 'updated_at' => now()]);
+            $conversation->setRawAttributes($current->getAttributes(), true);
+        });
+    }
+
+    /** @param array<string, mixed> $metadata */
+    private function publishAssistant(Bot $bot, ChatConversation $conversation, string $answer, array $metadata): ?ChatMessage
+    {
+        return DB::transaction(function () use ($bot, $conversation, $answer, $metadata): ?ChatMessage {
+            $current = ChatConversation::query()->lockForUpdate()->findOrFail($conversation->id);
+            if ($current->support_mode === 'human') {
+                return null;
+            }
+            $message = $current->messages()->create([
+                'tenant_id' => $bot->tenant_id, 'bot_id' => $bot->id, 'role' => 'assistant', 'content' => $answer, 'metadata' => $metadata,
+            ]);
+            $current->touch();
+
+            return $message;
+        });
+    }
+
+    private function recordDeliveredText(Bot $bot, ChatConversation $conversation, string $text): void
+    {
+        if (trim($text) === '') {
+            return;
+        }
+        $conversation->messages()->create([
+            'tenant_id' => $bot->tenant_id,
+            'bot_id' => $bot->id,
+            'role' => 'assistant',
+            'content' => $text,
+            'metadata' => ['interrupted_by_handoff' => true],
+        ]);
+        $conversation->touch();
+    }
+
+    /** @return array<string, mixed> */
+    private function humanResponse(): array
+    {
+        return ['human_support' => true, 'support_mode' => 'human', 'message' => null, 'chat_message_id' => null, 'needs_contact' => false, 'fallback' => false, 'sources' => []];
     }
 
     /**
@@ -275,34 +345,41 @@ class ChatAnswerService
 
     private function fallback(Bot $bot, ChatConversation $conversation, string $query, string $reason): array
     {
-        $this->manualHandoffNotifier->escalate($bot, $conversation);
-        $message = $this->fallbackMessage($bot, $conversation);
+        return DB::transaction(function () use ($bot, $conversation, $query, $reason): array {
+            $conversation = ChatConversation::query()->lockForUpdate()->findOrFail($conversation->id);
+            if ($conversation->support_mode === 'human') {
+                return $this->humanResponse();
+            }
 
-        $assistant = $conversation->messages()->create([
-            'tenant_id' => $bot->tenant_id,
-            'bot_id' => $bot->id,
-            'role' => 'assistant',
-            'content' => $message,
-            'metadata' => ['fallback_reason' => $reason],
-        ]);
+            $this->manualHandoffNotifier->escalate($bot, $conversation);
+            $message = $this->fallbackMessage($bot, $conversation);
 
-        RetrievalLog::create([
-            'tenant_id' => $bot->tenant_id,
-            'bot_id' => $bot->id,
-            'conversation_id' => $conversation->id,
-            'chat_message_id' => $assistant->id,
-            'query' => $query,
-            'selected_chunk_ids' => [],
-            'distances' => [],
-            'context_text' => null,
-        ]);
+            $assistant = $conversation->messages()->create([
+                'tenant_id' => $bot->tenant_id,
+                'bot_id' => $bot->id,
+                'role' => 'assistant',
+                'content' => $message,
+                'metadata' => ['fallback_reason' => $reason],
+            ]);
 
-        return $this->withContactMeta($bot, $conversation, [
-            'message' => $message,
-            'fallback' => true,
-            'chat_message_id' => $assistant->id,
-            'sources' => [],
-        ], 'unable_to_answer');
+            RetrievalLog::create([
+                'tenant_id' => $bot->tenant_id,
+                'bot_id' => $bot->id,
+                'conversation_id' => $conversation->id,
+                'chat_message_id' => $assistant->id,
+                'query' => $query,
+                'selected_chunk_ids' => [],
+                'distances' => [],
+                'context_text' => null,
+            ]);
+
+            return $this->withContactMeta($bot, $conversation, [
+                'message' => $message,
+                'fallback' => true,
+                'chat_message_id' => $assistant->id,
+                'sources' => [],
+            ], 'unable_to_answer');
+        });
     }
 
     /**
@@ -313,7 +390,7 @@ class ChatAnswerService
     {
         $needsContact = $this->shouldRequestContact($bot, $conversation, $handoffReason);
 
-        if ($needsContact) {
+        if ($handoffReason !== null) {
             $this->manualHandoffNotifier->escalate($bot, $conversation);
             $conversation->update(['handoff_reason' => $handoffReason]);
         }

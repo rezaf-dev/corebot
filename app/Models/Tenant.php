@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use Database\Factories\TenantFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -10,6 +12,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 #[Fillable(['name', 'slug', 'status'])]
 class Tenant extends Model
 {
+    /** @use HasFactory<TenantFactory> */
+    use HasFactory;
+
     public function aiSetting(): HasOne
     {
         return $this->hasOne(TenantAiSetting::class);

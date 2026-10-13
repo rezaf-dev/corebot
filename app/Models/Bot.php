@@ -4,7 +4,9 @@ namespace App\Models;
 
 use App\Support\WidgetAsset;
 use App\Support\WidgetConfig;
+use Database\Factories\BotFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -33,6 +35,9 @@ use Illuminate\Support\Str;
 ])]
 class Bot extends Model
 {
+    /** @use HasFactory<BotFactory> */
+    use HasFactory;
+
     public const DEFAULT_SYSTEM_PROMPT = <<<'PROMPT'
 You are a CRM support assistant.
 Answer only using the provided knowledge base context.

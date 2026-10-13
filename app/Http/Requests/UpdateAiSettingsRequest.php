@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Tenant;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -9,7 +10,7 @@ class UpdateAiSettingsRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->isTenantAdmin() === true;
+        return $this->user()?->isAdmin() === true;
     }
 
     /**
@@ -19,7 +20,7 @@ class UpdateAiSettingsRequest extends FormRequest
      */
     public function rules(): array
     {
-        $settings = $this->user()?->tenant?->aiSetting;
+        $settings = $this->user()->isSuperAdmin() ? Tenant::query()->find($this->input('tenant_id'))?->aiSetting : $this->user()?->tenant?->aiSetting;
         $providerChanged = $settings && $settings->provider !== $this->string('provider')->toString();
 
         return [

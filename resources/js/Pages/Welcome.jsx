@@ -70,19 +70,16 @@ export default function Welcome({ auth }) {
                         >{t("Live demo")}</a>
                         {auth.user ? (
                             <Link
-                                href={route('dashboard')}
+                                href={route('conversations.index')}
                                 className="rounded-md bg-white px-4 py-2 font-medium text-slate-950"
-                            >{t("Dashboard")}</Link>
+                            >{t("Conversations")}</Link>
                         ) : (
                             <>
                                 <Link
                                     href={route('login')}
                                     className="rounded-md px-4 py-2 text-slate-200 hover:text-white"
                                 >{t("Log in")}</Link>
-                                <Link
-                                    href={route('register')}
-                                    className="rounded-md bg-white px-4 py-2 font-medium text-slate-950"
-                                >{t("Register")}</Link>
+
                             </>
                         )}
                     </nav>
@@ -96,9 +93,9 @@ export default function Welcome({ auth }) {
 
                         <div className="mt-8 flex flex-wrap gap-3">
                             <Link
-                                href={auth.user ? route('dashboard') : route('login')}
+                                href={auth.user ? route('conversations.index') : route('login')}
                                 className="rounded-md bg-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950"
-                            >{t("Open dashboard")}</Link>
+                            >{t("Conversations")}</Link>
                             <a
                                 href={demoUrl}
                                 className="rounded-md border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-100 hover:border-slate-500"

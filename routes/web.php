@@ -8,8 +8,10 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\KnowledgeResearchController;
 use App\Http\Controllers\Admin\KnowledgeSourceController;
 use App\Http\Controllers\Admin\LanguageSettingsController;
+use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\TenantController;
 use App\Http\Controllers\Admin\WidgetInstallController;
+use App\Http\Controllers\Admin\WorkspaceController;
 use App\Http\Controllers\DemoController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\ProfileController;
@@ -17,7 +19,7 @@ use App\Http\Controllers\SupportRequestController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::get('/', fn () => Inertia::render('Welcome'))->name('home');
+Route::get('/', fn () => auth()->check() ? redirect()->route('conversations.index') : Inertia::render('Welcome'))->name('home');
 
 Route::get('/demo', DemoController::class)->name('demo');
 Route::post('/locale', [LocaleController::class, 'update'])->name('locale.update');
@@ -27,6 +29,13 @@ Route::post('/support-requests', [SupportRequestController::class, 'store'])
     ->name('support-requests.store');
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/settings', [WorkspaceController::class, 'settings'])->name('settings.index');
+    Route::get('/admin', [WorkspaceController::class, 'admin'])->name('admin.index');
+    Route::get('/staff', [StaffController::class, 'index'])->name('staff.index');
+    Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');
+    Route::put('/staff/{staff}', [StaffController::class, 'update'])->name('staff.update');
+    Route::post('/staff/{staff}/setup', [StaffController::class, 'setup'])->name('staff.setup');
+
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/language-settings', [LanguageSettingsController::class, 'edit'])->name('language-settings.edit');
     Route::put('/language-settings', [LanguageSettingsController::class, 'update'])->name('language-settings.update');
@@ -53,7 +62,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/conversations', [ConversationController::class, 'index'])->name('conversations.index');
     Route::get('/conversations/{conversation}', [ConversationController::class, 'show'])->name('conversations.show');
+    Route::get('/conversations/{conversation}/messages', [ConversationController::class, 'messages'])->name('conversations.messages.index');
     Route::post('/conversations/{conversation}/messages', [ConversationController::class, 'storeMessage'])->name('conversations.messages.store');
+    Route::patch('/conversations/{conversation}', [ConversationController::class, 'update'])->name('conversations.update');
     Route::delete('/conversations/{conversation}', [ConversationController::class, 'destroy'])->name('conversations.destroy');
 
     Route::get('/widget-install', WidgetInstallController::class)->name('widget.install');

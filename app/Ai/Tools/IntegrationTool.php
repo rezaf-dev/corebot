@@ -35,6 +35,10 @@ class IntegrationTool implements Tool
 
     public function handle(Request $request): Stringable|string
     {
+        if ($this->conversation->fresh()->support_mode === 'human') {
+            return 'This conversation is being handled by a support teammate. No action was executed.';
+        }
+
         return $this->executor->run(
             $this->bot,
             $this->conversation,

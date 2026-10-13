@@ -21,11 +21,20 @@ class TenantAccess
 
     public function scope(Builder $query, User $user): Builder
     {
+        abort_unless($user->hasWorkspaceAccess(), 403);
+
         return $user->isSuperAdmin() ? $query : $query->where('tenant_id', $user->tenant_id);
     }
 
     public function ensureTenantAdmin(User $user): Tenant
     {
+        if ($user->isSuperAdmin()) {
+            $tenantId = request()->input('tenant_id');
+            abort_unless($tenantId, 422, 'Choose a workspace first.');
+
+            return Tenant::query()->findOrFail($tenantId);
+        }
+
         if (! $user->isTenantAdmin() || ! $user->tenant) {
             throw new AuthorizationException('A tenant admin account is required.');
         }
@@ -35,6 +44,8 @@ class TenantAccess
 
     public function ensureCanAccess(User $user, Model $model): void
     {
+        abort_unless($user->hasWorkspaceAccess(), 403);
+
         if ($user->isSuperAdmin()) {
             return;
         }

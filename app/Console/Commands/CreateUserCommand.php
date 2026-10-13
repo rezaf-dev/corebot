@@ -15,13 +15,13 @@ use Illuminate\Validation\Rule;
     {--name= : User full name}
     {--email= : User email address}
     {--password= : Initial password}
-    {--role=tenant_admin : User role: tenant_admin or super_admin}
+    {--role=tenant_admin : User role: tenant_admin, agent or super_admin}
     {--tenant= : Tenant id or slug for tenant_admin users}
     {--verified : Mark the email address as verified}')]
 #[Description('Create a user account')]
 class CreateUserCommand extends Command
 {
-    private const ROLES = ['tenant_admin', 'super_admin'];
+    private const ROLES = ['tenant_admin', 'agent', 'super_admin'];
 
     /**
      * Execute the console command.
@@ -41,7 +41,7 @@ class CreateUserCommand extends Command
         $email = strtolower((string) ($this->option('email') ?: $this->ask('Email')));
         $password = (string) ($this->option('password') ?: $this->secret('Password'));
 
-        if ($role === 'tenant_admin') {
+        if ($role !== 'super_admin') {
             $tenant = $this->resolveTenant();
 
             if (! $tenant) {
@@ -62,7 +62,7 @@ class CreateUserCommand extends Command
                 'email' => ['required', 'email', 'max:255', Rule::unique(User::class, 'email')],
                 'password' => ['required', 'string', 'min:8'],
                 'role' => ['required', Rule::in(self::ROLES)],
-                'tenant_id' => [Rule::requiredIf($role === 'tenant_admin'), 'nullable', 'integer', Rule::exists(Tenant::class, 'id')],
+                'tenant_id' => [Rule::requiredIf($role !== 'super_admin'), 'nullable', 'integer', Rule::exists(Tenant::class, 'id')],
             ]
         );
 

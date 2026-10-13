@@ -1,12 +1,12 @@
 <?php
 
-test('registration screen can be rendered', function () {
+test('public registration screen is disabled', function () {
     $response = $this->get('/register');
 
-    $response->assertStatus(200);
+    $response->assertNotFound();
 });
 
-test('new users can register', function () {
+test('public users cannot register', function () {
     $response = $this->post('/register', [
         'name' => 'Test User',
         'email' => 'test@example.com',
@@ -14,6 +14,7 @@ test('new users can register', function () {
         'password_confirmation' => 'password',
     ]);
 
-    $this->assertAuthenticated();
-    $response->assertRedirect(route('dashboard', absolute: false));
+    $this->assertGuest();
+    $response->assertNotFound();
+    $this->assertDatabaseMissing('users', ['email' => 'test@example.com']);
 });

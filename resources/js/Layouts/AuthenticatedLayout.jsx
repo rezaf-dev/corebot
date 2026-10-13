@@ -2,204 +2,148 @@ import { t } from '@/localization';
 import LanguageSelector from '@/Components/LanguageSelector';
 import ApplicationLogo from '@/Components/ApplicationLogo';
 import Dropdown from '@/Components/Dropdown';
-import NavLink from '@/Components/NavLink';
-import ResponsiveNavLink from '@/Components/ResponsiveNavLink';
 import { Link, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
-export default function AuthenticatedLayout({ header, children }) {
-    const user = usePage().props.auth.user;
-    const flash = usePage().props.flash || {};
-    const links = [
-        ['dashboard', 'Dashboard'],
-        ['ai-settings.edit', 'AI Settings'],
-        ['bots.index', 'Bots'],
-        ['knowledge-sources.index', 'Knowledge'],
-        ['conversations.index', 'Conversations'],
-        ['widget.install', 'Widget'],
-    ];
-    if (user?.role === 'super_admin') {
-        links.splice(1, 0, ['tenants.index', 'Tenants']);
-        links.push(['language-settings.edit', 'Language settings']);
-    }
-
-    const [showingNavigationDropdown, setShowingNavigationDropdown] =
-        useState(false);
-
+export default function AuthenticatedLayout({
+    header,
+    children,
+    workspace = false,
+}) {
+    const { auth, flash = {} } = usePage().props;
+    const [menuOpen, setMenuOpen] = useState(false);
+    const links = [['conversations.index', 'Conversations', '◫']];
+    if (auth.capabilities?.configure)
+        links.push(['settings.index', 'Settings', '⚙']);
+    if (auth.capabilities?.platform) links.push(['admin.index', 'Admin', '◇']);
+    const active = (name) =>
+        name === 'conversations.index'
+            ? route().current('conversations.*')
+            : name === 'settings.index'
+              ? [
+                    'settings.*',
+                    'bots.*',
+                    'knowledge-sources.*',
+                    'ai-settings.*',
+                    'widget.*',
+                    'dashboard',
+                    ...(!auth.capabilities?.platform ? ['staff.*'] : []),
+                ].some((pattern) => route().current(pattern))
+              : [
+                    'admin.*',
+                    'tenants.*',
+                    'language-settings.*',
+                    ...(auth.capabilities?.platform ? ['staff.*'] : []),
+                ].some((pattern) => route().current(pattern));
     return (
-        <div className="min-h-screen bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
-            <nav className="border-b border-gray-100 bg-white dark:border-gray-700 dark:bg-gray-800">
-                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    <div className="flex h-16 justify-between">
-                        <div className="flex">
-                            <div className="flex shrink-0 items-center">
-                                <Link
-                                    href={route('home')}
-                                    className="inline-flex items-center"
-                                    aria-label={t("corebot home")}
-                                >
-                                    <ApplicationLogo
-                                        showWordmark
-                                        markClassName="h-9 w-9"
-                                        wordmarkClassName="hidden text-lg sm:inline"
-                                    />
-                                </Link>
-                            </div>
-
-                            <div className="hidden gap-4 xl:-my-px xl:ms-6 xl:flex">
-                                {links.filter(([name]) => name !== 'language-settings.edit').map(([name, label]) => (
-                                    <NavLink key={name} href={route(name)} active={route().current(name)}>
-                                        {t(label)}
-                                    </NavLink>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="hidden xl:ms-6 xl:flex xl:items-center">
-                            <LanguageSelector />
-                            <div className="relative ms-3">
-                                <Dropdown>
-                                    <Dropdown.Trigger>
-                                        <span className="inline-flex rounded-md">
-                                            <button
-                                                type="button"
-                                                className="inline-flex items-center rounded-md border border-transparent bg-white px-3 py-2 text-sm font-medium leading-4 text-gray-500 transition duration-150 ease-in-out hover:text-gray-700 focus:outline-none dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
-                                            >
-                                                {user.name}
-
-                                                <svg
-                                                    className="-me-0.5 ms-2 h-4 w-4"
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    viewBox="0 0 20 20"
-                                                    fill="currentColor"
-                                                >
-                                                    <path
-                                                        fillRule="evenodd"
-                                                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                                                        clipRule="evenodd"
-                                                    />
-                                                </svg>
-                                            </button>
-                                        </span>
-                                    </Dropdown.Trigger>
-
-                                    <Dropdown.Content>
-                                        {user?.role === 'super_admin' && (
-                                            <Dropdown.Link href={route('language-settings.edit')}>{t('Language settings')}</Dropdown.Link>
-                                        )}
-                                        <Dropdown.Link
-                                            href={route('profile.edit')}
-                                        >{t("Profile")}</Dropdown.Link>
-                                        <Dropdown.Link
-                                            href={route('logout')}
-                                            method="post"
-                                            as="button"
-                                        >{t("Log Out")}</Dropdown.Link>
-                                    </Dropdown.Content>
-                                </Dropdown>
-                            </div>
-                        </div>
-
-                        <div className="-me-2 flex items-center gap-3 xl:hidden">
-                            <LanguageSelector />
-                            <button
-                                onClick={() =>
-                                    setShowingNavigationDropdown(
-                                        (previousState) => !previousState,
-                                    )
-                                }
-                                aria-label={t('Toggle navigation')}
-                                aria-expanded={showingNavigationDropdown}
-                                className="inline-flex items-center justify-center rounded-md p-2 text-gray-400 transition duration-150 ease-in-out hover:bg-gray-100 hover:text-gray-500 focus:bg-gray-100 focus:text-gray-500 focus:outline-none dark:text-gray-500 dark:hover:bg-gray-900 dark:hover:text-gray-400 dark:focus:bg-gray-900 dark:focus:text-gray-400"
-                            >
-                                <svg
-                                    className="h-6 w-6"
-                                    stroke="currentColor"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        className={
-                                            !showingNavigationDropdown
-                                                ? 'inline-flex'
-                                                : 'hidden'
-                                        }
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth="2"
-                                        d="M4 6h16M4 12h16M4 18h16"
-                                    />
-                                    <path
-                                        className={
-                                            showingNavigationDropdown
-                                                ? 'inline-flex'
-                                                : 'hidden'
-                                        }
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth="2"
-                                        d="M6 18L18 6M6 6l12 12"
-                                    />
-                                </svg>
+        <div
+            className={`bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 ${workspace ? 'flex h-dvh flex-col overflow-hidden' : 'min-h-screen'}`}
+        >
+            <header className="z-30 flex h-16 shrink-0 items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 dark:border-gray-800 dark:bg-gray-900">
+                <div className="flex items-center gap-3">
+                    <button
+                        type="button"
+                        aria-label={t('Toggle navigation')}
+                        aria-expanded={menuOpen}
+                        onClick={() => setMenuOpen(!menuOpen)}
+                        className="rounded-lg p-2 focus-visible:ring-2 focus-visible:ring-indigo-500 md:hidden"
+                    >
+                        ☰
+                    </button>
+                    <Link
+                        href={route('conversations.index')}
+                        aria-label={t('Conversations')}
+                    >
+                        <ApplicationLogo
+                            showWordmark
+                            markClassName="h-8 w-8"
+                            wordmarkClassName="text-lg"
+                        />
+                    </Link>
+                    <span className="hidden border-s border-gray-200 ps-4 text-sm text-gray-500 dark:border-gray-700 sm:block">
+                        {auth.user.tenant?.name || t('Admin')}
+                    </span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <LanguageSelector />
+                    <Dropdown>
+                        <Dropdown.Trigger>
+                            <button className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-indigo-500">
+                                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 font-semibold text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200">
+                                    {auth.user.name.slice(0, 1)}
+                                </span>
+                                <span className="hidden sm:block">
+                                    {auth.user.name}
+                                </span>
+                                <span aria-hidden="true">⌄</span>
                             </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div
-                    className={
-                        (showingNavigationDropdown ? 'block' : 'hidden') +
-                        ' xl:hidden'
-                    }
-                >
-                    <div className="space-y-1 pb-3 pt-2">
-                        {links.map(([name, label]) => (
-                            <ResponsiveNavLink key={name} href={route(name)} active={route().current(name)}>
-                                {t(label)}
-                            </ResponsiveNavLink>
-                        ))}
-                    </div>
-
-                    <div className="border-t border-gray-200 pb-1 pt-4 dark:border-gray-600">
-                        <div className="px-4">
-                            <div className="text-base font-medium text-gray-800 dark:text-gray-200">
-                                {user.name}
-                            </div>
-                            <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                                {user.email}
-                            </div>
-                        </div>
-
-                        <div className="mt-3 space-y-1">
-                            <ResponsiveNavLink href={route('profile.edit')}>{t("Profile")}</ResponsiveNavLink>
-                            <ResponsiveNavLink
-                                method="post"
+                        </Dropdown.Trigger>
+                        <Dropdown.Content>
+                            <Dropdown.Link href={route('profile.edit')}>
+                                {t('Profile')}
+                            </Dropdown.Link>
+                            <Dropdown.Link
                                 href={route('logout')}
+                                method="post"
                                 as="button"
-                            >{t("Log Out")}</ResponsiveNavLink>
-                        </div>
-                    </div>
+                            >
+                                {t('Log Out')}
+                            </Dropdown.Link>
+                        </Dropdown.Content>
+                    </Dropdown>
                 </div>
-            </nav>
-
-            {header && (
-                <header className="bg-white shadow dark:bg-gray-800">
-                    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-                        {header}
+            </header>
+            <div className={`flex ${workspace ? 'min-h-0 flex-1' : ''}`}>
+                {menuOpen && (
+                    <button
+                        aria-label={t('Close navigation')}
+                        className="fixed inset-0 z-30 bg-black/30 md:hidden"
+                        onClick={() => setMenuOpen(false)}
+                    />
+                )}
+                <aside
+                    className={`${menuOpen ? 'flex' : 'hidden'} fixed bottom-0 start-0 top-16 z-40 w-40 flex-col border-e border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 md:sticky md:top-0 md:flex ${workspace ? 'md:h-full' : 'md:min-h-[calc(100dvh-4rem)]'}`}
+                >
+                    <nav
+                        aria-label={t('Main navigation')}
+                        className="flex flex-col gap-1"
+                    >
+                        {links.map(([name, label, icon]) => (
+                            <Link
+                                key={name}
+                                href={route(name)}
+                                aria-current={active(name) ? 'page' : undefined}
+                                onClick={() => setMenuOpen(false)}
+                                className={`flex items-center gap-2 rounded-lg px-3 py-3 text-sm font-medium focus-visible:ring-2 focus-visible:ring-indigo-500 ${active(name) ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800'}`}
+                            >
+                                <span aria-hidden="true">{icon}</span>
+                                {t(label)}
+                            </Link>
+                        ))}
+                    </nav>
+                    <div className="mt-auto border-t border-gray-100 px-3 pt-4 text-xs text-gray-500 dark:border-gray-800">
+                        {t(auth.user.role === 'agent' ? 'Agent' : 'Admin')}
                     </div>
-                </header>
-            )}
-
-            <main>
-                {(flash.success || flash.error) && (
-                    <div className="mx-auto mt-6 max-w-7xl px-4 sm:px-6 lg:px-8">
-                        <div className={`rounded border px-4 py-3 text-sm ${flash.error ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+                </aside>
+                <main
+                    className={`min-w-0 flex-1 ${workspace ? 'flex min-h-0 flex-col' : ''}`}
+                >
+                    {header && (
+                        <div className="border-b border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-gray-900">
+                            {header}
+                        </div>
+                    )}
+                    {(flash.success || flash.error) && (
+                        <div
+                            role={flash.error ? 'alert' : 'status'}
+                            className={`shrink-0 border-b px-5 py-3 text-sm ${flash.error ? 'border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200' : 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200'}`}
+                        >
                             {t(flash.error || flash.success)}
                         </div>
-                    </div>
-                )}
-                {children}
-            </main>
+                    )}
+                    {children}
+                </main>
+            </div>
         </div>
     );
 }

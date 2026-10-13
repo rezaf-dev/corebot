@@ -426,6 +426,7 @@ function createWidgetLocalization(initial) {
     let isChangingLanguage = false;
     let latestManualMessageId = 0;
     let manualMessagePolling = null;
+    let manualMessageRequestRunning = false;
 
     // Conversations created before session-token protection cannot safely be resumed.
     if (state.conversation_id && !state.conversation_token) {
@@ -567,7 +568,12 @@ function createWidgetLocalization(initial) {
         } catch {
             try {
                 const res = await post('/message', { conversation_id: state.conversation_id, message: text, page: pageContext() });
-                setBubbleText(assistant, res.message);
+                if (res.human_support) {
+                    assistant.remove();
+                    applySupportMode('human');
+                } else {
+                    setBubbleText(assistant, res.message);
+                }
                 if (shouldPromptContact(res)) showContact('fallback');
             } catch {
                 setBubbleText(assistant, t("Support is unavailable right now. Please try again later."));
@@ -832,11 +838,12 @@ function createWidgetLocalization(initial) {
         if (manualMessagePolling || !state.conversation_id || !state.conversation_token) return;
 
         pollManualMessages();
-        manualMessagePolling = window.setInterval(pollManualMessages, 8000);
+        manualMessagePolling = window.setInterval(pollManualMessages, 5000);
     }
 
     async function pollManualMessages() {
-        if (!state.conversation_id || !state.conversation_token) return;
+        if (!state.conversation_id || !state.conversation_token || manualMessageRequestRunning) return;
+        manualMessageRequestRunning = true;
 
         try {
             const response = await post('/manual-messages', {
@@ -844,7 +851,9 @@ function createWidgetLocalization(initial) {
                 after_id: latestManualMessageId,
             });
 
+            applySupportMode(response.support_mode);
             (response.messages || []).forEach((message) => {
+                if (message.id <= latestManualMessageId) return;
                 latestManualMessageId = Math.max(latestManualMessageId, message.id);
                 add('assistant', message.content);
                 if (!isOpen) {
@@ -853,7 +862,15 @@ function createWidgetLocalization(initial) {
             });
         } catch {
             return;
+        } finally {
+            manualMessageRequestRunning = false;
         }
+    }
+
+    function applySupportMode(mode) {
+        if (!mode) return;
+        const subtitle = crmRoot.querySelector('.crm-ai-head-sub');
+        if (subtitle) subtitle.textContent = mode === 'human' ? t('You are connected to our support team') : t(config.subtitle);
     }
 
     async function streamMessage(text, node) {
@@ -876,6 +893,7 @@ function createWidgetLocalization(initial) {
         const decoder = new TextDecoder();
         let buffer = '';
         let hasContent = false;
+        let humanSupport = false;
         let pendingDelta = '';
         let renderFrame = null;
 
@@ -911,6 +929,10 @@ function createWidgetLocalization(initial) {
                     }
                 }
 
+                if (payload.type === 'meta' && payload.human_support) {
+                    humanSupport = true;
+                    applySupportMode('human');
+                }
                 if (payload.type === 'meta' && shouldPromptContact(payload)) {
                     showContact('fallback');
                 }
@@ -929,7 +951,9 @@ function createWidgetLocalization(initial) {
             setBubbleText(node, getBubble(node)?.dataset.rawText || '');
         }
 
-        if (!hasContent) {
+        if (humanSupport && !hasContent) {
+            node.remove();
+        } else if (!hasContent) {
             setBubbleText(node, t("Sorry, I could not generate a response."));
         }
     }

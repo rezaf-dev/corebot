@@ -36,7 +36,14 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $request->user()?->loadMissing('tenant'),
+                'user' => $request->user() ? [
+                    ...$request->user()->only(['id', 'name', 'email', 'email_verified_at', 'tenant_id', 'role', 'is_active']),
+                    'tenant' => $request->user()->tenant?->only(['id', 'name', 'slug', 'status']),
+                ] : null,
+                'capabilities' => [
+                    'configure' => $request->user()?->isAdmin() ?? false,
+                    'platform' => $request->user()?->isSuperAdmin() ?? false,
+                ],
             ],
             'flash' => [
                 'success' => $request->session()->get('success'),
