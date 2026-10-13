@@ -1,5 +1,6 @@
 import { t } from '@/localization';
 import InputError from '@/Components/InputError';
+import Checkbox from '@/Components/Checkbox';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
@@ -16,19 +17,23 @@ const launcherTemplates = [
     "Let's talk",
 ];
 
-export default function Install({ bots, defaults, positions, icons }) {
+export default function Install({ bots, defaults, positions, icons, languages = [], language_settings, preview_translations = {} }) {
     const [selectedBotId, setSelectedBotId] = useState(bots[0]?.id ?? null);
     const [copied, setCopied] = useState(false);
+    const [editingLocale, setEditingLocale] = useState(language_settings?.default_locale || 'en');
 
     const selectedBot = bots.find((bot) => bot.id === selectedBotId);
 
-    const { data, setData, put, processing, errors, recentlySuccessful, reset } = useForm(
-        selectedBot?.widget_config || defaults,
+    const { data, setData, put, processing, errors, recentlySuccessful, defaults: updateDefaults, transform } = useForm(
+        { ...defaults, ...selectedBot?.widget_config },
     );
 
     useEffect(() => {
         if (selectedBot) {
-            reset(selectedBot.widget_config);
+            const settings = { ...defaults, ...selectedBot.widget_config };
+            updateDefaults(settings);
+            setData(settings);
+            setEditingLocale(settings.default_locale || language_settings?.default_locale || 'en');
         }
     }, [selectedBotId]);
 
@@ -40,8 +45,33 @@ export default function Install({ bots, defaults, positions, icons }) {
     const submit = (e) => {
         e.preventDefault();
         if (!selectedBot) return;
+        transform((values) => ({
+            ...values,
+            enabled_locales: JSON.stringify(values.enabled_locales || []),
+            localized_content: JSON.stringify(values.localized_content || {}),
+        }));
         put(route('widget.install.update', selectedBot.id), { preserveScroll: true, forceFormData: true });
     };
+
+    const effectiveLanguages = languages.filter((language) => !data.enabled_locales?.length || data.enabled_locales.includes(language.code));
+    const localizedCopy = data.localized_content?.[editingLocale] || {};
+    const previewCopy = preview_translations[editingLocale] || {};
+    const previewConfig = { ...data, welcome_message: selectedBot?.welcome_message || 'Hi, how can I help with your CRM today?' };
+    for (const field of ['title', 'subtitle', 'launcher_label', 'input_placeholder', 'send_button_label', 'welcome_message']) {
+        const defaultText = field === 'welcome_message' ? 'Hi, how can I help with your CRM today?' : defaults[field];
+        if (previewConfig[field] === defaultText) previewConfig[field] = previewCopy[defaultText] || defaultText;
+    }
+    Object.assign(previewConfig, Object.fromEntries(Object.entries(localizedCopy).filter(([, value]) => value !== '' && (!Array.isArray(value) || value.some(Boolean)))));
+    if (!previewConfig.suggested_prompts?.some((prompt) => prompt.trim())) {
+        previewConfig.suggested_prompts = ['How do I get started?', 'What can you help with?', 'Contact support'].map((prompt) => previewCopy[prompt] || prompt);
+    }
+
+    function updateLocalizedCopy(field, value) {
+        setData('localized_content', {
+            ...(data.localized_content || {}),
+            [editingLocale]: { ...localizedCopy, [field]: value },
+        });
+    }
 
     const copySnippet = async () => {
         try {
@@ -98,6 +128,68 @@ export default function Install({ bots, defaults, positions, icons }) {
 
                 <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
                     <form onSubmit={submit} className="space-y-6">
+                        <section className="space-y-5 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                            <div>
+                                <h3 className="text-base font-semibold">{t('Widget languages')}</h3>
+                                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t('Choose which languages visitors can use in this widget.')}</p>
+                            </div>
+                            <label className="flex items-center gap-3 text-sm">
+                                <Checkbox checked={!data.enabled_locales?.length} onChange={(event) => setData({ ...data, enabled_locales: event.target.checked ? [] : languages.map((language) => language.code), default_locale: '' })} />
+                                {t('Use global language settings')}
+                            </label>
+                            {!!data.enabled_locales?.length && (
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    {languages.map((language) => (
+                                        <label key={language.code} className="flex items-center gap-3 rounded-md border border-gray-200 p-3 text-sm dark:border-gray-700">
+                                            <Checkbox
+                                                checked={data.enabled_locales.includes(language.code)}
+                                                disabled={data.enabled_locales.length === 1 && data.enabled_locales.includes(language.code)}
+                                                onChange={(event) => {
+                                                    const enabled = event.target.checked ? [...data.enabled_locales, language.code] : data.enabled_locales.filter((code) => code !== language.code);
+                                                    setData({ ...data, enabled_locales: enabled, default_locale: enabled.includes(data.default_locale) ? data.default_locale : (enabled.includes(language_settings?.default_locale) ? '' : enabled[0]) });
+                                                }}
+                                            />
+                                            <span lang={language.code}>{language.native_name}</span>
+                                            <span className="ms-auto text-xs text-gray-500">{language.direction.toUpperCase()}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+                            <InputError message={errors.enabled_locales || Object.entries(errors).find(([key]) => key.startsWith('enabled_locales.'))?.[1]} />
+                            <div>
+                                <InputLabel htmlFor="widget_default_locale" value={t('Default language')} />
+                                <select id="widget_default_locale" value={data.default_locale || ''} onChange={(event) => setData('default_locale', event.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                                    <option value="">{t('Use global default')}</option>
+                                    {effectiveLanguages.map((language) => <option key={language.code} value={language.code}>{language.native_name}</option>)}
+                                </select>
+                                <InputError message={errors.default_locale} className="mt-1" />
+                                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{t('Visitors can switch languages in the chat header. Persian and Arabic use RTL automatically.')}</p>
+                            </div>
+                            <div className="space-y-4 border-t border-gray-200 pt-5 dark:border-gray-700">
+                                <div>
+                                    <InputLabel htmlFor="widget_translation_locale" value={t('Translated widget text')} />
+                                    <select id="widget_translation_locale" value={editingLocale} onChange={(event) => setEditingLocale(event.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                                        {languages.map((language) => <option key={language.code} value={language.code}>{language.native_name}</option>)}
+                                    </select>
+                                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{t('Built-in text is translated automatically. Add translations for your custom text here; blank fields use the base text.')}</p>
+                                </div>
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    {[
+                                        ['title', 'Title'], ['subtitle', 'Subtitle'], ['launcher_label', 'Launcher callout'],
+                                        ['send_button_label', 'Send button'], ['input_placeholder', 'Input placeholder'],
+                                        ['welcome_message', 'Welcome message'], ['fallback_message', 'Fallback message'],
+                                    ].map(([field, label]) => (
+                                        <TextField key={`${editingLocale}-${field}`} id={`localized_${field}`} label={t(label)} value={localizedCopy[field] || ''} onChange={(value) => updateLocalizedCopy(field, value)} error={errors[`localized_content.${editingLocale}.${field}`]} dir={languages.find((language) => language.code === editingLocale)?.direction} />
+                                    ))}
+                                </div>
+                                <div>
+                                    <InputLabel htmlFor="localized_suggested_prompts" value={t('Conversation starters')} />
+                                    <textarea id="localized_suggested_prompts" value={(localizedCopy.suggested_prompts || []).join('\n')} onChange={(event) => updateLocalizedCopy('suggested_prompts', event.target.value.split('\n'))} rows={4} dir={languages.find((language) => language.code === editingLocale)?.direction} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100" />
+                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('One prompt per line, up to four prompts.')}</p>
+                                    <InputError message={errors[`localized_content.${editingLocale}.suggested_prompts`] || Object.entries(errors).find(([key]) => key.startsWith(`localized_content.${editingLocale}.suggested_prompts.`))?.[1]} />
+                                </div>
+                            </div>
+                        </section>
                         <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
                             <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Appearance")}</h3>
                             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Colors and text shown in the chat header and launcher.")}</p>
@@ -313,7 +405,7 @@ export default function Install({ bots, defaults, positions, icons }) {
                     </form>
 
                     <aside className="space-y-6">
-                        <WidgetPreview config={data} initialOpen={data.initial_open} />
+                        <WidgetPreview config={previewConfig} initialOpen={data.initial_open} language={languages.find((language) => language.code === editingLocale)} />
                         <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
@@ -341,7 +433,7 @@ export default function Install({ bots, defaults, positions, icons }) {
     );
 }
 
-function WidgetPreview({ config, initialOpen }) {
+function WidgetPreview({ config, initialOpen, language }) {
     const positionClass = {
         'bottom-right': 'items-end justify-end',
         'bottom-left': 'items-end justify-start',
@@ -360,10 +452,11 @@ function WidgetPreview({ config, initialOpen }) {
             <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Preview")}</h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Approximate look on your site (desktop).")}</p>
             <div
-                className={`relative mt-4 flex h-96 overflow-hidden rounded-xl border border-gray-200 bg-gradient-to-br from-slate-100 to-slate-200 p-4 dark:border-gray-700 dark:from-gray-900 dark:to-gray-800 ${positionClass}`}
+                dir="ltr" className={`relative mt-4 flex h-96 overflow-hidden rounded-xl border border-gray-200 bg-gradient-to-br from-slate-100 to-slate-200 p-4 dark:border-gray-700 dark:from-gray-900 dark:to-gray-800 ${positionClass}`}
             >
                 {initialOpen && (
                 <div
+                    dir={language?.direction || 'ltr'}
                     className="flex w-[min(100%,280px)] flex-col overflow-hidden shadow-xl"
                     style={{
                         borderRadius: config.border_radius + 'px',
@@ -402,7 +495,7 @@ function WidgetPreview({ config, initialOpen }) {
                             <div
                                 className="max-w-[85%] rounded-2xl border px-3 py-2 text-xs"
                                 style={{ background: config.surface_color, borderColor: config.text_color + '22', color: config.text_color }}
-                            >{t("Welcome! How can I help?")}</div>
+                            >{config.welcome_message || t("Welcome! How can I help?")}</div>
                         </div>
                         <div className="ms-7 flex flex-wrap gap-1.5">
                             {previewPrompts.map((prompt) => (
@@ -483,11 +576,11 @@ function LauncherIcon({ icon }) {
     );
 }
 
-function TextField({ id, label, value, onChange, error, placeholder }) {
+function TextField({ id, label, value, onChange, error, placeholder, dir }) {
     return (
         <div>
             <InputLabel htmlFor={id} value={t(label)} />
-            <TextInput id={id} value={value} onChange={(e) => onChange(e.target.value)} className="mt-1 block w-full" placeholder={placeholder} />
+            <TextInput id={id} dir={dir} value={value} onChange={(e) => onChange(e.target.value)} className="mt-1 block w-full" placeholder={placeholder} />
             <InputError message={error} className="mt-1" />
         </div>
     );

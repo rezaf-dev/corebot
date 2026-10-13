@@ -35,6 +35,9 @@ class PublicChatController extends Controller
         $bot = $this->activeBot($data['bot_public_key']);
         $this->ensureAllowedDomain($bot, $data['source_url'] ?? $request->headers->get('referer'));
 
+        $widgetLocalization = $localization->widgetLocalization($data['locale'] ?? null, $bot);
+        $widget = $localization->widgetConfig($bot, $widgetLocalization['locale']);
+
         $priorContact = $this->priorVisitorContact($bot, $data['visitor_id'] ?? null);
         $ipAddress = $clientIp->resolve($request);
         $geo = $geoIp->lookup($ipAddress);
@@ -57,7 +60,7 @@ class PublicChatController extends Controller
             'country_name' => $geo['country_name'],
             'city' => $geo['city'],
             'timezone' => $data['timezone'] ?? null,
-            'language' => $this->preferredLanguage($request),
+            'language' => $widgetLocalization['locale'],
             'utm_source' => $data['utm_source'] ?? null,
             'utm_medium' => $data['utm_medium'] ?? null,
             'utm_campaign' => $data['utm_campaign'] ?? null,
@@ -69,10 +72,10 @@ class PublicChatController extends Controller
             [
                 'conversation_id' => $conversation->id,
                 'conversation_token' => $conversationToken,
-                'welcome_message' => $bot->welcome_message,
+                'welcome_message' => $widget['welcome_message'],
                 'collect_contact_on_start' => (bool) $bot->collect_contact_on_start,
-                'widget' => $bot->resolvedWidgetConfig(),
-                'localization' => $localization->widgetLocalization($data['locale'] ?? null),
+                'widget' => $widget,
+                'localization' => $widgetLocalization,
             ],
         ));
     }
@@ -86,14 +89,14 @@ class PublicChatController extends Controller
 
         $bot = $this->activeBot($data['bot_public_key']);
 
+        $widgetLocalization = $localization->widgetLocalization($data['locale'] ?? null, $bot);
+
         return response()->json([
-            'widget' => array_merge($bot->resolvedWidgetConfig(), [
-                'welcome_message' => $bot->welcome_message,
-            ]),
+            'widget' => $localization->widgetConfig($bot, $widgetLocalization['locale']),
             'contact_fields' => BotContactConfig::fields($bot),
             'contact_required' => BotContactConfig::required($bot),
             'collect_contact_on_start' => (bool) $bot->collect_contact_on_start,
-            'localization' => $localization->widgetLocalization($data['locale'] ?? null),
+            'localization' => $widgetLocalization,
         ]);
     }
 
@@ -185,6 +188,7 @@ class PublicChatController extends Controller
             'conversation_id' => ['required', 'integer'],
             'conversation_token' => ['required', 'string', 'size:64'],
             'message' => ['required', 'string', 'max:2000'],
+            'locale' => ['nullable', 'string', 'max:10'],
             'page.url' => ['nullable', 'url:http,https', 'max:2000'],
             'page.title' => ['nullable', 'string', 'max:255'],
         ]);
@@ -200,6 +204,11 @@ class PublicChatController extends Controller
         if (isset($pageContext['url'])) {
             $this->ensureAllowedDomain($bot, $pageContext['url']);
             $conversation->update(['source_url' => $pageContext['url']]);
+        }
+
+        $locale = app(Localization::class)->widgetLocalization($data['locale'] ?? $conversation->language, $bot)['locale'];
+        if ($conversation->language !== $locale) {
+            $conversation->update(['language' => $locale]);
         }
 
         return [$bot, $conversation, $data['message'], $pageContext];
@@ -266,18 +275,5 @@ class PublicChatController extends Controller
         }
 
         return BotContactConfig::contactPayload($prior);
-    }
-
-    private function preferredLanguage(Request $request): ?string
-    {
-        $header = $request->header('Accept-Language');
-
-        if (! is_string($header) || $header === '') {
-            return null;
-        }
-
-        $primary = explode(',', $header)[0] ?? '';
-
-        return substr(trim($primary), 0, 32) ?: null;
     }
 }

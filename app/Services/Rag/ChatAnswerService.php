@@ -10,6 +10,7 @@ use App\Services\Conversations\ManualHandoffNotifier;
 use App\Services\Conversations\PotentialCustomerDetector;
 use App\Services\Integrations\IntegrationToolFactory;
 use App\Support\BotContactConfig;
+use App\Support\Localization;
 use Generator;
 use Laravel\Ai\Streaming\Events\TextDelta;
 use Throwable;
@@ -19,6 +20,7 @@ use function Illuminate\Support\defer;
 class ChatAnswerService
 {
     public function __construct(
+        private readonly Localization $localization,
         private readonly SemanticSearchService $search,
         private readonly OpenAIService $openAI,
         private readonly IntegrationToolFactory $integrationTools,
@@ -48,7 +50,7 @@ class ChatAnswerService
         try {
             $response = $this->openAI->createChatCompletion($bot->tenant, $messages, $this->chatOptions($bot, $conversation));
 
-            $answer = trim($response['choices'][0]['message']['content'] ?? '') ?: $bot->fallback_message;
+            $answer = trim($response['choices'][0]['message']['content'] ?? '') ?: $this->fallbackMessage($bot, $conversation);
         } catch (Throwable) {
             return $this->fallback($bot, $conversation, $userMessage, 'Chat completion failed.');
         }
@@ -124,7 +126,7 @@ class ChatAnswerService
                 }
             }
 
-            $answer = trim($stream->text ?? '') ?: $bot->fallback_message;
+            $answer = trim($stream->text ?? '') ?: $this->fallbackMessage($bot, $conversation);
         } catch (Throwable) {
             $fallback = $this->fallback($bot, $conversation, $userMessage, 'Chat completion failed.');
 
@@ -200,7 +202,7 @@ class ChatAnswerService
     private function buildMessages(Bot $bot, ChatConversation $conversation, string $userMessage, ?string $context): array
     {
         $messages = [
-            ['role' => 'system', 'content' => $this->prompt($bot, $context)],
+            ['role' => 'system', 'content' => $this->prompt($bot, $conversation, $context)],
         ];
 
         $history = $conversation->messages()
@@ -274,12 +276,13 @@ class ChatAnswerService
     private function fallback(Bot $bot, ChatConversation $conversation, string $query, string $reason): array
     {
         $this->manualHandoffNotifier->escalate($bot, $conversation);
+        $message = $this->fallbackMessage($bot, $conversation);
 
         $assistant = $conversation->messages()->create([
             'tenant_id' => $bot->tenant_id,
             'bot_id' => $bot->id,
             'role' => 'assistant',
-            'content' => $bot->fallback_message,
+            'content' => $message,
             'metadata' => ['fallback_reason' => $reason],
         ]);
 
@@ -295,7 +298,7 @@ class ChatAnswerService
         ]);
 
         return $this->withContactMeta($bot, $conversation, [
-            'message' => $bot->fallback_message,
+            'message' => $message,
             'fallback' => true,
             'chat_message_id' => $assistant->id,
             'sources' => [],
@@ -350,11 +353,14 @@ class ChatAnswerService
         return null;
     }
 
-    private function prompt(Bot $bot, ?string $context): string
+    private function prompt(Bot $bot, ChatConversation $conversation, ?string $context): string
     {
         $base = trim((string) $bot->system_prompt) ?: Bot::DEFAULT_SYSTEM_PROMPT;
         $companyName = trim((string) $bot->tenant->name);
         $toolInstructions = $this->integrationToolInstructions($bot);
+        $locale = $this->localization->widgetLocalization($conversation->language, $bot)['locale'];
+        $languageName = config('localization.languages.'.$locale.'.name');
+        $base .= "\n\nVisitor language: {$languageName} ({$locale}). Respond in this language, including when the knowledge base is written in another language.";
 
         $identityInstructions = <<<PROMPT
 
@@ -393,6 +399,13 @@ CONTEXT:
 {$context}
 {$toolInstructions}
 PROMPT);
+    }
+
+    private function fallbackMessage(Bot $bot, ChatConversation $conversation): string
+    {
+        $locale = $this->localization->widgetLocalization($conversation->language, $bot)['locale'];
+
+        return $this->localization->widgetConfig($bot, $locale)['fallback_message'];
     }
 
     private function integrationToolInstructions(Bot $bot): string

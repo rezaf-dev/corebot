@@ -399,6 +399,10 @@ function createWidgetLocalization(initial) {
         set(next) { settings = next || settings; },
         locale() { return settings.locale || 'en'; },
         direction() { return settings.direction === 'rtl' ? 'rtl' : 'ltr'; },
+        languages() {
+            return (settings.available_languages || []).filter((language) =>
+                !settings.enabled_locales || settings.enabled_locales.includes(language.code));
+        },
         translate(key) {
             return Object.hasOwn(settings.translations || {}, key) ? settings.translations[key] : key;
         },
@@ -417,6 +421,9 @@ function createWidgetLocalization(initial) {
     const apiBase = serverBootstrap?.api_base || resolveApiBase(script);
     const storageKey = 'crm_ai_bot_' + botKey;
     const state = JSON.parse(localStorage.getItem(storageKey) || '{}');
+    const initialPreferredLocale = state.locale || script?.dataset.locale;
+    let configRequestSequence = 0;
+    let isChangingLanguage = false;
     let latestManualMessageId = 0;
     let manualMessagePolling = null;
 
@@ -485,6 +492,7 @@ function createWidgetLocalization(initial) {
     const iconClose = root.querySelector('.crm-ai-icon-close');
     const panel = root.querySelector('.crm-ai-panel');
     const closeBtn = root.querySelector('.crm-ai-close');
+    const languageSelect = root.querySelector('.crm-ai-language');
     const headTitle = root.querySelector('.crm-ai-head-title');
     const headSub = root.querySelector('.crm-ai-head-sub');
     const headAvatar = root.querySelector('.crm-ai-head-avatar');
@@ -503,9 +511,26 @@ function createWidgetLocalization(initial) {
     applyConfig(config);
 
     if (serverBootstrap) {
-        applyRemoteConfig(serverBootstrap);
+        applyRemoteConfig({ ...serverBootstrap, defer_initial_open: Boolean(initialPreferredLocale) });
     }
-    loadRemoteConfig().then(applyRemoteConfig);
+    loadRemoteConfig(initialPreferredLocale).then(applyRemoteConfig);
+
+    languageSelect.addEventListener('change', async () => {
+        if (isLoading || isStarting || isChangingLanguage) return;
+        isChangingLanguage = true;
+        languageSelect.disabled = true;
+        try {
+            const remote = await loadRemoteConfig(languageSelect.value);
+            if (remote?.localization) {
+                state.locale = remote.localization.locale;
+                applyRemoteConfig(remote);
+            }
+            languageSelect.value = widgetLocalization.locale();
+        } finally {
+            isChangingLanguage = false;
+            updateChatAvailability();
+        }
+    });
 
     button.addEventListener('click', () => togglePanel());
     button.addEventListener('pointerdown', unlockNotificationSound, { once: true });
@@ -653,7 +678,7 @@ function createWidgetLocalization(initial) {
 
     function showWelcomeMessage(text) {
         messages.innerHTML = '';
-        add('assistant', text || welcomeText());
+        add('assistant', text || welcomeText()).dataset.welcome = 'true';
         renderSuggestedPrompts();
     }
 
@@ -705,12 +730,15 @@ function createWidgetLocalization(initial) {
         }
     }
 
-    async function loadRemoteConfig() {
+    async function loadRemoteConfig(preferredLocale) {
+        const requestSequence = ++configRequestSequence;
         try {
-            const url = apiBase + '/widget-config?bot_public_key=' + encodeURIComponent(botKey) + (script?.dataset.locale ? '&locale=' + encodeURIComponent(script.dataset.locale) : '');
+            const url = apiBase + '/widget-config?bot_public_key=' + encodeURIComponent(botKey)
+                + (preferredLocale ? '&locale=' + encodeURIComponent(preferredLocale) : '');
             const response = await fetch(url, { headers: { Accept: 'application/json' } });
             if (!response.ok) return {};
-            return await response.json();
+            const remote = await response.json();
+            return requestSequence === configRequestSequence ? remote : null;
         } catch {
             return {};
         }
@@ -719,8 +747,22 @@ function createWidgetLocalization(initial) {
     function applyLocalization(localization) {
         if (!localization) return;
         widgetLocalization.set(localization);
+        if (state.locale) state.locale = widgetLocalization.locale();
+        localStorage.setItem(storageKey, JSON.stringify(state));
         crmRoot.lang = widgetLocalization.locale();
         crmRoot.dir = widgetLocalization.direction();
+        const languages = widgetLocalization.languages();
+        languageSelect.replaceChildren();
+        languages.forEach((language) => {
+            const option = document.createElement('option');
+            option.value = language.code;
+            option.lang = language.code;
+            option.textContent = language.native_name;
+            languageSelect.appendChild(option);
+        });
+        languageSelect.value = widgetLocalization.locale();
+        languageSelect.hidden = languages.length < 2;
+        button.setAttribute('aria-label', t(isOpen ? 'Close chat' : 'Open support chat'));
         crmRoot.querySelectorAll('[data-i18n]').forEach((element) => {
             element.textContent = t(element.dataset.i18n);
         });
@@ -730,6 +772,7 @@ function createWidgetLocalization(initial) {
     }
 
     function applyRemoteConfig(remote) {
+        if (!remote) return;
         applyLocalization(remote.localization);
         config = mergeConfig(config, remote.widget || {});
         applyConfig(config);
@@ -740,7 +783,12 @@ function createWidgetLocalization(initial) {
             localStorage.setItem(storageKey, JSON.stringify(state));
         }
 
-        applyInitialOpen();
+        const welcome = messages.querySelector('[data-welcome]');
+        if (welcome && !hasUserMessages()) {
+            setBubbleText(welcome, welcomeText());
+            renderSuggestedPrompts();
+        }
+        if (!remote.defer_initial_open) applyInitialOpen();
         crmRoot.dataset.configReady = 'true';
     }
 
@@ -757,14 +805,14 @@ function createWidgetLocalization(initial) {
             contactConfig.collect_on_start = remote.collect_contact_on_start;
         }
 
-        renderContactForm({});
+        renderContactForm(getContactFormValues());
     }
 
     async function post(path, body) {
         const response = await fetch(apiBase + path, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-            body: JSON.stringify({ bot_public_key: botKey, conversation_token: state.conversation_token, ...body }),
+            body: JSON.stringify({ bot_public_key: botKey, conversation_token: state.conversation_token, locale: widgetLocalization.locale(), ...body }),
         });
 
         if (!response.ok) {
@@ -816,6 +864,7 @@ function createWidgetLocalization(initial) {
                 bot_public_key: botKey,
                 conversation_token: state.conversation_token,
                 conversation_id: state.conversation_id,
+                locale: widgetLocalization.locale(),
                 message: text,
                 page: pageContext(),
             }),
@@ -1013,7 +1062,8 @@ function createWidgetLocalization(initial) {
 
     function updateChatAvailability() {
         const blocked = chatBlockedByContact();
-        const disabled = isLoading || isStarting || blocked;
+        const disabled = isLoading || isStarting || isChangingLanguage || blocked;
+        languageSelect.disabled = isLoading || isStarting || isChangingLanguage;
         sendBtn.disabled = disabled;
         input.disabled = disabled;
         form.classList.toggle('is-blocked', blocked);
@@ -1246,7 +1296,7 @@ function createWidgetLocalization(initial) {
         }
 
         return {
-            locale: script?.dataset.locale || widgetLocalization.locale(),
+            locale: widgetLocalization.locale(),
             visitor_id: state.visitor_id,
             source_url: location.href,
             referrer_url: document.referrer || null,
@@ -1397,7 +1447,7 @@ function createWidgetLocalization(initial) {
         if (node.querySelector('.crm-ai-feedback')) return;
         const feedback = document.createElement('div');
         feedback.className = 'crm-ai-feedback';
-        feedback.innerHTML = ("<span class=\"crm-ai-feedback-label\">" + escapeHtml(t("Was this helpful?")) + "</span><button type=\"button\" aria-label=\"" + escapeAttr(t("Helpful")) + "\" aria-pressed=\"false\" data-feedback=\"up\">\ud83d\udc4d</button><button type=\"button\" aria-label=\"" + escapeAttr(t("Not helpful")) + "\" aria-pressed=\"false\" data-feedback=\"down\">\ud83d\udc4e</button>");
+        feedback.innerHTML = ("<span class=\"crm-ai-feedback-label\" data-i18n=\"Was this helpful?\">" + escapeHtml(t("Was this helpful?")) + "</span><button type=\"button\" aria-label=\"" + escapeAttr(t("Helpful")) + "\" aria-pressed=\"false\" data-i18n-aria-label=\"Helpful\" data-feedback=\"up\">\ud83d\udc4d</button><button type=\"button\" aria-label=\"" + escapeAttr(t("Not helpful")) + "\" aria-pressed=\"false\" data-i18n-aria-label=\"Not helpful\" data-feedback=\"down\">\ud83d\udc4e</button>");
         feedback.addEventListener('click', (event) => {
             const button = event.target.closest('[data-feedback]');
             if (!button) return;
@@ -1729,6 +1779,23 @@ function createWidgetLocalization(initial) {
                 flex-shrink: 0;
             }
             .crm-ai-head-sub { font-size: 12px; color: var(--crm-muted); line-height: 1.3; }
+            .crm-ai-language {
+                flex-shrink: 0;
+                max-width: 105px;
+                margin-inline-start: auto;
+                padding: 5px 6px;
+                border: 1px solid var(--crm-border);
+                border-radius: 6px;
+                background: var(--crm-surface);
+                color: var(--crm-text);
+                font: inherit;
+                font-size: 12px;
+                cursor: pointer;
+            }
+            .crm-ai-language[hidden] { display: none; }
+            .crm-ai-language:focus-visible { outline: 2px solid var(--crm-accent); }
+            .crm-ai-language:disabled { opacity: 0.6; cursor: wait; }
+            .crm-ai-root[dir="rtl"] .crm-ai-send svg { transform: scaleX(-1); }
             .crm-ai-close {
                 flex-shrink: 0;
                 border: 0;
@@ -2226,6 +2293,7 @@ function createWidgetLocalization(initial) {
                             </div>
                         </div>
                     </div>
+                    <select class="crm-ai-language" hidden aria-label="${escapeAttr(t('Language'))}" data-i18n-aria-label="Language"></select>
                     <button type="button" class="crm-ai-close" aria-label="${escapeAttr(t("Close chat"))}" data-i18n-aria-label="Close chat">
                         <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
                     </button>

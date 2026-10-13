@@ -59,7 +59,7 @@ it('returns contact configuration when starting a conversation', function () {
         ->and($conversation->country_code)->toBe('US')
         ->and($conversation->city)->toBe('New York')
         ->and($conversation->user_agent)->toBe('Mozilla/5.0 Test')
-        ->and($conversation->language)->toBe('en-US');
+        ->and($conversation->language)->toBe('en');
 });
 
 it('reuses prior visitor contact on new conversations', function () {

@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\ApplicationSetting;
+use App\Models\Bot;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 
@@ -45,19 +46,57 @@ class Localization
         return config('localization.languages.'.$locale.'.direction', 'ltr');
     }
 
-    /** @return array{locale: string, direction: string, translations: array<string, string>} */
-    public function widgetLocalization(?string $preferredLocale = null): array
+    /** @return array<string, mixed> */
+    public function widgetLocalization(?string $preferredLocale = null, ?Bot $bot = null): array
     {
         $settings = $this->settings();
-        $locale = in_array($preferredLocale, $settings['enabled_locales'], true)
-            ? $preferredLocale
-            : $settings['default_locale'];
+        $config = $bot?->resolvedWidgetConfig() ?? [];
+        $requested = $config['enabled_locales'] ?? [];
+        $enabled = is_array($requested) && $requested !== []
+            ? array_values(array_intersect($settings['enabled_locales'], $requested))
+            : $settings['enabled_locales'];
+        $enabled = $enabled !== [] ? $enabled : $settings['enabled_locales'];
+        $default = $config['default_locale'] ?? '';
+        if (! in_array($default, $enabled, true)) {
+            $default = in_array($settings['default_locale'], $enabled, true) ? $settings['default_locale'] : $enabled[0];
+        }
+        $locale = in_array($preferredLocale, $enabled, true) ? $preferredLocale : $default;
 
         return [
             'locale' => $locale,
+            'default_locale' => $default,
+            'enabled_locales' => $enabled,
+            'available_languages' => array_values(array_filter($this->availableLanguages(), fn (array $language): bool => in_array($language['code'], $enabled, true))),
             'direction' => $this->direction($locale),
             'translations' => $this->translations($locale),
         ];
+    }
+
+    /** @return array<string, mixed> */
+    public function widgetConfig(Bot $bot, string $locale): array
+    {
+        $config = $bot->resolvedWidgetConfig();
+        $translations = $this->translations($locale);
+        $config['welcome_message'] = $bot->welcome_message;
+        $config['fallback_message'] = $bot->fallback_message;
+        $defaults = [
+            ...WidgetConfig::DEFAULTS,
+            'welcome_message' => Bot::DEFAULT_WELCOME_MESSAGE,
+            'fallback_message' => Bot::DEFAULT_FALLBACK_MESSAGE,
+        ];
+        foreach (WidgetConfig::LOCALIZED_FIELDS as $field) {
+            if ($field !== 'suggested_prompts' && ($config[$field] ?? null) === $defaults[$field]) {
+                $config[$field] = $translations[$defaults[$field]] ?? $defaults[$field];
+            }
+        }
+        $overrides = $config['localized_content'][$locale] ?? [];
+        foreach (WidgetConfig::LOCALIZED_FIELDS as $field) {
+            if (array_key_exists($field, $overrides) && $overrides[$field] !== null) {
+                $config[$field] = $overrides[$field];
+            }
+        }
+
+        return $config;
     }
 
     /** @return array<string, string> */

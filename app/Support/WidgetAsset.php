@@ -66,12 +66,14 @@ class WidgetAsset
     /** @return array<string, mixed> */
     private function bootstrap(Bot $bot): array
     {
+        $localization = app(Localization::class);
+        $widgetLocalization = $localization->widgetLocalization(bot: $bot);
+
         return [
             'bot_key' => $bot->public_key,
             'api_base' => url('/api/public/chat'),
-            'widget' => array_merge($bot->resolvedWidgetConfig(), [
-                'welcome_message' => $bot->welcome_message,
-            ]),
+            'widget' => $localization->widgetConfig($bot, $widgetLocalization['locale']),
+            'localization' => $widgetLocalization,
             'contact_fields' => BotContactConfig::fields($bot),
             'contact_required' => BotContactConfig::required($bot),
             'collect_contact_on_start' => (bool) $bot->collect_contact_on_start,

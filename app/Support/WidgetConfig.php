@@ -4,7 +4,12 @@ namespace App\Support;
 
 class WidgetConfig
 {
+    public const LOCALIZED_FIELDS = ['title', 'subtitle', 'launcher_label', 'send_button_label', 'input_placeholder', 'welcome_message', 'fallback_message', 'suggested_prompts'];
+
     public const DEFAULTS = [
+        'default_locale' => '',
+        'enabled_locales' => [],
+        'localized_content' => [],
         'title' => 'Support',
         'subtitle' => 'We typically reply instantly',
         'avatar_url' => '',

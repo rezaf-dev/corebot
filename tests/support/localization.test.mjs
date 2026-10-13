@@ -58,3 +58,70 @@ for (const locale of locales) {
     assert.equal(translator.translate('custom visitor content'), 'custom visitor content');
 }
 console.log('Frontend localization and widget translation checks passed.');
+
+// Exercise the actual widget locale update against minimal DOM controls.
+const widgetAst = parseAst(widget, { lang: 'js' });
+function widgetFunction(name) {
+    let match;
+    function visit(node) {
+        if (!node || typeof node !== 'object') return;
+        if (node.type === 'FunctionDeclaration' && node.id?.name === name) match = widget.slice(node.start, node.end);
+        for (const value of Object.values(node)) {
+            if (Array.isArray(value)) value.forEach(visit);
+            else if (value && typeof value === 'object') visit(value);
+        }
+    }
+    visit(widgetAst);
+    assert.ok(match, `widget function ${name} exists`);
+    return match;
+}
+let storedState;
+const controls = {
+    state: { locale: 'en' },
+    localStorage: { setItem(_key, value) { storedState = JSON.parse(value); } },
+    storageKey: 'test',
+    isOpen: false,
+    widgetLocalization: context.createWidgetLocalization(),
+    languageSelect: { children: [], replaceChildren() { this.children = []; }, appendChild(option) { this.children.push(option); } },
+    crmRoot: { querySelectorAll() { return []; } },
+    document: { createElement() { return {}; } },
+    button: { setAttribute(name, value) { this[name] = value; } },
+};
+controls.t = (key) => controls.widgetLocalization.translate(key);
+const widgetContext = vm.createContext(controls);
+vm.runInContext(widgetFunction('applyLocalization'), widgetContext);
+const languageOptions = [{ code: 'en', native_name: 'English' }, { code: 'fa', native_name: 'فارسی' }, { code: 'ar', native_name: 'العربية' }];
+widgetContext.applyLocalization({ locale: 'fa', direction: 'rtl', enabled_locales: ['en', 'fa'], available_languages: languageOptions, translations: { 'Open support chat': 'باز کردن گفتگو' } });
+assert.equal(controls.crmRoot.dir, 'rtl');
+assert.equal(controls.crmRoot.lang, 'fa');
+assert.equal(storedState.locale, 'fa');
+assert.equal(controls.languageSelect.value, 'fa');
+assert.equal(controls.languageSelect.hidden, false);
+assert.deepEqual(controls.languageSelect.children.map((option) => option.value), ['en', 'fa']);
+assert.equal(controls.languageSelect.children[1].textContent, 'فارسی');
+assert.equal(controls.button['aria-label'], 'باز کردن گفتگو');
+widgetContext.applyLocalization({ locale: 'en', direction: 'ltr', enabled_locales: ['en'], available_languages: languageOptions, translations: {} });
+assert.equal(controls.crmRoot.dir, 'ltr');
+assert.equal(controls.languageSelect.hidden, true, 'single language widgets hide the switcher');
+assert.equal(storedState.locale, 'en', 'resolved default replaces disabled saved preferences');
+
+// A slower initial config request must not overwrite a visitor's newer choice.
+const pending = [];
+const raceContext = vm.createContext({
+    botKey: 'test', apiBase: 'https://example.test/api', configRequestSequence: 0,
+    fetch(url) { return new Promise((resolve) => pending.push({ url, resolve })); },
+});
+vm.runInContext(widgetFunction('loadRemoteConfig'), raceContext);
+const older = raceContext.loadRemoteConfig('en');
+const newer = raceContext.loadRemoteConfig('fa');
+assert.ok(pending[1].url.endsWith('&locale=fa'));
+pending[1].resolve({ ok: true, async json() { return { locale: 'fa' }; } });
+assert.equal((await newer).locale, 'fa');
+pending[0].resolve({ ok: true, async json() { return { locale: 'en' }; } });
+assert.equal(await older, null);
+console.log('Widget language switching, persistence and config race checks passed.');
+
+controls.state = {};
+widgetContext.state = controls.state;
+widgetContext.applyLocalization({ locale: 'fa', direction: 'rtl', available_languages: languageOptions, translations: {} });
+assert.equal(storedState.locale, undefined, 'automatic defaults are not saved as explicit visitor choices');

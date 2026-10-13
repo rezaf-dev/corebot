@@ -42,6 +42,8 @@ Do not invent business rules, prices, policies, legal advice, medical advice, pa
 Keep answers clear, practical, and concise.
 PROMPT;
 
+    public const DEFAULT_WELCOME_MESSAGE = 'Hi, how can I help with your CRM today?';
+
     public const DEFAULT_FALLBACK_MESSAGE = 'I am not sure based on the available information. Please contact support, and someone can help you with this.';
 
     protected static function booted(): void
@@ -50,7 +52,7 @@ PROMPT;
             $bot->public_key ??= 'bot_'.Str::random(32);
             $bot->system_prompt ??= self::DEFAULT_SYSTEM_PROMPT;
             $bot->fallback_message ??= self::DEFAULT_FALLBACK_MESSAGE;
-            $bot->welcome_message ??= 'Hi, how can I help with your CRM today?';
+            $bot->welcome_message ??= self::DEFAULT_WELCOME_MESSAGE;
         });
 
         static::saved(function (Bot $bot): void {
