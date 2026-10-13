@@ -24,7 +24,7 @@ export default function Install({ bots, defaults, positions, icons, languages = 
 
     const selectedBot = bots.find((bot) => bot.id === selectedBotId);
 
-    const { data, setData, put, processing, errors, recentlySuccessful, defaults: updateDefaults, transform } = useForm(
+    const { data, setData, put, processing, errors, recentlySuccessful, setDefaults: updateDefaults, transform } = useForm(
         { ...defaults, ...selectedBot?.widget_config },
     );
 

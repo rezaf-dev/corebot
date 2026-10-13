@@ -11,6 +11,14 @@ function sanitizeUrl(url) {
     const trimmed = String(url || '').trim();
     if (!trimmed) return null;
 
+    if (/^mailto:/i.test(trimmed)) {
+        const address = trimmed.slice(7);
+        if (/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(address)) {
+            return 'mailto:' + address;
+        }
+        return null;
+    }
+
     if (/^tel:/i.test(trimmed)) {
         const phone = trimmed.replace(/^tel:/i, '').trim();
         if (/^\+?[0-9][0-9().\-\s]{5,}$/.test(phone)) {
@@ -44,20 +52,47 @@ function applyInlineMarkdown(text) {
     const emailLinks = [];
     const markdownLinks = [];
     const phoneLinks = [];
+    const inlineCode = [];
 
-    html = html.replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, (email) => {
-        const placeholder = '\u0000EMAILLINK' + emailLinks.length + '\u0000';
-        emailLinks.push('<a href="mailto:' + email + '">' + email + '</a>');
+    html = html.replace(/`([^`\n]+)`/g, (_, code) => {
+        const placeholder = '\u0000INLINECODE' + inlineCode.length + '\u0000';
+        inlineCode.push('<code>' + code + '</code>');
         return placeholder;
     });
 
     html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => {
-        const safeUrl = sanitizeUrl(url);
-        if (!safeUrl) return label;
-        const downloadAttributes = isDownloadUrl(safeUrl) ? ' download data-download-link="true"' : '';
-        const targetAttributes = safeUrl.startsWith('tel:') ? '' : ' target="_blank" rel="noopener noreferrer"';
         const placeholder = '\u0000MARKDOWNLINK' + markdownLinks.length + '\u0000';
-        markdownLinks.push('<a href="' + safeUrl.replace(/"/g, '&quot;') + '"' + targetAttributes + downloadAttributes + '>' + label + '</a>');
+        if (/^reply:/i.test(url)) {
+            try {
+                const reply = decodeURIComponent(url.slice(6)).trim();
+                if (!reply || reply.length > 500 || /[\r\n\u0000-\u001f]/.test(reply)) return label;
+                markdownLinks.push('<button type="button" class="crm-ai-reply-action" data-reply="' + encodeURIComponent(reply) + '">' + label + '</button>');
+                return placeholder;
+            } catch {
+                return label;
+            }
+        }
+        const safeUrl = sanitizeUrl(url.replace(/&amp;/g, '&'));
+        if (!safeUrl) return label;
+        const contactAction = /^(mailto:|tel:)/.test(safeUrl) || isWhatsAppUrl(safeUrl);
+        const actionAttributes = contactAction ? ' class="crm-ai-contact-action"' : '';
+        const downloadAttributes = isDownloadUrl(safeUrl) ? ' download data-download-link="true"' : '';
+        const targetAttributes = /^(tel:|mailto:)/.test(safeUrl) ? '' : ' target="_blank" rel="noopener noreferrer"';
+        markdownLinks.push('<a href="' + escapeHtml(safeUrl) + '"' + actionAttributes + targetAttributes + downloadAttributes + '>' + label + '</a>');
+        return placeholder;
+    });
+
+    html = html.replace(/https:\/\/(?:wa\.me|(?:api|web|chat)\.whatsapp\.com)\/[^\s<>]+/gi, (url) => {
+        const safeUrl = sanitizeUrl(url.replace(/[.,;!?]+$/, '').replace(/&amp;/g, '&'));
+        if (!safeUrl || !isWhatsAppUrl(safeUrl)) return url;
+        const placeholder = '\u0000MARKDOWNLINK' + markdownLinks.length + '\u0000';
+        markdownLinks.push('<a href="' + escapeHtml(safeUrl) + '" class="crm-ai-contact-action" target="_blank" rel="noopener noreferrer">' + escapeHtml(safeUrl) + '</a>');
+        return placeholder + (url.match(/[.,;!?]+$/)?.[0] || '');
+    });
+
+    html = html.replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, (email) => {
+        const placeholder = '\u0000EMAILLINK' + emailLinks.length + '\u0000';
+        emailLinks.push('<a class="crm-ai-contact-action" href="mailto:' + email + '">' + email + '</a>');
         return placeholder;
     });
 
@@ -65,11 +100,10 @@ function applyInlineMarkdown(text) {
         const safePhone = sanitizeUrl('tel:' + phone);
         if (!safePhone) return phone;
         const placeholder = '\u0000PHONELINK' + phoneLinks.length + '\u0000';
-        phoneLinks.push('<a href="' + safePhone + '">' + phone + '</a>');
+        phoneLinks.push('<a class="crm-ai-contact-action" href="' + safePhone + '">' + phone + '</a>');
         return placeholder;
     });
 
-    html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
     html = html.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/__([^_\n]+)__/g, '<strong>$1</strong>');
     html = html.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>');
@@ -77,7 +111,17 @@ function applyInlineMarkdown(text) {
     return html
         .replace(/\u0000EMAILLINK(\d+)\u0000/g, (_, index) => emailLinks[Number(index)] || '')
         .replace(/\u0000MARKDOWNLINK(\d+)\u0000/g, (_, index) => markdownLinks[Number(index)] || '')
-        .replace(/\u0000PHONELINK(\d+)\u0000/g, (_, index) => phoneLinks[Number(index)] || '');
+        .replace(/\u0000PHONELINK(\d+)\u0000/g, (_, index) => phoneLinks[Number(index)] || '')
+        .replace(/\u0000INLINECODE(\d+)\u0000/g, (_, index) => inlineCode[Number(index)] || '');
+}
+
+function isWhatsAppUrl(url) {
+    try {
+        const parsed = new URL(url);
+        return parsed.protocol === 'https:' && ['wa.me', 'api.whatsapp.com', 'web.whatsapp.com', 'chat.whatsapp.com'].includes(parsed.hostname);
+    } catch {
+        return false;
+    }
 }
 
 function messageDirection(text) {
@@ -475,6 +519,8 @@ function createWidgetLocalization(initial) {
     let isLoading = false;
     let isStarting = false;
     let notificationAudioContext = null;
+    let followingLatestMessages = true;
+    let hasUnreadMessages = false;
 
     const LAUNCHER_ICONS = {
         chat: '<path d="M21 15a4 4 0 0 1-4 4H8l-5 3v-3a4 4 0 0 1-2-3V7a4 4 0 0 1 4-4h12a4 4 0 0 1 4 4Z"/><path d="M8 9h8M8 13h5"/>',
@@ -506,6 +552,10 @@ function createWidgetLocalization(initial) {
     const launcherBadge = root.querySelector('.crm-ai-launcher-badge');
     const newMessagesButton = root.querySelector('.crm-ai-new-messages');
     const isMobile = () => window.matchMedia('(max-width: 480px)').matches;
+    const messageResizeObserver = typeof ResizeObserver === 'function'
+        ? new ResizeObserver(() => scrollToBottom(false, false))
+        : null;
+    messageResizeObserver?.observe(messages);
 
     renderContactForm({});
 
@@ -536,6 +586,7 @@ function createWidgetLocalization(initial) {
     button.addEventListener('click', () => togglePanel());
     button.addEventListener('pointerdown', unlockNotificationSound, { once: true });
     closeBtn.addEventListener('click', () => togglePanel(false));
+    messages.addEventListener('click', handleReplyActionClick);
 
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && isOpen) {
@@ -557,8 +608,13 @@ function createWidgetLocalization(initial) {
         }
 
         input.value = '';
+        messages.querySelectorAll('[data-reply]').forEach((action) => {
+            action.dataset.expired = 'true';
+            action.disabled = true;
+        });
         hideSuggestedPrompts();
         add('user', text);
+        scrollToBottom(true);
 
         const assistant = add('assistant', '', { loading: true });
         setLoading(true);
@@ -683,7 +739,11 @@ function createWidgetLocalization(initial) {
     }
 
     function showWelcomeMessage(text) {
+        messageResizeObserver?.disconnect();
+        messageResizeObserver?.observe(messages);
         messages.innerHTML = '';
+        followingLatestMessages = true;
+        hasUnreadMessages = false;
         add('assistant', text || welcomeText()).dataset.welcome = 'true';
         renderSuggestedPrompts();
     }
@@ -1090,6 +1150,9 @@ function createWidgetLocalization(initial) {
         languageSelect.disabled = isLoading || isStarting || isChangingLanguage;
         sendBtn.disabled = disabled;
         input.disabled = disabled;
+        messages.querySelectorAll('[data-reply]').forEach((action) => {
+            action.disabled = disabled || action.dataset.expired === 'true';
+        });
         form.classList.toggle('is-blocked', blocked);
         panel.classList.toggle('crm-ai-panel--contact', contact.classList.contains('is-visible'));
     }
@@ -1398,7 +1461,7 @@ function createWidgetLocalization(initial) {
     }
 
     async function handlePromptClick(text) {
-        if (isLoading || isStarting || chatBlockedByContact()) {
+        if (isLoading || isStarting || isChangingLanguage || chatBlockedByContact()) {
             return;
         }
 
@@ -1406,19 +1469,35 @@ function createWidgetLocalization(initial) {
         form.requestSubmit();
     }
 
+    function handleReplyActionClick(event) {
+        const action = event.target.closest('[data-reply]');
+        if (!action || !messages.contains(action) || action.disabled || action.dataset.expired === 'true') return;
+        try {
+            const reply = decodeURIComponent(action.dataset.reply);
+            if (reply.trim() && reply.length <= 500) handlePromptClick(reply);
+        } catch {
+            return;
+        }
+    }
+
     function isNearBottom() {
         return messages.scrollHeight - messages.scrollTop - messages.clientHeight < 48;
     }
 
     function updateNewMessagesButton() {
-        newMessagesButton.classList.toggle('is-visible', !isNearBottom());
+        followingLatestMessages = isNearBottom();
+        if (followingLatestMessages) hasUnreadMessages = false;
+        newMessagesButton.classList.toggle('is-visible', hasUnreadMessages);
     }
 
-    function scrollToBottom(force = false) {
-        if (!force && !isNearBottom()) {
-            newMessagesButton.classList.add('is-visible');
+    function scrollToBottom(force = false, markUnread = true) {
+        if (!force && !followingLatestMessages) {
+            if (markUnread) hasUnreadMessages = true;
+            newMessagesButton.classList.toggle('is-visible', hasUnreadMessages);
             return;
         }
+        followingLatestMessages = true;
+        hasUnreadMessages = false;
         messages.scrollTop = messages.scrollHeight;
         newMessagesButton.classList.remove('is-visible');
     }
@@ -1453,6 +1532,7 @@ function createWidgetLocalization(initial) {
             attachFeedback(wrap, options.messageId);
         }
         messages.appendChild(wrap);
+        messageResizeObserver?.observe(wrap);
         scrollToBottom();
 
         return wrap;
@@ -1520,6 +1600,9 @@ function createWidgetLocalization(initial) {
         bubble.dataset.rawText = raw;
         bubble.classList.add('crm-ai-formatted');
         bubble.innerHTML = formatMarkdown(raw);
+        bubble.querySelectorAll('[data-reply]').forEach((action) => {
+            action.disabled = isLoading || isStarting || isChangingLanguage || chatBlockedByContact();
+        });
     }
 
     function setBubbleText(node, text) {
@@ -1844,7 +1927,7 @@ function createWidgetLocalization(initial) {
                 overflow-y: auto;
                 overflow-x: hidden;
                 background: var(--crm-bg);
-                scroll-behavior: smooth;
+                scroll-behavior: auto;
                 -webkit-overflow-scrolling: touch;
                 position: relative;
             }
@@ -1999,6 +2082,28 @@ function createWidgetLocalization(initial) {
             .crm-ai-user .crm-ai-bubble.crm-ai-formatted a {
                 color: #fff;
             }
+            .crm-ai-reply-action,
+            .crm-ai-assistant .crm-ai-bubble.crm-ai-formatted a.crm-ai-contact-action {
+                display: inline-flex;
+                align-items: center;
+                min-height: 36px;
+                margin: 4px 2px;
+                padding: 6px 12px;
+                border: 1px solid var(--crm-accent);
+                border-radius: 999px;
+                background: var(--crm-surface);
+                color: var(--crm-accent);
+                font: inherit;
+                font-size: 13px;
+                text-decoration: none;
+                overflow-wrap: anywhere;
+                cursor: pointer;
+            }
+            .crm-ai-reply-action:hover:not(:disabled),
+            .crm-ai-contact-action:hover { filter: brightness(.9); }
+            .crm-ai-reply-action:focus-visible,
+            .crm-ai-contact-action:focus-visible { outline: 3px solid var(--crm-focus-ring); outline-offset: 2px; }
+            .crm-ai-reply-action:disabled { opacity: .45; cursor: not-allowed; }
             .crm-ai-typing {
                 display: inline-flex;
                 align-items: center;

@@ -46,3 +46,62 @@ if (messageDirection('Hello, how can I help?') !== 'ltr') {
 }
 
 console.log('widget-markdown tests passed');
+
+const assert = require('node:assert/strict');
+assertIncludes(formatMarkdown('[Email us](mailto:support@example.com)'), 'href="mailto:support@example.com"', 'email action');
+assertIncludes(formatMarkdown('[Email us](mailto:support@example.com)'), 'class="crm-ai-contact-action"', 'email action style');
+assertIncludes(formatMarkdown('[WhatsApp](https://wa.me/15551234567)'), 'class="crm-ai-contact-action"', 'WhatsApp action');
+assertIncludes(formatMarkdown('[WhatsApp](https://api.whatsapp.com/send?phone=15551234567&text=Hello)'), 'phone=15551234567&amp;text=Hello', 'WhatsApp query escaping');
+assertIncludes(formatMarkdown('[Sales](reply:Talk%20to%20sales)'), 'data-reply="Talk%20to%20sales"', 'reply action payload');
+assertIncludes(formatMarkdown('[Sales](reply:Sales)'), '<button type="button"', 'reply action button');
+assertIncludes(formatMarkdown('[دعم](reply:%D8%AF%D8%B9%D9%85)'), 'data-reply="%D8%AF%D8%B9%D9%85"', 'localized reply');
+assert.equal(formatMarkdown('[Broken](reply:%ZZ)').includes('<button'), false);
+assert.equal(formatMarkdown('[Empty](reply:)').includes('<button'), false);
+assert.equal(formatMarkdown('[Long](reply:' + 'a'.repeat(501) + ')').includes('<button'), false);
+assert.equal(formatMarkdown('[Bad](reply:hello%0Aworld)').includes('<button'), false);
+assert.equal(formatMarkdown('[Bad](mailto:person@example.com?bcc=other@example.com)').includes('href='), false);
+assert.equal(formatMarkdown('[Fake](https://wa.me.evil.test/123)').includes('crm-ai-contact-action'), false);
+assert.equal(formatMarkdown('[Fake](https://example.com/wa.me/123)').includes('crm-ai-contact-action'), false);
+assert.equal(formatMarkdown('```\n[Sales](reply:Sales)\n```').includes('<button'), false, 'code blocks do not execute actions');
+assert.equal(formatMarkdown('[<img src=x onerror=alert>](reply:%22%3E%3Cimg%3E)').includes('<img'), false, 'labels and values are escaped');
+
+const actionFunction = widgetSource.slice(widgetSource.indexOf('    function handleReplyActionClick('), widgetSource.indexOf('    function isNearBottom('));
+const sent = [];
+const action = { dataset: { reply: 'Talk%20to%20sales' }, disabled: false };
+const actionContext = vm.createContext({ messages: { contains: () => true }, handlePromptClick: (reply) => sent.push(reply) });
+vm.runInContext(actionFunction, actionContext);
+const click = () => actionContext.handleReplyActionClick({ target: { closest: () => action } });
+click();
+assert.deepEqual(sent, ['Talk to sales']);
+action.disabled = true;
+click();
+assert.equal(sent.length, 1, 'disabled actions do not send');
+action.disabled = false;
+action.dataset.expired = 'true';
+click();
+assert.equal(sent.length, 1, 'expired choices do not send');
+delete action.dataset.expired;
+action.dataset.reply = '%ZZ';
+click();
+assert.equal(sent.length, 1, 'malformed choices do not send');
+
+const availabilityFunction = widgetSource.slice(widgetSource.indexOf('    function updateChatAvailability('), widgetSource.indexOf('    function showContact('));
+const availabilityContext = vm.createContext({
+    isLoading: true, isStarting: false, isChangingLanguage: false,
+    chatBlockedByContact: () => false, languageSelect: {}, sendBtn: {}, input: {},
+    form: { classList: { toggle() {} } }, panel: { classList: { toggle() {} } }, contact: { classList: { contains: () => false } },
+    messages: { querySelectorAll: () => [action] },
+});
+vm.runInContext(availabilityFunction, availabilityContext);
+availabilityContext.updateChatAvailability();
+assert.equal(action.disabled, true, 'actions disabled while streaming');
+availabilityContext.isLoading = false;
+availabilityContext.updateChatAvailability();
+assert.equal(action.disabled, false, 'actions enabled after streaming');
+action.dataset.expired = 'true';
+availabilityContext.updateChatAvailability();
+assert.equal(action.disabled, true, 'expired actions stay disabled');
+console.log('Widget contact and reply actions passed');
+assertIncludes(formatMarkdown('WhatsApp: https://wa.me/15551234567.'), 'href="https://wa.me/15551234567"', 'plain WhatsApp action');
+assert.equal(formatMarkdown('`[Sales](reply:Sales)`').includes('<button'), false, 'inline code does not execute actions');
+assertIncludes(formatMarkdown('`**code**`'), '<code>**code**</code>', 'inline code stays literal');

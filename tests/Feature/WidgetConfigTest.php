@@ -6,7 +6,14 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Support\WidgetConfig;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
+
+it('initializes widget settings and switches bots with the installed React form API', function () {
+    $result = Process::path(base_path())->run('node tests/support/widget-settings.test.mjs');
+
+    expect($result->successful())->toBeTrue("Widget settings checks failed:\n".$result->errorOutput());
+});
 
 it('returns widget config for an active bot', function () {
     $tenant = Tenant::create(['name' => 'Demo', 'slug' => 'widget-config', 'status' => 'active']);

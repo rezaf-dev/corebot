@@ -1,0 +1,53 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import React from 'react';
+import { renderToString } from 'react-dom/server';
+import { useForm } from '@inertiajs/react';
+import { parseAst } from 'rolldown/parseAst';
+
+// Get the real installed React form API without adding a DOM test dependency.
+let form;
+function FormProbe() {
+    form = useForm({ title: 'Support' });
+    return null;
+}
+renderToString(React.createElement(FormProbe));
+
+// Execute the page's actual bot-selection effect against that API.
+const source = fs.readFileSync('resources/js/Pages/Widget/Install.jsx', 'utf8');
+const ast = parseAst(source, { lang: 'jsx' });
+const page = ast.body.find((node) => node.type === 'ExportDefaultDeclaration').declaration;
+const statements = page.body.body;
+const formDeclaration = statements.flatMap((node) => node.declarations || [])
+    .find((node) => node.init?.callee?.name === 'useForm');
+const effect = statements.find((node) => node.expression?.callee?.name === 'useEffect').expression.arguments[0];
+const calls = {};
+const context = vm.createContext({
+    defaults: { title: 'Support', primary_color: '#111827', default_locale: '' },
+    language_settings: { default_locale: 'en' },
+    selectedBot: { widget_config: { title: 'First bot', default_locale: 'fa' } },
+    setEditingLocale: (locale) => { calls.locale = locale; },
+});
+for (const property of formDeclaration.id.properties) {
+    const method = form[property.key.name];
+    context[property.value.name] = typeof method === 'function'
+        ? (...args) => { calls[property.key.name] = args; return method(...args); }
+        : method;
+}
+const syncBot = vm.runInContext(`(${source.slice(effect.start, effect.end)})`, context);
+syncBot();
+assert.equal(calls.setDefaults[0].title, 'First bot');
+assert.equal(calls.setData[0].title, 'First bot');
+assert.equal(calls.setData[0].primary_color, '#111827');
+assert.equal(calls.locale, 'fa');
+
+context.selectedBot = { widget_config: { primary_color: '#ff0000' } };
+syncBot();
+assert.equal(calls.setDefaults[0].title, 'Support', 'bot changes must reset previous overrides');
+assert.equal(calls.setData[0].primary_color, '#ff0000');
+assert.equal(calls.locale, 'en', 'bot changes must restore the global locale');
+
+context.selectedBot = undefined;
+assert.doesNotThrow(syncBot, 'an empty bot list must not attempt to update the form');
+console.log('Widget settings mount and bot-selection checks passed.');
