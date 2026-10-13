@@ -96,7 +96,9 @@ function applyInlineMarkdown(text) {
         return placeholder;
     });
 
-    html = html.replace(/(?<![\w+])(?:\+?\d[\d().\-\s]{5,}\d)(?!\w)/g, (phone) => {
+    html = html.replace(/(?<![\w+])\+\d[\d().\- \t]*\d(?!\w)/g, (phone) => {
+        const digits = phone.replace(/\D/g, '');
+        if (digits.length < 7 || digits.length > 15) return phone;
         const safePhone = sanitizeUrl('tel:' + phone);
         if (!safePhone) return phone;
         const placeholder = '\u0000PHONELINK' + phoneLinks.length + '\u0000';
@@ -625,8 +627,8 @@ function createWidgetLocalization(initial) {
             try {
                 const res = await post('/message', { conversation_id: state.conversation_id, message: text, page: pageContext() });
                 if (res.human_support) {
-                    assistant.remove();
                     applySupportMode('human');
+                    showHumanSupportAcknowledgement(assistant);
                 } else {
                     setBubbleText(assistant, res.message);
                 }
@@ -933,6 +935,10 @@ function createWidgetLocalization(initial) {
         if (subtitle) subtitle.textContent = mode === 'human' ? t('You are connected to our support team') : t(config.subtitle);
     }
 
+    function showHumanSupportAcknowledgement(node) {
+        setBubbleText(node, t('Your message has been sent to our support team. Replies will appear here.'));
+    }
+
     async function streamMessage(text, node) {
         const response = await fetch(apiBase + '/message/stream', {
             method: 'POST',
@@ -1012,7 +1018,7 @@ function createWidgetLocalization(initial) {
         }
 
         if (humanSupport && !hasContent) {
-            node.remove();
+            showHumanSupportAcknowledgement(node);
         } else if (!hasContent) {
             setBubbleText(node, t("Sorry, I could not generate a response."));
         }

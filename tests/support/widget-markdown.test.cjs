@@ -48,6 +48,22 @@ if (messageDirection('Hello, how can I help?') !== 'ltr') {
 console.log('widget-markdown tests passed');
 
 const assert = require('node:assert/strict');
+for (const text of [
+    '- CAS: 67-56-1',
+    'CAS: 7732-18-5',
+    'CAS: 1234567-89-0',
+    'Product code: 1234567890',
+    'Date: 2026-10-13',
+    'Range: 100000-200000',
+    'Phone: +1234567890123456',
+    'CAS: 67-56-1\n7732-18-5',
+]) {
+    assert.equal(formatMarkdown(text).includes('href="tel:'), false, `Keep identifiers and ambiguous numbers as text: ${text}`);
+}
+assertIncludes(formatMarkdown('+90 555 123 4567'), 'href="tel:+905551234567"', 'international phone link');
+assertIncludes(formatMarkdown('[Call support](tel:5551234567)'), 'href="tel:5551234567"', 'explicit local phone link');
+assertIncludes(formatMarkdown('CAS: 67-56-1. Call +1 (555) 123-4567'), 'href="tel:+15551234567"', 'phone alongside CAS');
+assert.equal(formatMarkdown('CAS: 67-56-1. Call +1 (555) 123-4567').includes('href="tel:67561"'), false);
 assertIncludes(formatMarkdown('[Email us](mailto:support@example.com)'), 'href="mailto:support@example.com"', 'email action');
 assertIncludes(formatMarkdown('[Email us](mailto:support@example.com)'), 'class="crm-ai-contact-action"', 'email action style');
 assertIncludes(formatMarkdown('[WhatsApp](https://wa.me/15551234567)'), 'class="crm-ai-contact-action"', 'WhatsApp action');

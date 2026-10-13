@@ -655,6 +655,7 @@
     "You can rename this document. To change the file, delete this source and upload a new one.": "می‌توانید نام سند را تغییر دهید. برای تغییر فایل، این منبع را حذف و فایل جدید بارگذاری کنید.",
     "Your API key is encrypted at rest. Leave the key field blank to keep the current value.": "کلید API در حالت ذخیره رمزگذاری می‌شود. برای حفظ مقدار فعلی، فیلد کلید را خالی بگذارید.",
     "Your current password": "رمز عبور فعلی شما",
+    "Your message has been sent to our support team. Replies will appear here.": "پیام شما برای تیم پشتیبانی ارسال شد. پاسخ‌ها در همین‌جا نمایش داده می‌شوند.",
     "Your support workspace": "محیط پشتیبانی شما",
     "admin reply": "پاسخ مدیر",
     "app.example.com\ncrm.example.com": "app.example.com\ncrm.example.com",

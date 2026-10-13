@@ -655,6 +655,7 @@
     "You can rename this document. To change the file, delete this source and upload a new one.": "Bu belgeyi yeniden adlandırabilirsiniz. Dosyayı değiştirmek için bu kaynağı silip yenisini yükleyin.",
     "Your API key is encrypted at rest. Leave the key field blank to keep the current value.": "API anahtarınız şifrelenerek saklanır. Mevcut değeri korumak için anahtar alanını boş bırakın.",
     "Your current password": "Mevcut şifreniz",
+    "Your message has been sent to our support team. Replies will appear here.": "Mesajınız destek ekibimize gönderildi. Yanıtlar burada görünecek.",
     "Your support workspace": "Destek çalışma alanınız",
     "admin reply": "Yönetici yanıtı",
     "app.example.com\ncrm.example.com": "app.example.com\ncrm.example.com",

@@ -655,6 +655,7 @@
     "You can rename this document. To change the file, delete this source and upload a new one.": "Puedes cambiar el nombre de este documento. Para cambiar el archivo, elimina esta fuente y sube una nueva.",
     "Your API key is encrypted at rest. Leave the key field blank to keep the current value.": "Tu clave API se almacena cifrada. Deja el campo vacío para mantener el valor actual.",
     "Your current password": "Tu contraseña actual",
+    "Your message has been sent to our support team. Replies will appear here.": "Tu mensaje se ha enviado a nuestro equipo de soporte. Las respuestas aparecerán aquí.",
     "Your support workspace": "Tu espacio de soporte",
     "admin reply": "Respuesta del administrador",
     "app.example.com\ncrm.example.com": "app.example.com\ncrm.example.com",
