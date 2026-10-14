@@ -6,6 +6,8 @@ class WidgetConfig
 {
     public const LOCALIZED_FIELDS = ['title', 'subtitle', 'launcher_label', 'send_button_label', 'input_placeholder', 'welcome_message', 'fallback_message', 'suggested_prompts'];
 
+    public const DEFAULT_SUGGESTED_PROMPTS = ['How do I get started?', 'What can you help with?', 'Contact support'];
+
     public const DEFAULTS = [
         'default_locale' => '',
         'enabled_locales' => [],

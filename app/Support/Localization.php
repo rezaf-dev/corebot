@@ -77,7 +77,7 @@ class Localization
     {
         $config = $bot->resolvedWidgetConfig();
         $translations = $this->translations($locale);
-        $config['welcome_message'] = $bot->welcome_message;
+        $config['welcome_message'] = filled($bot->welcome_message) ? $bot->welcome_message : Bot::DEFAULT_WELCOME_MESSAGE;
         $config['fallback_message'] = $bot->fallback_message;
         $defaults = [
             ...WidgetConfig::DEFAULTS,
@@ -89,6 +89,12 @@ class Localization
                 $config[$field] = $translations[$defaults[$field]] ?? $defaults[$field];
             }
         }
+        $config['suggested_prompts'] = array_map(
+            fn (string $prompt): string => in_array($prompt, WidgetConfig::DEFAULT_SUGGESTED_PROMPTS, true)
+                ? ($translations[$prompt] ?? $prompt)
+                : $prompt,
+            $config['suggested_prompts'] ?: WidgetConfig::DEFAULT_SUGGESTED_PROMPTS,
+        );
         $overrides = $config['localized_content'][$locale] ?? [];
         foreach (WidgetConfig::LOCALIZED_FIELDS as $field) {
             if (array_key_exists($field, $overrides) && $overrides[$field] !== null) {

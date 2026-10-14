@@ -96,6 +96,52 @@ it('translates built in messages while preserving custom base content', function
     expect(app(Localization::class)->widgetConfig($this->bot, 'fa'))->title->toBe('Custom title')->welcome_message->toBe('Custom welcome')->fallback_message->toBe('Custom fallback');
 });
 
+it('serves translated default welcome messages and conversation starters in every language', function (string $locale) {
+    $translations = json_decode(file_get_contents(lang_path($locale.'.json')), true, flags: JSON_THROW_ON_ERROR);
+    $prompts = ['How do I get started?', 'What can you help with?', 'Contact support'];
+
+    foreach ([Bot::DEFAULT_WELCOME_MESSAGE, ...$prompts] as $key) {
+        expect($translations)->toHaveKey($key)
+            ->and($translations[$key])->toBeString()->not->toBeEmpty();
+
+        if ($locale !== 'en') {
+            expect($translations[$key])->not->toBe($key);
+        }
+    }
+
+    $expectedPrompts = array_map(fn (string $prompt): string => $translations[$prompt], $prompts);
+
+    $this->getJson('/api/public/chat/widget-config?bot_public_key='.$this->bot->public_key.'&locale='.$locale)
+        ->assertSuccessful()
+        ->assertJsonPath('widget.welcome_message', $translations[Bot::DEFAULT_WELCOME_MESSAGE])
+        ->assertJsonPath('widget.suggested_prompts', $expectedPrompts);
+
+    $this->postJson('/api/public/chat/start', ['bot_public_key' => $this->bot->public_key, 'locale' => $locale])
+        ->assertSuccessful()
+        ->assertJsonPath('welcome_message', $translations[Bot::DEFAULT_WELCOME_MESSAGE])
+        ->assertJsonPath('widget.suggested_prompts', $expectedPrompts);
+})->with(['en', 'fa', 'ar', 'it', 'es', 'tr']);
+
+it('uses the translated default welcome message when the base message is blank', function (?string $message) {
+    $this->bot->update(['welcome_message' => $message]);
+
+    expect(app(Localization::class)->widgetConfig($this->bot, 'fa')['welcome_message'])
+        ->toBe(app(Localization::class)->translations('fa')[Bot::DEFAULT_WELCOME_MESSAGE]);
+})->with([null, '', '   ']);
+
+it('translates built in base starters while preserving custom questions and localized overrides', function () {
+    $this->bot->update(['widget_config' => [
+        'suggested_prompts' => ['How do I get started?', 'Custom question'],
+        'localized_content' => ['fa' => ['welcome_message' => 'خوش آمدید', 'suggested_prompts' => ['Local question']]],
+    ]]);
+    $localization = app(Localization::class);
+
+    expect($localization->widgetConfig($this->bot, 'tr')['suggested_prompts'])
+        ->toBe([$localization->translations('tr')['How do I get started?'], 'Custom question'])
+        ->and($localization->widgetConfig($this->bot, 'fa'))
+        ->welcome_message->toBe('خوش آمدید')->suggested_prompts->toBe(['Local question']);
+});
+
 it('changes conversation language only after authenticating the public session', function () {
     $conversation = ChatConversation::create(['tenant_id' => $this->tenant->id, 'bot_id' => $this->bot->id, 'language' => 'en', 'public_session_token' => hash('sha256', $token = Str::random(64))]);
     $payload = ['bot_public_key' => $this->bot->public_key, 'conversation_id' => $conversation->id, 'conversation_token' => Str::random(64), 'message' => 'Hello', 'locale' => 'fa'];

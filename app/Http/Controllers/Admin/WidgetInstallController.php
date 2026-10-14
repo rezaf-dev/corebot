@@ -40,7 +40,7 @@ class WidgetInstallController extends Controller
             WidgetConfig::DEFAULTS['title'], WidgetConfig::DEFAULTS['subtitle'],
             WidgetConfig::DEFAULTS['launcher_label'], WidgetConfig::DEFAULTS['input_placeholder'],
             WidgetConfig::DEFAULTS['send_button_label'], Bot::DEFAULT_WELCOME_MESSAGE, Bot::DEFAULT_FALLBACK_MESSAGE,
-            'How do I get started?', 'What can you help with?', 'Contact support',
+            ...WidgetConfig::DEFAULT_SUGGESTED_PROMPTS,
             'Need help?', 'Chat with our team', 'Questions? Ask us', 'Support is online', "Let's talk",
         ];
 
