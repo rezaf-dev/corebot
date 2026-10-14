@@ -32,15 +32,16 @@ class WidgetInstallController extends Controller
         $bots = $access->scope(Bot::query(), auth()->user())
             ->where('status', 'active')
             ->orderBy('name')
-            ->get(['id', 'name', 'public_key', 'widget_config', 'welcome_message']);
+            ->get(['id', 'name', 'public_key', 'widget_config', 'welcome_message', 'fallback_message']);
 
         $languageSettings = $localization->settings();
         $languages = array_values(array_filter($localization->availableLanguages(), fn (array $language): bool => in_array($language['code'], $languageSettings['enabled_locales'], true)));
         $previewKeys = [
             WidgetConfig::DEFAULTS['title'], WidgetConfig::DEFAULTS['subtitle'],
             WidgetConfig::DEFAULTS['launcher_label'], WidgetConfig::DEFAULTS['input_placeholder'],
-            WidgetConfig::DEFAULTS['send_button_label'], Bot::DEFAULT_WELCOME_MESSAGE,
+            WidgetConfig::DEFAULTS['send_button_label'], Bot::DEFAULT_WELCOME_MESSAGE, Bot::DEFAULT_FALLBACK_MESSAGE,
             'How do I get started?', 'What can you help with?', 'Contact support',
+            'Need help?', 'Chat with our team', 'Questions? Ask us', 'Support is online', "Let's talk",
         ];
 
         return Inertia::render('Widget/Install', [
@@ -51,6 +52,7 @@ class WidgetInstallController extends Controller
                 'widget_url' => $widgetAsset->url($bot),
                 'widget_config' => $bot->resolvedWidgetConfig(),
                 'welcome_message' => $bot->welcome_message,
+                'fallback_message' => $bot->fallback_message,
                 'localization' => Arr::except($localization->widgetLocalization(bot: $bot), ['translations']),
             ]),
             'defaults' => WidgetConfig::DEFAULTS,
@@ -70,10 +72,15 @@ class WidgetInstallController extends Controller
 
         $data = $request->validated();
         $existingConfig = $bot->resolvedWidgetConfig();
-        $config = WidgetConfig::resolve(array_replace($existingConfig, Arr::except($data, ['avatar', 'avatar_path'])));
+        $config = WidgetConfig::resolve(array_replace($existingConfig, Arr::except($data, ['avatar', 'avatar_path', 'remove_avatar'])));
         $config['default_locale'] = $data['default_locale'] ?? ($request->exists('default_locale') ? '' : $existingConfig['default_locale']);
         $config['avatar_path'] = $existingConfig['avatar_path'];
         $config['avatar_url'] = $existingConfig['avatar_url'];
+
+        if ($request->boolean('remove_avatar')) {
+            $config['avatar_path'] = '';
+            $config['avatar_url'] = '';
+        }
 
         if ($request->hasFile('avatar')) {
             $path = $request->file('avatar')->storePublicly("tenants/{$bot->tenant_id}/widget-avatars", 'public');
@@ -83,7 +90,7 @@ class WidgetInstallController extends Controller
 
         $bot->update(['widget_config' => $config]);
 
-        if ($request->hasFile('avatar') && filled($existingConfig['avatar_path'])) {
+        if (($request->hasFile('avatar') || $request->boolean('remove_avatar')) && filled($existingConfig['avatar_path'])) {
             Storage::disk('public')->delete($existingConfig['avatar_path']);
         }
 

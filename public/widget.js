@@ -604,40 +604,50 @@ function createWidgetLocalization(initial) {
         const text = input.value.trim();
         if (!text) return;
 
-        if (!state.conversation_id || !state.conversation_token) {
-            await startConversation();
-            if (!state.conversation_id) return;
-        }
-
-        input.value = '';
-        messages.querySelectorAll('[data-reply]').forEach((action) => {
-            action.dataset.expired = 'true';
-            action.disabled = true;
-        });
-        hideSuggestedPrompts();
-        add('user', text);
-        scrollToBottom(true);
-
-        const assistant = add('assistant', '', { loading: true });
-        setLoading(true);
-
-        try {
-            await streamMessage(text, assistant);
-        } catch {
-            try {
-                const res = await post('/message', { conversation_id: state.conversation_id, message: text, page: pageContext() });
-                if (res.human_support) {
-                    applySupportMode('human');
-                    showHumanSupportAcknowledgement(assistant);
-                } else {
-                    setBubbleText(assistant, res.message);
-                }
-                if (shouldPromptContact(res)) showContact('fallback');
-            } catch {
-                setBubbleText(assistant, t("Support is unavailable right now. Please try again later."));
+        for (let attempt = 0; attempt < 2; attempt++) {
+            if (!state.conversation_id || !state.conversation_token) {
+                await startConversation();
+                if (!state.conversation_id) return;
             }
-        } finally {
-            setLoading(false);
+
+            input.value = '';
+            messages.querySelectorAll('[data-reply]').forEach((action) => {
+                action.dataset.expired = 'true';
+                action.disabled = true;
+            });
+            hideSuggestedPrompts();
+            add('user', text);
+            scrollToBottom(true);
+
+            const assistant = add('assistant', '', { loading: true });
+            setLoading(true);
+
+            try {
+                try {
+                    await streamMessage(text, assistant);
+                } catch (error) {
+                    if (error.conversationReset) throw error;
+                    const res = await post('/message', { conversation_id: state.conversation_id, message: text, page: pageContext() });
+                    if (res.human_support) {
+                        applySupportMode('human');
+                        showHumanSupportAcknowledgement(assistant);
+                    } else {
+                        setBubbleText(assistant, res.message);
+                    }
+                    if (shouldPromptContact(res)) showContact('fallback');
+                }
+                return;
+            } catch (error) {
+                if (error.conversationReset) {
+                    input.value = text;
+                    if (attempt === 0) continue;
+                } else {
+                    setBubbleText(assistant, t("Support is unavailable right now. Please try again later."));
+                }
+                return;
+            } finally {
+                setLoading(false);
+            }
         }
     });
 
@@ -665,6 +675,7 @@ function createWidgetLocalization(initial) {
             await post('/contact', { conversation_id: state.conversation_id, ...payload });
             completeContactSubmission();
         } catch (error) {
+            if (error.conversationReset) return;
             const apiErrors = mapContactFieldErrors(error && error.data && error.data.errors);
             contactErrors = Object.keys(apiErrors).length
                 ? apiErrors
@@ -790,6 +801,7 @@ function createWidgetLocalization(initial) {
         } catch {
             showWelcomeMessage(t("Unable to start chat. Please refresh and try again."));
             state.conversation_id = null;
+            delete state.conversation_token;
             delete state.welcome_message;
             localStorage.setItem(storageKey, JSON.stringify(state));
         } finally {
@@ -876,6 +888,27 @@ function createWidgetLocalization(initial) {
         renderContactForm(getContactFormValues());
     }
 
+    function resetConversation(conversationId) {
+        if (!conversationId || state.conversation_id !== conversationId) return false;
+
+        window.clearInterval(manualMessagePolling);
+        manualMessagePolling = null;
+        latestManualMessageId = 0;
+        delete state.conversation_id;
+        delete state.conversation_token;
+        delete state.welcome_message;
+        delete state.has_contact;
+        contactConfig.has_contact = false;
+        contactConfig.countryCode = null;
+        localStorage.setItem(storageKey, JSON.stringify(state));
+        hideContact();
+        renderContactForm({});
+        applySupportMode('ai');
+        clearUnreadNotification();
+        showWelcomeMessage();
+        return true;
+    }
+
     async function post(path, body) {
         const response = await fetch(apiBase + path, {
             method: 'POST',
@@ -885,6 +918,9 @@ function createWidgetLocalization(initial) {
 
         if (!response.ok) {
             const error = new Error('Request failed');
+            error.status = response.status;
+            error.conversationReset = response.status === 404 && Boolean(body.conversation_id);
+            if (error.conversationReset) resetConversation(body.conversation_id);
             try {
                 error.data = await response.json();
             } catch {
@@ -906,13 +942,15 @@ function createWidgetLocalization(initial) {
     async function pollManualMessages() {
         if (!state.conversation_id || !state.conversation_token || manualMessageRequestRunning) return;
         manualMessageRequestRunning = true;
+        const conversationId = state.conversation_id;
 
         try {
             const response = await post('/manual-messages', {
-                conversation_id: state.conversation_id,
+                conversation_id: conversationId,
                 after_id: latestManualMessageId,
             });
 
+            if (state.conversation_id !== conversationId) return;
             applySupportMode(response.support_mode);
             (response.messages || []).forEach((message) => {
                 if (message.id <= latestManualMessageId) return;
@@ -940,20 +978,27 @@ function createWidgetLocalization(initial) {
     }
 
     async function streamMessage(text, node) {
+        const conversationId = state.conversation_id;
         const response = await fetch(apiBase + '/message/stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
             body: JSON.stringify({
                 bot_public_key: botKey,
                 conversation_token: state.conversation_token,
-                conversation_id: state.conversation_id,
+                conversation_id: conversationId,
                 locale: widgetLocalization.locale(),
                 message: text,
                 page: pageContext(),
             }),
         });
 
-        if (!response.ok || !response.body) throw new Error('Stream failed');
+        if (!response.ok || !response.body) {
+            const error = new Error('Stream failed');
+            error.status = response.status;
+            error.conversationReset = response.status === 404 && Boolean(conversationId);
+            if (error.conversationReset) resetConversation(conversationId);
+            throw error;
+        }
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();

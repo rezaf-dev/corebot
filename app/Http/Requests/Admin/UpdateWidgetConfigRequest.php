@@ -61,6 +61,7 @@ class UpdateWidgetConfigRequest extends FormRequest
         return [
             ...WidgetConfig::validationRules(),
             'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'remove_avatar' => ['sometimes', 'boolean'],
             'default_locale' => ['sometimes', 'nullable', 'string', Rule::in($enabled)],
             'enabled_locales' => ['sometimes', 'array', 'list'],
             'enabled_locales.*' => ['required', 'string', 'distinct', Rule::in($enabled)],

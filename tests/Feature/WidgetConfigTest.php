@@ -128,6 +128,64 @@ it('uploads a support avatar for tenant admins', function () {
     Storage::disk('public')->assertExists($config['avatar_path']);
 });
 
+it('deletes an uploaded avatar and removes it from the saved widget', function () {
+    Storage::fake('public');
+    $user = User::factory()->create();
+    $path = "tenants/{$user->tenant_id}/widget-avatars/old.png";
+    Storage::disk('public')->put($path, 'old image');
+    $bot = Bot::factory()->create([
+        'tenant_id' => $user->tenant_id,
+        'widget_config' => ['avatar_path' => $path, 'avatar_url' => url('/storage/'.$path)],
+    ]);
+
+    $this->actingAs($user)->post(route('widget.install.update', $bot), [
+        ...$bot->resolvedWidgetConfig(), '_method' => 'put', 'remove_avatar' => true,
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($bot->fresh()->resolvedWidgetConfig())->avatar_path->toBe('')->avatar_url->toBe('')
+        ->and($bot->fresh()->widget_config)->not->toHaveKey('remove_avatar');
+    Storage::disk('public')->assertMissing($path);
+    $this->getJson('/api/public/chat/widget-config?bot_public_key='.$bot->public_key)
+        ->assertSuccessful()->assertJsonPath('widget.avatar_url', '');
+});
+
+it('replaces an uploaded avatar and deletes the previous file', function () {
+    Storage::fake('public');
+    $user = User::factory()->create();
+    $path = "tenants/{$user->tenant_id}/widget-avatars/old.png";
+    Storage::disk('public')->put($path, 'old image');
+    $bot = Bot::factory()->create([
+        'tenant_id' => $user->tenant_id,
+        'widget_config' => ['avatar_path' => $path, 'avatar_url' => url('/storage/'.$path)],
+    ]);
+
+    $this->actingAs($user)->post(route('widget.install.update', $bot), [
+        ...$bot->resolvedWidgetConfig(), '_method' => 'put',
+        'remove_avatar' => true, 'avatar' => UploadedFile::fake()->image('replacement.png'),
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    $config = $bot->fresh()->resolvedWidgetConfig();
+    expect($config['avatar_path'])->not->toBe($path)->not->toBe('')
+        ->and($config['avatar_url'])->toBe(Storage::disk('public')->url($config['avatar_path']));
+    Storage::disk('public')->assertMissing($path);
+    Storage::disk('public')->assertExists($config['avatar_path']);
+});
+
+it('does not let another workspace delete an avatar', function () {
+    Storage::fake('public');
+    $bot = Bot::factory()->create();
+    $path = "tenants/{$bot->tenant_id}/widget-avatars/old.png";
+    Storage::disk('public')->put($path, 'old image');
+    $bot->update(['widget_config' => ['avatar_path' => $path, 'avatar_url' => url('/storage/'.$path)]]);
+
+    $this->actingAs(User::factory()->create())->put(route('widget.install.update', $bot), [
+        ...$bot->resolvedWidgetConfig(), 'remove_avatar' => true,
+    ])->assertForbidden();
+
+    Storage::disk('public')->assertExists($path);
+    expect($bot->fresh()->resolvedWidgetConfig()['avatar_path'])->toBe($path);
+});
+
 it('resolves api base from widget script url', function (string $widgetUrl, string $expectedApiBase) {
     expect(WidgetConfig::apiBaseFromWidgetUrl($widgetUrl))->toBe($expectedApiBase);
 })->with([

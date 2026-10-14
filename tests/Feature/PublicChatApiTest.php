@@ -151,3 +151,48 @@ it('records one feedback vote per public chat session', function () {
 
     expect(ChatMessageFeedback::query()->where('chat_message_id', $message->id)->value('vote'))->toBe('down');
 });
+
+it('allows a visitor to start a fresh chat after their conversation is deleted', function () {
+    $conversationToken = Str::random(64);
+    $conversation = ChatConversation::factory()->create([
+        'visitor_id' => 'returning-visitor',
+        'public_session_token' => hash('sha256', $conversationToken),
+    ]);
+    $bot = $conversation->bot;
+    $deletedConversationId = $conversation->id;
+    $conversation->delete();
+
+    foreach (['message', 'message/stream', 'manual-messages'] as $endpoint) {
+        $this->postJson('/api/public/chat/'.$endpoint, [
+            'bot_public_key' => $bot->public_key,
+            'conversation_id' => $deletedConversationId,
+            'conversation_token' => $conversationToken,
+            'message' => 'Another question',
+        ])->assertNotFound();
+    }
+
+    $session = $this->postJson('/api/public/chat/start', [
+        'bot_public_key' => $bot->public_key,
+        'visitor_id' => 'returning-visitor',
+        'source_url' => 'https://example.com/help',
+    ])->assertSuccessful()->json();
+
+    expect($session['conversation_id'])->not->toBe($deletedConversationId)
+        ->and($session['conversation_token'])->not->toBe($conversationToken);
+
+    $this->mock(ChatAnswerService::class)
+        ->shouldReceive('answer')
+        ->once()
+        ->withArgs(fn (Bot $receivedBot, ChatConversation $receivedConversation, string $message, array $page) => $receivedBot->is($bot)
+            && $receivedConversation->id === $session['conversation_id']
+            && $receivedConversation->visitor_id === 'returning-visitor'
+            && $message === 'Another question')
+        ->andReturn(['message' => 'Fresh answer']);
+
+    $this->postJson('/api/public/chat/message', [
+        'bot_public_key' => $bot->public_key,
+        'conversation_id' => $session['conversation_id'],
+        'conversation_token' => $session['conversation_token'],
+        'message' => 'Another question',
+    ])->assertSuccessful()->assertJsonPath('message', 'Fresh answer');
+});

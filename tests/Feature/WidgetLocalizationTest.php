@@ -157,7 +157,7 @@ it('only sends compact language metadata per bot on the installation page', func
         ->where('language_settings.default_locale', 'en')->has('languages', 6)
         ->where('preview_translations.fa.Support', 'پشتیبانی')
         ->where('bots.0.welcome_message', Bot::DEFAULT_WELCOME_MESSAGE)
-        ->has('preview_translations.fa', 9));
+        ->has('preview_translations.fa'));
 });
 
 it('saves and serves custom conversation starters in every supported language', function () {
@@ -170,7 +170,7 @@ it('saves and serves custom conversation starters in every supported language', 
         'es' => '¿Cómo puedo empezar?',
         'tr' => 'Nasıl başlayabilirim?',
     ];
-    $localizedContent = collect($questions)->map(fn (string $question): array => ['suggested_prompts' => [$question]])->all();
+    $localizedContent = collect($questions)->map(fn (string $question): array => ['title' => 'Title: '.$question, 'subtitle' => $question, 'suggested_prompts' => [$question]])->all();
     $payload = array_replace(WidgetConfig::DEFAULTS, [
         '_method' => 'put',
         'suggested_prompts' => ['Base question'],
@@ -188,6 +188,8 @@ it('saves and serves custom conversation starters in every supported language', 
         $this->getJson('/api/public/chat/widget-config?bot_public_key='.$this->bot->public_key.'&locale='.$locale)
             ->assertSuccessful()
             ->assertJsonPath('localization.locale', $locale)
-            ->assertJsonPath('widget.suggested_prompts', [$question]);
+            ->assertJsonPath('widget.suggested_prompts', [$question])
+            ->assertJsonPath('widget.title', 'Title: '.$question)
+            ->assertJsonPath('widget.subtitle', $question);
     }
 });

@@ -5,6 +5,7 @@ import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { useForm } from '@inertiajs/react';
 import { parseAst } from 'rolldown/parseAst';
+import { resolveWidgetText, defaultWidgetMessages, defaultWidgetPrompts } from '../../resources/js/widget-settings.js';
 
 // Get the real installed React form API without adding a DOM test dependency.
 let form;
@@ -28,7 +29,8 @@ const context = vm.createContext({
     language_settings: { default_locale: 'en' },
     selectedBot: { widget_config: { title: 'First bot', default_locale: 'fa' } },
     setEditingLocale: (locale) => { calls.locale = locale; },
-    setStarterLocale: (locale) => { calls.starterLocale = locale; },
+    languages: [{ code: 'en' }, { code: 'fa' }],
+    setPreviewOpen: (value) => { calls.previewOpen = value; },
 });
 for (const property of formDeclaration.id.properties) {
     const method = form[property.key.name];
@@ -82,8 +84,7 @@ const starterContext = vm.createContext({
         suggested_prompts: ['Base question'],
         localized_content: { fa: { title: 'پشتیبانی', suggested_prompts: ['قدیمی'] }, tr: { suggested_prompts: ['Eski soru'] } },
     },
-    starterLocale: 'fa',
-    editingLocale: 'en',
+    editingLocale: 'fa',
 });
 starterContext.setData = (key, value) => { starterContext.data[key] = value; };
 vm.runInContext(source.slice(localizedFunction.start, localizedFunction.end), starterContext);
@@ -93,31 +94,62 @@ assert.equal(starterContext.data.localized_content.fa.suggested_prompts[0], 'چ�
 assert.equal(starterContext.data.localized_content.fa.title, 'پشتیبانی');
 assert.equal(starterContext.data.localized_content.tr.suggested_prompts[0], 'Eski soru');
 assert.equal(starterContext.data.suggested_prompts[0], 'Base question');
-starterContext.starterLocale = 'tr';
+starterContext.editingLocale = 'tr';
 starterContext.updateStarterPrompts(['Nasıl başlayabilirim?']);
 assert.equal(starterContext.data.localized_content.tr.suggested_prompts[0], 'Nasıl başlayabilirim?');
-starterContext.starterLocale = '';
+starterContext.editingLocale = 'en';
 starterContext.updateStarterPrompts(['New base']);
-assert.equal(starterContext.data.suggested_prompts[0], 'New base');
+assert.equal(starterContext.data.localized_content.en.suggested_prompts[0], 'New base');
+assert.equal(starterContext.data.suggested_prompts[0], 'Base question');
 assert.equal(starterContext.data.localized_content.fa.suggested_prompts[0], 'چطور شروع کنم؟');
 
-// The collapsed language section must not hide everyday customization controls.
-function findAdvanced(node) {
-    if (!node || typeof node !== 'object') return null;
-    if (node.type === 'JSXElement' && node.openingElement.attributes.some((attribute) => attribute.name?.name === 'id' && attribute.value?.value === 'advanced-widget-settings')) return node;
+// The language section follows all text, appearance, and layout controls.
+function elements(node, predicate) {
+    if (!node || typeof node !== 'object') return [];
+    const found = node.type === 'JSXElement' && predicate(node) ? [node] : [];
     for (const value of Object.values(node)) {
-        for (const child of Array.isArray(value) ? value : [value]) {
-            const found = findAdvanced(child);
-            if (found) return found;
-        }
+        for (const child of Array.isArray(value) ? value : [value]) found.push(...elements(child, predicate));
     }
-    return null;
+    return found;
 }
-const advanced = findAdvanced(page);
-assert.ok(advanced);
-const advancedSource = source.slice(advanced.start, advanced.end);
-assert.ok(advancedSource.includes('Widget languages'));
-for (const section of ['Appearance', 'Layout', 'Conversation starters', 'Labels']) {
-    assert.ok(!advancedSource.includes(`t("${section}")`), `${section} must remain visible when advanced settings are collapsed`);
+const byId = (id) => elements(page, (node) => node.openingElement.attributes.some((attribute) => attribute.name?.name === 'id' && attribute.value?.value === id))[0];
+const texts = byId('widget-text-settings');
+const languageConfig = byId('widget-language-config');
+assert.ok(texts && languageConfig);
+assert.ok(texts.start < languageConfig.start);
+assert.ok(!byId('advanced-widget-settings'), 'language configuration must always be visible');
+const textSection = source.slice(texts.start, texts.end);
+assert.ok(textSection.includes('effectiveLanguages.map'), 'text selector only offers active languages');
+for (const field of ['title', 'subtitle', 'launcher_label', 'input_placeholder', 'send_button_label', 'welcome_message', 'fallback_message']) {
+    assert.ok(textSection.includes(`['${field}',`), `${field} belongs in the unified language editor`);
 }
-console.log('Localized starter editing and settings visibility checks passed.');
+assert.ok(textSection.includes('Conversation starters'));
+const formElement = elements(page, (node) => node.openingElement.name.name === 'form')[0];
+const sections = formElement.children.filter((node) => node.type === 'JSXElement' && node.openingElement.name.name === 'section');
+assert.equal(sections.at(-1), languageConfig, 'language configuration is the last settings section');
+const aside = elements(page, (node) => node.openingElement.name.name === 'aside')[0];
+assert.ok(aside.start < formElement.start, 'preview precedes the form on small screens');
+assert.equal(aside.children.find((node) => node.type === 'JSXElement').openingElement.name.name, 'WidgetPreview');
+assert.equal(calls.previewOpen, false, 'switching bots resets the preview to its launcher');
+
+// Resolve the same defaults shown in the editor and used by the preview.
+const defaults = { title: 'Support', subtitle: 'We typically reply instantly', launcher_label: "We're here to help", input_placeholder: 'Type your message…', send_button_label: 'Send' };
+for (const filename of fs.readdirSync('lang').filter((name) => name.endsWith('.json'))) {
+    const locale = filename.replace('.json', '');
+    const translations = JSON.parse(fs.readFileSync(`lang/${filename}`, 'utf8'));
+    const resolved = resolveWidgetText({ ...defaults, suggested_prompts: [] }, {}, defaults, translations, locale);
+    assert.equal(resolved.title, translations.Support || 'Support');
+    assert.equal(resolved.subtitle, translations[defaults.subtitle] || defaults.subtitle);
+    assert.equal(resolved.welcome_message, translations[defaultWidgetMessages.welcome_message] || defaultWidgetMessages.welcome_message);
+    assert.deepEqual(resolved.suggested_prompts, defaultWidgetPrompts.map((prompt) => translations[prompt] || prompt));
+    const config = { ...defaults, title: 'Existing base title', localized_content: { [locale]: { title: 'Custom title', subtitle: 'Custom subtitle', suggested_prompts: ['Custom question'] } } };
+    const custom = resolveWidgetText(config, {}, defaults, translations, locale);
+    assert.equal(custom.title, 'Custom title');
+    assert.equal(custom.subtitle, 'Custom subtitle');
+    assert.deepEqual(custom.suggested_prompts, ['Custom question']);
+    config.localized_content[locale] = { title: '', subtitle: '   ', suggested_prompts: [''] };
+    const cleared = resolveWidgetText(config, {}, defaults, translations, locale);
+    assert.equal(cleared.title, 'Existing base title', 'cleared overrides restore existing fallback text');
+    assert.equal(cleared.subtitle, translations[defaults.subtitle] || defaults.subtitle);
+}
+console.log('Unified language editor, defaults, preview order, and language configuration checks passed.');
