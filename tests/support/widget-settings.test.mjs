@@ -5,6 +5,7 @@ import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { useForm } from '@inertiajs/react';
 import { parseAst } from 'rolldown/parseAst';
+import { transformSync } from 'rolldown/utils';
 import { resolveWidgetText, defaultWidgetMessages, defaultWidgetPrompts } from '../../resources/js/widget-settings.js';
 
 // Get the real installed React form API without adding a DOM test dependency.
@@ -153,3 +154,27 @@ for (const filename of fs.readdirSync('lang').filter((name) => name.endsWith('.j
     assert.equal(cleared.subtitle, translations[defaults.subtitle] || defaults.subtitle);
 }
 console.log('Unified language editor, defaults, preview order, and language configuration checks passed.');
+
+// Render the actual field components so undeclared JSX props fail before shipping.
+const fieldNodes = ast.body.filter((node) => node.type === 'FunctionDeclaration' && ['TextField', 'ColorField', 'RangeField'].includes(node.id.name));
+const fieldSource = fieldNodes.map((node) => source.slice(node.start, node.end)).join('\n');
+const transformedFields = transformSync('widget-fields.jsx', fieldSource, { lang: 'jsx', jsx: { runtime: 'classic' } });
+assert.equal(transformedFields.errors.length, 0);
+let receivedInputProps;
+const fieldContext = vm.createContext({
+    React,
+    t: (text) => text,
+    InputLabel: ({ value }) => React.createElement('label', null, value),
+    InputError: () => null,
+    TextInput: (props) => { receivedInputProps = props; return React.createElement('input', props); },
+});
+vm.runInContext(transformedFields.code, fieldContext);
+for (const field of ['TextField', 'ColorField', 'RangeField']) {
+    assert.doesNotThrow(() => renderToString(React.createElement(fieldContext[field], {
+        id: field, label: field, value: field === 'ColorField' ? '#123456' : 'Example', onChange() {}, min: 0, max: 100,
+    })), `${field} must render without missing variables`);
+}
+const blur = () => {};
+renderToString(React.createElement(fieldContext.TextField, { id: 'title', value: 'Support', onChange() {}, onBlur: blur }));
+assert.equal(receivedInputProps.onBlur, blur, 'text fields preserve their default-restoring blur callback');
+console.log('Widget field render checks passed.');

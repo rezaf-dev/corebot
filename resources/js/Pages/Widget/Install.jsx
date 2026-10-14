@@ -539,7 +539,7 @@ function ColorField({ id, label, value, onChange, error }) {
                     onChange={(e) => onChange(e.target.value)}
                     className="h-10 w-12 cursor-pointer rounded border border-gray-300 dark:border-gray-700"
                 />
-                <TextInput id={id} value={value} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} className="block w-full font-mono text-sm" />
+                <TextInput id={id} value={value} onChange={(e) => onChange(e.target.value)} className="block w-full font-mono text-sm" />
             </div>
             <InputError message={error} className="mt-1" />
         </div>
