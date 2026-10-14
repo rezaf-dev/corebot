@@ -39,10 +39,39 @@ export default function Inbox({
     const [busy, setBusy] = useState(false);
     const [navigationPending, setNavigationPending] = useState(false);
     const [refreshError, setRefreshError] = useState(false);
+    const [selectionMode, setSelectionMode] = useState(false);
+    const [selectedIds, setSelectedIds] = useState([]);
+    const [bulkError, setBulkError] = useState('');
     const listRef = useRef(null);
     const savedListScroll = useRef(0);
     const previousFilters = useRef(JSON.stringify(filters));
     const query = { ...filters, page: conversations.current_page };
+    const visibleIds = conversations.data.map((item) => item.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+    useEffect(() => {
+        setSelectedIds((ids) => ids.filter((id) => visibleIds.includes(id)));
+    }, [visibleIds.join(',')]);
+    useEffect(() => {
+        setSelectedIds([]);
+        setBulkError('');
+    }, [JSON.stringify(filters), conversations.current_page]);
+    const toggleSelection = (id) =>
+        setSelectedIds((ids) => ids.includes(id) ? ids.filter((value) => value !== id) : [...ids, id]);
+    const bulkAction = (action) => {
+        if (busy || !selectedIds.length) return;
+        if (action === 'delete' && !window.confirm(t('Delete :count selected conversations? This cannot be undone.', { count: selectedIds.length }))) return;
+        setBulkError('');
+        router.post(route('conversations.bulk-action'), { action, conversation_ids: selectedIds, filters }, {
+            preserveScroll: true,
+            onStart: () => setBusy(true),
+            onSuccess: () => {
+                setSelectedIds([]);
+                setSelectionMode(false);
+            },
+            onError: () => setBulkError(t('Unable to update the selection. Refresh and try again.')),
+            onFinish: () => setBusy(false),
+        });
+    };
     usePoll(5000, {
         only: ['conversations', 'counts', 'conversation', 'staff'],
         preserveScroll: true,
@@ -122,9 +151,24 @@ export default function Inbox({
                         <h1 className="text-lg font-semibold">
                             {t('Conversations')}
                         </h1>
-                        <span className="rounded-full bg-gray-100 px-2 py-1 text-xs dark:bg-gray-800">
-                            {counts.all}
-                        </span>
+                        <div className="flex items-center gap-2">
+                            <span className="rounded-full bg-gray-100 px-2 py-1 text-xs dark:bg-gray-800">{counts.all}</span>
+                            {auth.capabilities.configure && (
+                                <button
+                                    type="button"
+                                    className={button}
+                                    disabled={busy}
+                                    aria-pressed={selectionMode}
+                                    onClick={() => {
+                                        setSelectionMode(!selectionMode);
+                                        setSelectedIds([]);
+                                        setBulkError('');
+                                    }}
+                                >
+                                    {t(selectionMode ? 'Cancel' : 'Select')}
+                                </button>
+                            )}
+                        </div>
                     </div>
                     <form
                         onSubmit={(e) => {
@@ -198,6 +242,22 @@ export default function Inbox({
                             </button>
                         ))}
                     </nav>
+                    {auth.capabilities.configure && selectionMode && (
+                        <div className="space-y-2 border-b border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                            <div className="flex items-center justify-between gap-2">
+                                <label className="flex items-center gap-2 text-xs">
+                                    <input type="checkbox" checked={allSelected} disabled={busy || !visibleIds.length} onChange={(event) => setSelectedIds(event.target.checked ? visibleIds : [])} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900" />
+                                    {t('Select this page')}
+                                </label>
+                                <span role="status" className="text-xs text-gray-500">{t(':count selected', { count: selectedIds.length })}</span>
+                            </div>
+                            <div className="flex gap-2">
+                                <button type="button" className={button} disabled={busy || !selectedIds.length} onClick={() => bulkAction('resolve')}>{t('Resolve selected')}</button>
+                                <button type="button" className={`${button} text-red-600 dark:text-red-400`} disabled={busy || !selectedIds.length} onClick={() => bulkAction('delete')}>{t('Delete selected')}</button>
+                            </div>
+                            {bulkError && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{bulkError}</p>}
+                        </div>
+                    )}
                     <div
                         aria-busy={navigationPending}
                         ref={listRef}
@@ -225,65 +285,81 @@ export default function Inbox({
                             </div>
                         )}
                         {conversations.data.map((item) => (
-                            <Link
-                                key={item.id}
-                                href={route('conversations.show', {
-                                    conversation: item.id,
-                                    ...query,
-                                })}
-                                preserveState
-                                preserveScroll
-                                aria-current={
-                                    conversation?.id === item.id
-                                        ? 'page'
-                                        : undefined
-                                }
-                                className={`block border-b border-gray-100 px-4 py-4 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:border-gray-800 ${conversation?.id === item.id ? 'bg-indigo-50 dark:bg-indigo-950/40' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'}`}
-                            >
-                                <div className="flex items-center justify-between gap-2">
-                                    <span className="truncate text-sm font-semibold">
-                                        {visitor(item)}
-                                    </span>
-                                    <time className="shrink-0 text-[11px] text-gray-500">
-                                        {date(item.updated_at)}
-                                    </time>
-                                </div>
-                                <p
-                                    dir="auto"
-                                    className="mt-1 truncate text-sm text-gray-500 dark:text-gray-400"
+                            <div key={item.id} className={`flex border-b border-gray-100 dark:border-gray-800 ${selectedIds.includes(item.id) ? 'bg-indigo-50 dark:bg-indigo-950/40' : ''}`}>
+                                {auth.capabilities.configure && selectionMode && (
+                                    <div className="flex items-start ps-3 pt-5">
+                                        <input
+                                            type="checkbox"
+                                            aria-label={t('Select conversation :id', { id: item.id })}
+                                            checked={selectedIds.includes(item.id)}
+                                            disabled={busy}
+                                            onChange={() => toggleSelection(item.id)}
+                                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900"
+                                        />
+                                    </div>
+                                )}
+                                <Link
+                                    href={route('conversations.show', {
+                                        conversation: item.id,
+                                        ...query,
+                                    })}
+                                    preserveState
+                                    preserveScroll
+                                    aria-current={
+                                        conversation?.id === item.id
+                                            ? 'page'
+                                            : undefined
+                                    }
+                                    className={`block min-w-0 flex-1 px-4 py-4 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 ${conversation?.id === item.id ? 'bg-indigo-50 dark:bg-indigo-950/40' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'}`}
                                 >
-                                    {item.latest_message?.content ||
-                                        t('No messages yet')}
-                                </p>
-                                <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-gray-500">
-                                    <span className="truncate">
-                                        {item.bot?.name}
-                                        {' · '}
-                                        {item.assignee?.name || t('Unassigned')}
-                                    </span>
-                                    <span
-                                        className={
-                                            item.support_mode === 'human' &&
-                                            item.status !== 'resolved' &&
-                                            (item.needs_reply ||
-                                                item.status === 'escalated')
-                                                ? 'font-semibold text-amber-700 dark:text-amber-300'
-                                                : ''
-                                        }
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="truncate text-sm font-semibold">
+                                            {visitor(item)}
+                                        </span>
+                                        <time className="shrink-0 text-[11px] text-gray-500">
+                                            {date(item.updated_at)}
+                                        </time>
+                                    </div>
+                                    <p
+                                        dir="auto"
+                                        className="mt-1 truncate text-sm text-gray-500 dark:text-gray-400"
                                     >
-                                        {t(
-                                            item.status === 'resolved'
-                                                ? 'Resolved'
-                                                : item.support_mode === 'human'
-                                                  ? item.needs_reply ||
-                                                    item.status === 'escalated'
-                                                      ? 'Needs reply'
-                                                      : 'Human support'
-                                                  : 'AI',
-                                        )}
-                                    </span>
-                                </div>
-                            </Link>
+                                        {item.latest_message?.content ||
+                                            t('No messages yet')}
+                                    </p>
+                                    <p className="mt-1 truncate text-[11px] text-gray-500 dark:text-gray-400" title={t('Country')}>
+                                        {item.country_name || item.country_code || t('Unknown country')}
+                                    </p>
+                                    <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-gray-500">
+                                        <span className="truncate">
+                                            {item.bot?.name}
+                                            {' · '}
+                                            {item.assignee?.name || t('Unassigned')}
+                                        </span>
+                                        <span
+                                            className={
+                                                item.support_mode === 'human' &&
+                                                item.status !== 'resolved' &&
+                                                (item.needs_reply ||
+                                                    item.status === 'escalated')
+                                                    ? 'font-semibold text-amber-700 dark:text-amber-300'
+                                                    : ''
+                                            }
+                                        >
+                                            {t(
+                                                item.status === 'resolved'
+                                                    ? 'Resolved'
+                                                    : item.support_mode === 'human'
+                                                      ? item.needs_reply ||
+                                                        item.status === 'escalated'
+                                                          ? 'Needs reply'
+                                                          : 'Human support'
+                                                      : 'AI',
+                                            )}
+                                        </span>
+                                    </div>
+                                </Link>
+                            </div>
                         ))}
                     </div>
                     {conversations.last_page > 1 && (

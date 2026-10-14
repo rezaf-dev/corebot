@@ -5,11 +5,13 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UpdateWidgetConfigRequest;
 use App\Models\Bot;
+use App\Support\BotContactConfig;
 use App\Support\Localization;
 use App\Support\TenantAccess;
 use App\Support\WidgetAsset;
 use App\Support\WidgetConfig;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -17,6 +19,28 @@ use Inertia\Response;
 
 class WidgetInstallController extends Controller
 {
+    public function preview(Request $request, Bot $bot, TenantAccess $access, WidgetAsset $widgetAsset, Localization $localization): Response
+    {
+        $access->ensureCanAccess($request->user(), $bot);
+        abort_unless($bot->isActive(), 404);
+
+        $widgetLocalization = $localization->widgetLocalization(bot: $bot);
+
+        return Inertia::render('Widget/Preview', [
+            'bot' => $bot->only(['id', 'name', 'allowed_domains']),
+            'widget_url' => $widgetAsset->url($bot),
+            'widget_config' => Arr::except($localization->widgetConfig($bot, $widgetLocalization['locale']), ['avatar_path']),
+            'widget_localization' => Arr::except($widgetLocalization, ['translations']),
+            'contact_config' => [
+                'fields' => BotContactConfig::fields($bot),
+                'required' => BotContactConfig::required($bot),
+                'collect_contact_on_start' => (bool) $bot->collect_contact_on_start,
+            ],
+            'embedded' => $request->boolean('embedded'),
+            'preview_host' => $request->getHost(),
+        ]);
+    }
+
     public function __invoke(TenantAccess $access, WidgetAsset $widgetAsset, Localization $localization): Response
     {
         $bots = $access->scope(Bot::query(), auth()->user())

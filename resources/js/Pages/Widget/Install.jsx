@@ -439,6 +439,13 @@ export default function Install({ bots, defaults, positions, icons, languages = 
                     </form>
 
                     <aside className="space-y-6 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto">
+                        <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                            <h3 className="text-base font-semibold">{t('Live demo')}</h3>
+                            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{t('Try the real widget on a demo page. Save your settings first to preview your latest changes.')}</p>
+                            <a href={route('widget.preview', selectedBot.id)} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500">
+                                {t('Open demo')} <span className="sr-only">{t('(opens in a new tab)')}</span>
+                            </a>
+                        </section>
                         <WidgetPreview config={previewConfig} initialOpen={previewOpen} onToggle={() => setPreviewOpen(!previewOpen)} language={languages.find((language) => language.code === editingLocale)} />
                         <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
                             <div className="flex items-start justify-between gap-3">

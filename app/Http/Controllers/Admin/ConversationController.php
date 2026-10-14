@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\BulkConversationActionRequest;
 use App\Http\Requests\StoreManualConversationMessageRequest;
 use App\Http\Requests\UpdateConversationRequest;
 use App\Models\Bot;
@@ -114,7 +115,7 @@ class ConversationController extends Controller
             'conversations' => $this->queue(clone $base, $tab, $request->user())
                 ->with(['bot:id,name', 'assignee:id,name', 'latestMessage:chat_messages.id,chat_messages.conversation_id,chat_messages.role,chat_messages.content,chat_messages.created_at'])
                 ->withExists(['messages as needs_reply' => fn ($query) => $query->where('role', 'user')->whereRaw("chat_messages.id > COALESCE((SELECT MAX(replies.id) FROM chat_messages replies WHERE replies.conversation_id = chat_messages.conversation_id AND replies.role = 'admin'), 0)")])
-                ->orderByDesc('updated_at')->orderByDesc('id')->paginate(30, ['id', 'tenant_id', 'bot_id', 'visitor_name', 'visitor_email', 'visitor_phone', 'visitor_id', 'status', 'support_mode', 'assigned_to', 'updated_at'])->withQueryString(),
+                ->orderByDesc('updated_at')->orderByDesc('id')->paginate(30, ['id', 'tenant_id', 'bot_id', 'visitor_name', 'visitor_email', 'visitor_phone', 'visitor_id', 'status', 'support_mode', 'assigned_to', 'country_name', 'country_code', 'updated_at'])->withQueryString(),
             'bots' => $access->scope(Bot::query(), $request->user())->orderBy('name')->get(['id', 'name']),
             'tenants' => $request->user()->isSuperAdmin() ? Tenant::query()->orderBy('name')->get(['id', 'name']) : [],
             'conversation' => null,
@@ -185,6 +186,33 @@ class ConversationController extends Controller
         }, 3);
 
         return $conflict ? back()->with('error', 'This conversation was claimed by another teammate. Ownership has been refreshed.') : back();
+    }
+
+    public function bulkAction(BulkConversationActionRequest $request, TenantAccess $access): RedirectResponse
+    {
+        $ids = $request->validated('conversation_ids');
+        $action = $request->validated('action');
+
+        DB::transaction(function () use ($request, $access, $ids, $action): void {
+            $conversations = $access->scope(ChatConversation::query(), $request->user())
+                ->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get();
+            if ($conversations->count() !== count($ids)) {
+                throw ValidationException::withMessages(['conversation_ids' => 'Some selected conversations are no longer available. Refresh and try again.']);
+            }
+            foreach ($conversations as $conversation) {
+                Gate::authorize($action === 'delete' ? 'delete' : 'update', $conversation);
+            }
+            foreach ($conversations as $conversation) {
+                if ($action === 'delete') {
+                    $conversation->delete();
+                } elseif ($conversation->status !== 'resolved') {
+                    $conversation->update(['status' => 'resolved', 'resolved_at' => now()]);
+                }
+            }
+        }, 3);
+
+        return redirect()->route('conversations.index', $request->validated('filters', []))
+            ->with('success', $action === 'delete' ? 'Selected conversations deleted.' : 'Selected conversations resolved.');
     }
 
     public function destroy(ChatConversation $conversation): RedirectResponse

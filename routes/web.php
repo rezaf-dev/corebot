@@ -60,6 +60,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/knowledge-sources/{knowledgeSource}/reprocess', [KnowledgeSourceController::class, 'reprocess'])->name('knowledge-sources.reprocess');
     Route::post('/knowledge-sources/{knowledgeSource}/cancel', [KnowledgeSourceController::class, 'cancel'])->name('knowledge-sources.cancel');
 
+    Route::post('/conversations/bulk-actions', [ConversationController::class, 'bulkAction'])->name('conversations.bulk-action');
     Route::get('/conversations', [ConversationController::class, 'index'])->name('conversations.index');
     Route::get('/conversations/{conversation}', [ConversationController::class, 'show'])->name('conversations.show');
     Route::get('/conversations/{conversation}/messages', [ConversationController::class, 'messages'])->name('conversations.messages.index');
@@ -68,6 +69,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/conversations/{conversation}', [ConversationController::class, 'destroy'])->name('conversations.destroy');
 
     Route::get('/widget-install', WidgetInstallController::class)->name('widget.install');
+    Route::get('/widget-install/{bot}/preview', [WidgetInstallController::class, 'preview'])->name('widget.preview');
     Route::put('/widget-install/{bot}', [WidgetInstallController::class, 'update'])->name('widget.install.update');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

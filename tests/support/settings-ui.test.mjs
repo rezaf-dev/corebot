@@ -8,25 +8,36 @@ import { setLocalization, t } from '../../resources/js/localization.js';
 
 // Render the real JSX and invoke its controls with a small state harness.
 // This needs no additional browser or DOM dependency.
-async function pageHarness(path, name) {
-    const source = fs.readFileSync(path, 'utf8').replace(/^import .*;\n/gm, '').replace('export default function', 'function');
+async function pageHarness(path, name, overrides = {}) {
+    const source = fs.readFileSync(path, 'utf8').replace(/^import[\s\S]*?;\s*/gm, '').replace('export default function', 'function');
     const { code } = await transformWithOxc(source, path, { jsx: { runtime: 'classic' } });
     const states = [];
     let cursor = 0;
     let data;
     const controls = [];
+    const effectDeps = [];
+    let effectCursor = 0;
+    let pendingEffects = [];
     const context = vm.createContext({
         React: { ...React, createElement: (type, props, ...children) => {
-            if (typeof type === 'string') controls.push({ type, ...props, children });
+            if (typeof type === 'string') controls.push({ tag: type, type, ...props, children });
             return React.createElement(type, props, ...children);
         } },
         t,
         useState: (initial) => {
             const index = cursor++;
             if (!(index in states)) states[index] = initial;
-            return [states[index], (value) => { states[index] = value; }];
+            return [states[index], (value) => { states[index] = typeof value === 'function' ? value(states[index]) : value; }];
         },
-        useEffect: () => {},
+        useEffect: (callback, deps) => {
+            const index = effectCursor++;
+            if (!effectDeps[index] || deps.some((value, i) => !Object.is(value, effectDeps[index][i]))) pendingEffects.push(callback);
+            effectDeps[index] = deps;
+        },
+        useLayoutEffect: () => {},
+        useRef: (initial) => ({ current: initial }),
+        usePoll: () => {},
+        currentLocale: () => 'en',
         useMemo: (callback) => callback(),
         useForm: (initial) => {
             data ??= initial;
@@ -34,21 +45,25 @@ async function pageHarness(path, name) {
         },
         AuthenticatedLayout: ({ children }) => React.createElement('main', null, children),
         Head: () => null,
-        Link: ({ children, href, ...props }) => React.createElement('a', { href, ...props }, children),
+        Link: ({ children, href, preserveState, preserveScroll, ...props }) => React.createElement('a', { href, ...props }, children),
         InputLabel: ({ htmlFor, value }) => React.createElement('label', { htmlFor }, value),
         InputError: () => null,
         TextInput: (props) => React.createElement('input', props),
         Checkbox: (props) => React.createElement('input', { ...props, type: 'checkbox' }),
         PrimaryButton: ({ children, ...props }) => React.createElement('button', props, children),
         route: (name) => `/routes/${name}`,
+        ...overrides,
     });
     vm.runInContext(`${code}\nthis.Page = ${name};`, context);
     return {
         render(props) {
             cursor = 0;
+            effectCursor = 0;
             controls.length = 0;
             return renderToString(React.createElement(context.Page, props));
         },
+        runEffects() { const effects = pendingEffects; pendingEffects = []; effects.forEach((effect) => effect()); },
+        controls: () => controls,
         control(id) { return controls.find((control) => control.id === id); },
         button(text) { return controls.find((control) => control.type === 'button' && control.children.includes(text)); },
     };
@@ -98,3 +113,73 @@ guide.button('View setup guide').onClick();
 assert.doesNotMatch(guide.render({ onboarding }), /id="workspace-setup-steps" hidden=""/);
 assert.equal(guide.render({ onboarding: null }), '');
 console.log('Settings and onboarding rendering and interaction checks passed.');
+
+setLocalization();
+let activeRoute = 'bots.edit';
+const navigation = await pageHarness('resources/js/Components/WorkspaceNavigation.jsx', 'WorkspaceNavigation', {
+    route: (name) => name ? `/routes/${name}` : { current: (pattern) => pattern.endsWith('.*') ? activeRoute.startsWith(pattern.slice(0, -1)) : activeRoute === pattern },
+});
+html = navigation.render({ capabilities: { configure: true, platform: false } });
+for (const name of ['bots.index', 'knowledge-sources.index', 'widget.install', 'ai-settings.edit', 'dashboard', 'staff.index']) assert.ok(html.includes(`/routes/${name}`));
+assert.equal((html.match(/aria-current="page"/g) || []).length, 1, 'only the current destination should be highlighted');
+assert.match(html, /href="\/routes\/bots.index" aria-current="page"/);
+html = navigation.render({ capabilities: { configure: false, platform: false } });
+assert.match(html, /conversations.index/);
+assert.doesNotMatch(html, /bots.index|settings.index|admin.index/, 'agents should only see destinations they can access');
+html = navigation.render({ capabilities: { configure: true, platform: true } });
+assert.match(html, /tenants.index/);
+assert.match(html, /language-settings.edit/);
+assert.doesNotMatch(html, /href="\/routes\/ai-settings.edit"/, 'platform admins must choose a workspace before AI settings');
+
+let capabilities = { configure: true, platform: false };
+let request;
+let confirmed = false;
+const inbox = await pageHarness('resources/js/Pages/Conversations/Index.jsx', 'Inbox', {
+    usePage: () => ({ props: { auth: { capabilities } } }),
+    router: { on: () => () => {}, post: (...args) => { request = args; } },
+    window: { confirm: () => confirmed },
+});
+const inboxProps = {
+    conversations: { current_page: 1, last_page: 1, data: [
+        { id: 1, visitor_name: 'First', country_name: 'Türkiye', country_code: 'TR' },
+        { id: 2, visitor_name: 'Second', country_code: 'DE' },
+        { id: 3, visitor_name: 'Third' },
+    ] },
+    counts: { all: 3 }, filters: { tab: 'all' }, conversation: null, bots: [], tenants: [], staff: [],
+};
+html = inbox.render(inboxProps);
+inbox.runEffects();
+assert.match(html, /Türkiye/);
+assert.match(html, />DE</);
+assert.match(html, /Unknown country/);
+inbox.button('Select').onClick();
+html = inbox.render(inboxProps);
+assert.equal(inbox.button('Resolve selected').disabled, true);
+inbox.controls().find((control) => control['aria-label'] === 'Select conversation 1').onChange();
+html = inbox.render(inboxProps);
+assert.match(html, /1 selected/);
+inbox.button('Resolve selected').onClick();
+assert.equal(request[0], '/routes/conversations.bulk-action');
+assert.deepEqual(Array.from(request[1].conversation_ids), [1]);
+assert.equal(request[1].action, 'resolve');
+request = undefined;
+inbox.button('Delete selected').onClick();
+assert.equal(request, undefined, 'cancelled delete must never send a request');
+confirmed = true;
+inbox.button('Delete selected').onClick();
+assert.equal(request[1].action, 'delete');
+request[2].onError();
+assert.match(inbox.render(inboxProps), /Unable to update the selection/);
+inbox.controls().find((control) => control.tag === 'input' && control.type === 'checkbox' && control['aria-label'] === undefined && control.onChange && control.checked === false).onChange({ target: { checked: true } });
+html = inbox.render(inboxProps);
+assert.match(html, /3 selected/);
+inbox.button('Resolve selected').onClick();
+assert.deepEqual(Array.from(request[1].conversation_ids), [1, 2, 3]);
+const nextPage = { ...inboxProps, conversations: { ...inboxProps.conversations, current_page: 2, data: [{ id: 4, visitor_name: 'Fourth' }] } };
+inbox.render(nextPage);
+inbox.runEffects();
+assert.match(inbox.render(nextPage), /0 selected/, 'page changes must clear previous selections');
+capabilities = { configure: false, platform: false };
+html = inbox.render(inboxProps);
+assert.doesNotMatch(html, /Select conversation|Resolve selected|Delete selected/);
+console.log('Navigation, country and bulk action interaction checks passed.');
