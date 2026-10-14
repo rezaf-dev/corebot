@@ -22,6 +22,7 @@ use Inertia\Inertia;
 Route::get('/', fn () => auth()->check() ? redirect()->route('conversations.index') : Inertia::render('Welcome'))->name('home');
 
 Route::get('/demo', DemoController::class)->name('demo');
+Route::get('/widget-install/{bot:public_key}/preview', [WidgetInstallController::class, 'preview'])->name('widget.preview');
 Route::post('/locale', [LocaleController::class, 'update'])->name('locale.update');
 
 Route::post('/support-requests', [SupportRequestController::class, 'store'])
@@ -69,7 +70,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/conversations/{conversation}', [ConversationController::class, 'destroy'])->name('conversations.destroy');
 
     Route::get('/widget-install', WidgetInstallController::class)->name('widget.install');
-    Route::get('/widget-install/{bot}/preview', [WidgetInstallController::class, 'preview'])->name('widget.preview');
     Route::put('/widget-install/{bot}', [WidgetInstallController::class, 'update'])->name('widget.install.update');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

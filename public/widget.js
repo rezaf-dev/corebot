@@ -1458,7 +1458,7 @@ function createWidgetLocalization(initial) {
             promptButton.type = 'button';
             promptButton.className = 'crm-ai-prompt';
             promptButton.textContent = DEFAULT_SUGGESTED_PROMPTS.includes(text) ? t(text) : text;
-            promptButton.addEventListener('click', () => handlePromptClick(text));
+            promptButton.addEventListener('click', () => handlePromptClick(promptButton.textContent));
             container.appendChild(promptButton);
         });
 
