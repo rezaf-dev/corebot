@@ -8,10 +8,11 @@ import TextInput from '@/Components/TextInput';
 import BotIntegrationsSection from '@/Components/BotIntegrationsSection';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function Form({ bot, widgetSnippet = null, integrationTypes = [] }) {
     const isEditing = Boolean(bot);
+    const [advancedOpen, setAdvancedOpen] = useState(false);
 
     const { data, setData, post, put, processing, errors, recentlySuccessful } = useForm({
         name: bot?.name || '',
@@ -28,6 +29,10 @@ export default function Form({ bot, widgetSnippet = null, integrationTypes = [] 
         notification_email: bot?.notification_email || '',
         collect_contact_on_start: bot?.collect_contact_on_start ?? false,
     });
+
+    useEffect(() => {
+        if (Object.keys(errors).length) setAdvancedOpen(true);
+    }, [errors]);
 
     const submit = (e) => {
         e.preventDefault();
@@ -102,85 +107,6 @@ export default function Form({ bot, widgetSnippet = null, integrationTypes = [] 
 
                 <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
                     <SectionHeading
-                        title={t("Messages")}
-                        description={t("What visitors see when the chat opens and when the bot cannot answer.")}
-                    />
-                    <div className="mt-5 space-y-5">
-                        <FormField
-                            id="welcome_message"
-                            label={t("Welcome message")}
-                            value={data.welcome_message}
-                            onChange={(value) => setData('welcome_message', value)}
-                            error={errors.welcome_message}
-                            placeholder={t("Hi! How can I help you today?")}
-                        />
-                        <FormField
-                            id="fallback_message"
-                            label={t("Fallback message")}
-                            value={data.fallback_message}
-                            onChange={(value) => setData('fallback_message', value)}
-                            error={errors.fallback_message}
-                            hint={t("Shown when the bot cannot answer from knowledge.")}
-                        />
-                        <TextAreaField
-                            id="system_prompt"
-                            label={t("System prompt")}
-                            value={data.system_prompt}
-                            onChange={(value) => setData('system_prompt', value)}
-                            error={errors.system_prompt}
-                            rows={8}
-                            hint={t("Instructions that shape tone, scope, and safety for every reply.")}
-                        />
-                    </div>
-                </section>
-
-                <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-                    <SectionHeading
-                        title={t("Retrieval")}
-                        description={t("Tune how aggressively the bot pulls context from your knowledge base.")}
-                    />
-                    <div className="mt-5 space-y-6">
-                        <RangeField
-                            id="temperature"
-                            label={t("Temperature")}
-                            value={Number(data.temperature)}
-                            min={0}
-                            max={1}
-                            step={0.05}
-                            onChange={(value) => setData('temperature', value.toFixed(2))}
-                            error={errors.temperature}
-                            hint={t("Higher values are more creative; lower values stay closer to retrieved context.")}
-                        />
-                        <RangeField
-                            id="similarity_threshold"
-                            label={t("Similarity threshold")}
-                            value={Number(data.similarity_threshold)}
-                            min={0}
-                            max={1}
-                            step={0.05}
-                            onChange={(value) => setData('similarity_threshold', value.toFixed(3))}
-                            error={errors.similarity_threshold}
-                            hint={t("Minimum relevance score for a knowledge chunk to be included.")}
-                        />
-                        <div>
-                            <InputLabel htmlFor="max_context_chunks" value={t("Max context chunks")} />
-                            <TextInput
-                                id="max_context_chunks"
-                                type="number"
-                                min={1}
-                                max={12}
-                                value={data.max_context_chunks}
-                                onChange={(e) => setData('max_context_chunks', e.target.value)}
-                                className="mt-1 block w-full sm:max-w-xs"
-                            />
-                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("Number of knowledge chunks sent to the model (1–12).")}</p>
-                            <InputError message={errors.max_context_chunks} className="mt-1" />
-                        </div>
-                    </div>
-                </section>
-
-                <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-                    <SectionHeading
                         title={t("Security")}
                         description={t("Restrict the widget to specific hostnames. Leave empty to allow any domain.")}
                     />
@@ -197,41 +123,129 @@ export default function Form({ bot, widgetSnippet = null, integrationTypes = [] 
                     />
                 </section>
 
-                <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-                    <SectionHeading
-                        title={t("Lead capture")}
-                        description={t("Collect visitor contact details when the bot cannot answer confidently, and notify your team by email.")}
-                    />
-                    <div className="mt-5 space-y-5">
-                        <FormField
-                            id="notification_email"
-                            label={t("Notification email")}
-                            value={data.notification_email}
-                            onChange={(value) => setData('notification_email', value)}
-                            error={errors.notification_email}
-                            placeholder={t("sales@example.com")}
-                            hint={t("Receives an email when a visitor submits their contact details.")}
+                <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                    <button type="button" aria-expanded={advancedOpen} aria-controls="advanced-bot-settings" onClick={() => setAdvancedOpen(!advancedOpen)} className="flex w-full items-center justify-between text-start font-semibold">
+                        {t('Advanced settings')} <span aria-hidden="true">{advancedOpen ? '−' : '+'}</span>
+                    </button>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t('Default messages and AI behavior are ready to use.')}</p>
+                </div>
+                <div id="advanced-bot-settings" hidden={!advancedOpen} className="space-y-6">
+                    <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                        <SectionHeading
+                            title={t("Messages")}
+                            description={t("What visitors see when the chat opens and when the bot cannot answer.")}
                         />
-                        <ContactFieldGroup
-                            label={t("Fields to collect")}
-                            fields={data.contact_fields}
-                            required={data.contact_required}
-                            onChangeFields={(fields) => setData('contact_fields', fields)}
-                            onChangeRequired={(required) => setData('contact_required', required)}
-                            errors={errors}
-                        />
-                        <label className="flex items-start gap-3">
-                            <Checkbox
-                                checked={data.collect_contact_on_start}
-                                onChange={(e) => setData('collect_contact_on_start', e.target.checked)}
+                        <div className="mt-5 space-y-5">
+                            <FormField
+                                id="welcome_message"
+                                label={t("Welcome message")}
+                                value={data.welcome_message}
+                                onChange={(value) => setData('welcome_message', value)}
+                                error={errors.welcome_message}
+                                placeholder={t("Hi! How can I help you today?")}
                             />
-                            <span>
-                                <span className="block text-sm font-medium text-gray-900 dark:text-white">{t("Prompt on chat open")}</span>
-                                <span className="block text-xs text-gray-500 dark:text-gray-400">{t("Show the contact form when the visitor opens the widget (if details are not already known).")}</span>
-                            </span>
-                        </label>
-                    </div>
-                </section>
+                            <FormField
+                                id="fallback_message"
+                                label={t("Fallback message")}
+                                value={data.fallback_message}
+                                onChange={(value) => setData('fallback_message', value)}
+                                error={errors.fallback_message}
+                                hint={t("Shown when the bot cannot answer from knowledge.")}
+                            />
+                            <TextAreaField
+                                id="system_prompt"
+                                label={t("System prompt")}
+                                value={data.system_prompt}
+                                onChange={(value) => setData('system_prompt', value)}
+                                error={errors.system_prompt}
+                                rows={8}
+                                hint={t("Instructions that shape tone, scope, and safety for every reply.")}
+                            />
+                        </div>
+                    </section>
+
+                    <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                        <SectionHeading
+                            title={t("Retrieval")}
+                            description={t("Tune how aggressively the bot pulls context from your knowledge base.")}
+                        />
+                        <div className="mt-5 space-y-6">
+                            <RangeField
+                                id="temperature"
+                                label={t("Temperature")}
+                                value={Number(data.temperature)}
+                                min={0}
+                                max={1}
+                                step={0.05}
+                                onChange={(value) => setData('temperature', value.toFixed(2))}
+                                error={errors.temperature}
+                                hint={t("Higher values are more creative; lower values stay closer to retrieved context.")}
+                            />
+                            <RangeField
+                                id="similarity_threshold"
+                                label={t("Similarity threshold")}
+                                value={Number(data.similarity_threshold)}
+                                min={0}
+                                max={1}
+                                step={0.05}
+                                onChange={(value) => setData('similarity_threshold', value.toFixed(3))}
+                                error={errors.similarity_threshold}
+                                hint={t("Minimum relevance score for a knowledge chunk to be included.")}
+                            />
+                            <div>
+                                <InputLabel htmlFor="max_context_chunks" value={t("Max context chunks")} />
+                                <TextInput
+                                    id="max_context_chunks"
+                                    type="number"
+                                    min={1}
+                                    max={12}
+                                    value={data.max_context_chunks}
+                                    onChange={(e) => setData('max_context_chunks', e.target.value)}
+                                    className="mt-1 block w-full sm:max-w-xs"
+                                />
+                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("Number of knowledge chunks sent to the model (1–12).")}</p>
+                                <InputError message={errors.max_context_chunks} className="mt-1" />
+                            </div>
+                        </div>
+                    </section>
+
+                    <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                        <SectionHeading
+                            title={t("Lead capture")}
+                            description={t("Collect visitor contact details when the bot cannot answer confidently, and notify your team by email.")}
+                        />
+                        <div className="mt-5 space-y-5">
+                            <FormField
+                                id="notification_email"
+                                label={t("Notification email")}
+                                value={data.notification_email}
+                                onChange={(value) => setData('notification_email', value)}
+                                error={errors.notification_email}
+                                placeholder={t("sales@example.com")}
+                                hint={t("Receives an email when a visitor submits their contact details.")}
+                            />
+                            <ContactFieldGroup
+                                label={t("Fields to collect")}
+                                fields={data.contact_fields}
+                                required={data.contact_required}
+                                onChangeFields={(fields) => setData('contact_fields', fields)}
+                                onChangeRequired={(required) => setData('contact_required', required)}
+                                errors={errors}
+                            />
+                            <label className="flex items-start gap-3">
+                                <Checkbox
+                                    checked={data.collect_contact_on_start}
+                                    onChange={(e) => setData('collect_contact_on_start', e.target.checked)}
+                                />
+                                <span>
+                                    <span className="block text-sm font-medium text-gray-900 dark:text-white">{t("Prompt on chat open")}</span>
+                                    <span className="block text-xs text-gray-500 dark:text-gray-400">{t("Show the contact form when the visitor opens the widget (if details are not already known).")}</span>
+                                </span>
+                            </label>
+                        </div>
+                    </section>
+
+                </div>
 
                 <div className="flex flex-wrap items-center gap-3">
                     <PrimaryButton disabled={processing}>

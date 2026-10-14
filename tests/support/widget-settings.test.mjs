@@ -51,3 +51,24 @@ assert.equal(calls.locale, 'en', 'bot changes must restore the global locale');
 context.selectedBot = undefined;
 assert.doesNotThrow(syncBot, 'an empty bot list must not attempt to update the form');
 console.log('Widget settings mount and bot-selection checks passed.');
+
+// Exercise submission rather than only checking source text: multipart writes
+// must use POST with Laravel method spoofing, including empty JSON collections.
+const submitDeclaration = statements.flatMap((node) => node.declarations || []).find((node) => node.id?.name === 'submit');
+let transformed;
+let submitted;
+const submitContext = vm.createContext({
+    selectedBot: { id: 42 },
+    transform: (callback) => { transformed = callback; },
+    post: (url, options) => { submitted = { url, options }; },
+    route: (name, id) => `${name}/${id}`,
+});
+vm.runInContext(`(${source.slice(submitDeclaration.init.start, submitDeclaration.init.end)})`, submitContext)({ preventDefault() {} });
+const payload = transformed({ primary_color: '#abcdef', launcher_icon: 'assistant' });
+assert.equal(payload._method, 'put');
+assert.equal(payload.enabled_locales, '[]');
+assert.equal(payload.localized_content, '{}');
+assert.equal(payload.primary_color, '#abcdef');
+assert.equal(submitted.url, 'widget.install.update/42');
+assert.equal(submitted.options.forceFormData, true);
+console.log('Widget settings submission checks passed.');

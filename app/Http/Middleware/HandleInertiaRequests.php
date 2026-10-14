@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Support\Localization;
+use App\Support\WorkspaceOnboarding;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -45,6 +46,7 @@ class HandleInertiaRequests extends Middleware
                     'platform' => $request->user()?->isSuperAdmin() ?? false,
                 ],
             ],
+            'onboarding' => fn () => app(WorkspaceOnboarding::class)->forUser($request->user()),
             'flash' => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),

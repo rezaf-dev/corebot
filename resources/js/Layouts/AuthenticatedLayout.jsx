@@ -1,4 +1,5 @@
 import { t } from '@/localization';
+import WorkspaceOnboarding from '@/Components/WorkspaceOnboarding';
 import LanguageSelector from '@/Components/LanguageSelector';
 import ApplicationLogo from '@/Components/ApplicationLogo';
 import Dropdown from '@/Components/Dropdown';
@@ -10,7 +11,7 @@ export default function AuthenticatedLayout({
     children,
     workspace = false,
 }) {
-    const { auth, flash = {} } = usePage().props;
+    const { auth, flash = {}, onboarding } = usePage().props;
     const [menuOpen, setMenuOpen] = useState(false);
     const links = [['conversations.index', 'Conversations', '◫']];
     if (auth.capabilities?.configure)
@@ -141,6 +142,7 @@ export default function AuthenticatedLayout({
                             {t(flash.error || flash.success)}
                         </div>
                     )}
+                    <WorkspaceOnboarding onboarding={onboarding} />
                     {children}
                 </main>
             </div>

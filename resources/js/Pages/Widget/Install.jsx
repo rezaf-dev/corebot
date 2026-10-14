@@ -5,7 +5,7 @@ import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 
 const launcherTemplates = [
@@ -20,11 +20,14 @@ const launcherTemplates = [
 export default function Install({ bots, defaults, positions, icons, languages = [], language_settings, preview_translations = {} }) {
     const [selectedBotId, setSelectedBotId] = useState(bots[0]?.id ?? null);
     const [copied, setCopied] = useState(false);
+    const [advancedOpen, setAdvancedOpen] = useState(false);
+    const [previewOpen, setPreviewOpen] = useState(true);
+    const [avatarPreview, setAvatarPreview] = useState(null);
     const [editingLocale, setEditingLocale] = useState(language_settings?.default_locale || 'en');
 
     const selectedBot = bots.find((bot) => bot.id === selectedBotId);
 
-    const { data, setData, put, processing, errors, recentlySuccessful, setDefaults: updateDefaults, transform } = useForm(
+    const { data, setData, post, processing, errors, recentlySuccessful, setDefaults: updateDefaults, transform } = useForm(
         { ...defaults, ...selectedBot?.widget_config },
     );
 
@@ -37,6 +40,20 @@ export default function Install({ bots, defaults, positions, icons, languages = 
         }
     }, [selectedBotId]);
 
+    useEffect(() => {
+        if (Object.keys(errors).length) setAdvancedOpen(true);
+    }, [errors]);
+
+    useEffect(() => {
+        if (!data.avatar) {
+            setAvatarPreview(null);
+            return;
+        }
+        const url = URL.createObjectURL(data.avatar);
+        setAvatarPreview(url);
+        return () => URL.revokeObjectURL(url);
+    }, [data.avatar]);
+
     const snippet = useMemo(() => {
         if (!selectedBot) return '';
         return buildEmbedSnippet(selectedBot.widget_url);
@@ -47,16 +64,17 @@ export default function Install({ bots, defaults, positions, icons, languages = 
         if (!selectedBot) return;
         transform((values) => ({
             ...values,
+            _method: 'put',
             enabled_locales: JSON.stringify(values.enabled_locales || []),
             localized_content: JSON.stringify(values.localized_content || {}),
         }));
-        put(route('widget.install.update', selectedBot.id), { preserveScroll: true, forceFormData: true });
+        post(route('widget.install.update', selectedBot.id), { preserveScroll: true, forceFormData: true });
     };
 
     const effectiveLanguages = languages.filter((language) => !data.enabled_locales?.length || data.enabled_locales.includes(language.code));
     const localizedCopy = data.localized_content?.[editingLocale] || {};
     const previewCopy = preview_translations[editingLocale] || {};
-    const previewConfig = { ...data, welcome_message: selectedBot?.welcome_message || 'Hi, how can I help with your CRM today?' };
+    const previewConfig = { ...data, avatar_url: avatarPreview || data.avatar_url, welcome_message: selectedBot?.welcome_message || 'Hi, how can I help with your CRM today?' };
     for (const field of ['title', 'subtitle', 'launcher_label', 'input_placeholder', 'send_button_label', 'welcome_message']) {
         const defaultText = field === 'welcome_message' ? 'Hi, how can I help with your CRM today?' : defaults[field];
         if (previewConfig[field] === defaultText) previewConfig[field] = previewCopy[defaultText] || defaultText;
@@ -91,6 +109,7 @@ export default function Install({ bots, defaults, positions, icons, languages = 
                     <div className="rounded-lg border border-dashed border-gray-200 bg-white px-6 py-12 text-center dark:border-gray-700 dark:bg-gray-800">
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t("No active bots")}</h3>
                         <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{t("Create and activate a bot before customizing the chat widget.")}</p>
+                        <Link href={route('bots.create')} className="mt-5 inline-flex rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">{t("Create a bot")}</Link>
                     </div>
                 </div>
             </AuthenticatedLayout>
@@ -126,134 +145,15 @@ export default function Install({ bots, defaults, positions, icons, languages = 
                     ))}
                 </div>
 
-                <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
+                <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
                     <form onSubmit={submit} className="space-y-6">
-                        <section className="space-y-5 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-                            <div>
-                                <h3 className="text-base font-semibold">{t('Widget languages')}</h3>
-                                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t('Choose which languages visitors can use in this widget.')}</p>
-                            </div>
-                            <label className="flex items-center gap-3 text-sm">
-                                <Checkbox checked={!data.enabled_locales?.length} onChange={(event) => setData({ ...data, enabled_locales: event.target.checked ? [] : languages.map((language) => language.code), default_locale: '' })} />
-                                {t('Use global language settings')}
-                            </label>
-                            {!!data.enabled_locales?.length && (
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    {languages.map((language) => (
-                                        <label key={language.code} className="flex items-center gap-3 rounded-md border border-gray-200 p-3 text-sm dark:border-gray-700">
-                                            <Checkbox
-                                                checked={data.enabled_locales.includes(language.code)}
-                                                disabled={data.enabled_locales.length === 1 && data.enabled_locales.includes(language.code)}
-                                                onChange={(event) => {
-                                                    const enabled = event.target.checked ? [...data.enabled_locales, language.code] : data.enabled_locales.filter((code) => code !== language.code);
-                                                    setData({ ...data, enabled_locales: enabled, default_locale: enabled.includes(data.default_locale) ? data.default_locale : (enabled.includes(language_settings?.default_locale) ? '' : enabled[0]) });
-                                                }}
-                                            />
-                                            <span lang={language.code}>{language.native_name}</span>
-                                            <span className="ms-auto text-xs text-gray-500">{language.direction.toUpperCase()}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            )}
-                            <InputError message={errors.enabled_locales || Object.entries(errors).find(([key]) => key.startsWith('enabled_locales.'))?.[1]} />
-                            <div>
-                                <InputLabel htmlFor="widget_default_locale" value={t('Default language')} />
-                                <select id="widget_default_locale" value={data.default_locale || ''} onChange={(event) => setData('default_locale', event.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
-                                    <option value="">{t('Use global default')}</option>
-                                    {effectiveLanguages.map((language) => <option key={language.code} value={language.code}>{language.native_name}</option>)}
-                                </select>
-                                <InputError message={errors.default_locale} className="mt-1" />
-                                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{t('Visitors can switch languages in the chat header. Persian and Arabic use RTL automatically.')}</p>
-                            </div>
-                            <div className="space-y-4 border-t border-gray-200 pt-5 dark:border-gray-700">
-                                <div>
-                                    <InputLabel htmlFor="widget_translation_locale" value={t('Translated widget text')} />
-                                    <select id="widget_translation_locale" value={editingLocale} onChange={(event) => setEditingLocale(event.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
-                                        {languages.map((language) => <option key={language.code} value={language.code}>{language.native_name}</option>)}
-                                    </select>
-                                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{t('Built-in text is translated automatically. Add translations for your custom text here; blank fields use the base text.')}</p>
-                                </div>
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    {[
-                                        ['title', 'Title'], ['subtitle', 'Subtitle'], ['launcher_label', 'Launcher callout'],
-                                        ['send_button_label', 'Send button'], ['input_placeholder', 'Input placeholder'],
-                                        ['welcome_message', 'Welcome message'], ['fallback_message', 'Fallback message'],
-                                    ].map(([field, label]) => (
-                                        <TextField key={`${editingLocale}-${field}`} id={`localized_${field}`} label={t(label)} value={localizedCopy[field] || ''} onChange={(value) => updateLocalizedCopy(field, value)} error={errors[`localized_content.${editingLocale}.${field}`]} dir={languages.find((language) => language.code === editingLocale)?.direction} />
-                                    ))}
-                                </div>
-                                <div>
-                                    <InputLabel htmlFor="localized_suggested_prompts" value={t('Conversation starters')} />
-                                    <textarea id="localized_suggested_prompts" value={(localizedCopy.suggested_prompts || []).join('\n')} onChange={(event) => updateLocalizedCopy('suggested_prompts', event.target.value.split('\n'))} rows={4} dir={languages.find((language) => language.code === editingLocale)?.direction} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100" />
-                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('One prompt per line, up to four prompts.')}</p>
-                                    <InputError message={errors[`localized_content.${editingLocale}.suggested_prompts`] || Object.entries(errors).find(([key]) => key.startsWith(`localized_content.${editingLocale}.suggested_prompts.`))?.[1]} />
-                                </div>
-                            </div>
-                        </section>
                         <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Appearance")}</h3>
-                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Colors and text shown in the chat header and launcher.")}</p>
+                            <h3 className="text-base font-semibold">{t('Widget essentials')}</h3>
+                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t('Choose branding and position. Default text is translated automatically.')}</p>
                             <div className="mt-5 grid gap-5 sm:grid-cols-2">
                                 <TextField id="title" label={t("Title")} value={data.title} onChange={(v) => setData('title', v)} error={errors.title} />
-                                <TextField id="subtitle" label={t("Subtitle")} value={data.subtitle} onChange={(v) => setData('subtitle', v)} error={errors.subtitle} />
-                                <div>
-                                    <InputLabel htmlFor="avatar" value={t("Support avatar")} />
-                                    <input
-                                        id="avatar"
-                                        type="file"
-                                        accept="image/jpeg,image/png,image/webp"
-                                        onChange={(event) => setData('avatar', event.target.files?.[0] || null)}
-                                        className="mt-1 block w-full text-sm text-gray-700 file:me-4 file:rounded-md file:border-0 file:bg-indigo-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100 dark:text-gray-300 dark:file:bg-indigo-950/50 dark:file:text-indigo-300 dark:hover:file:bg-indigo-950"
-                                    />
-                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("JPEG, PNG, or WebP up to 2 MB.")}</p>
-                                    <InputError message={errors.avatar} className="mt-1" />
-                                </div>
-                                <div className="sm:col-span-2">
-                                    <TextField id="launcher_label" label={t("Launcher callout")} value={data.launcher_label} onChange={(v) => setData('launcher_label', v)} error={errors.launcher_label} />
-                                    <div className="mt-2 flex flex-wrap gap-2">
-                                        {launcherTemplates.map((template) => (
-                                            <button
-                                                key={t(template)}
-                                                type="button"
-                                                onClick={() => setData('launcher_label', t(template))}
-                                                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                                                    data.launcher_label === t(template)
-                                                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-950/50 dark:text-indigo-300'
-                                                        : 'border-gray-200 bg-white text-gray-600 hover:border-indigo-300 hover:text-indigo-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-indigo-500 dark:hover:text-indigo-300'
-                                                }`}
-                                            >
-                                                {t(template)}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
                                 <ColorField id="primary_color" label={t("Header & buttons")} value={data.primary_color} onChange={(v) => setData('primary_color', v)} error={errors.primary_color} />
                                 <ColorField id="accent_color" label={t("User messages")} value={data.accent_color} onChange={(v) => setData('accent_color', v)} error={errors.accent_color} />
-                                <ColorField id="background_color" label={t("Messages background")} value={data.background_color} onChange={(v) => setData('background_color', v)} error={errors.background_color} />
-                                <ColorField id="surface_color" label={t("Panel surface")} value={data.surface_color} onChange={(v) => setData('surface_color', v)} error={errors.surface_color} />
-                                <ColorField id="text_color" label={t("Text color")} value={data.text_color} onChange={(v) => setData('text_color', v)} error={errors.text_color} />
-                                <div>
-                                    <InputLabel htmlFor="launcher_icon" value={t("Launcher icon")} />
-                                    <select
-                                        id="launcher_icon"
-                                        value={data.launcher_icon}
-                                        onChange={(e) => setData('launcher_icon', e.target.value)}
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
-                                    >
-                                        {icons.map((icon) => (
-                                            <option key={t(icon === 'help' ? 'Help' : icon === 'assistant' ? 'Assistant' : icon.charAt(0).toUpperCase() + icon.slice(1))} value={t(icon === 'help' ? 'Help' : icon === 'assistant' ? 'Assistant' : icon.charAt(0).toUpperCase() + icon.slice(1))}>
-                                                {t(icon === 'help' ? 'Help' : icon === 'assistant' ? 'Assistant' : icon.charAt(0).toUpperCase() + icon.slice(1))}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <InputError message={errors.launcher_icon} className="mt-1" />
-                                </div>
-                            </div>
-                        </section>
-
-                        <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Layout")}</h3>
-                            <div className="mt-5 grid gap-5 sm:grid-cols-2">
                                 <div>
                                     <InputLabel htmlFor="position" value={t("Position")} />
                                     <select
@@ -270,132 +170,266 @@ export default function Install({ bots, defaults, positions, icons, languages = 
                                     </select>
                                     <InputError message={errors.position} className="mt-1" />
                                 </div>
-                                <RangeField
-                                    id="panel_width"
-                                    label={t("Panel width (px)")}
-                                    value={data.panel_width}
-                                    min={320}
-                                    max={480}
-                                    onChange={(v) => setData('panel_width', v)}
-                                    error={errors.panel_width}
-                                />
-                                <RangeField
-                                    id="launcher_size"
-                                    label={t("Launcher size (px)")}
-                                    value={data.launcher_size}
-                                    min={44}
-                                    max={72}
-                                    onChange={(v) => setData('launcher_size', v)}
-                                    error={errors.launcher_size}
-                                />
-                                <RangeField
-                                    id="border_radius"
-                                    label={t("Corner radius (px)")}
-                                    value={data.border_radius}
-                                    min={0}
-                                    max={32}
-                                    onChange={(v) => setData('border_radius', v)}
-                                    error={errors.border_radius}
-                                />
-                                <RangeField
-                                    id="offset_x"
-                                    label={t("Horizontal offset (px)")}
-                                    value={data.offset_x}
-                                    min={0}
-                                    max={80}
-                                    onChange={(v) => setData('offset_x', v)}
-                                    error={errors.offset_x}
-                                />
-                                <RangeField
-                                    id="offset_y"
-                                    label={t("Vertical offset (px)")}
-                                    value={data.offset_y}
-                                    min={0}
-                                    max={80}
-                                    onChange={(v) => setData('offset_y', v)}
-                                    error={errors.offset_y}
-                                />
                                 <div>
-                                    <InputLabel htmlFor="initial_open" value={t("Initial state")} />
-                                    <select
-                                        id="initial_open"
-                                        value={data.initial_open ? 'open' : 'closed'}
-                                        onChange={(e) => setData('initial_open', e.target.value === 'open')}
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
-                                    >
-                                        <option value="closed">{t("Closed (launcher only)")}</option>
-                                        <option value="open">{t("Open (chat panel visible)")}</option>
-                                    </select>
-                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("When open, visitors see the welcome message immediately on page load.")}</p>
-                                    <InputError message={errors.initial_open} className="mt-1" />
+                                    <InputLabel htmlFor="avatar" value={t("Support avatar")} />
+                                    <input
+                                        id="avatar"
+                                        type="file"
+                                        accept="image/jpeg,image/png,image/webp"
+                                        onChange={(event) => setData('avatar', event.target.files?.[0] || null)}
+                                        className="mt-1 block w-full text-sm text-gray-700 file:me-4 file:rounded-md file:border-0 file:bg-indigo-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100 dark:text-gray-300 dark:file:bg-indigo-950/50 dark:file:text-indigo-300 dark:hover:file:bg-indigo-950"
+                                    />
+                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("JPEG, PNG, or WebP up to 2 MB.")}</p>
+                                    <InputError message={errors.avatar} className="mt-1" />
                                 </div>
                             </div>
                         </section>
-
-                        <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Conversation starters")}</h3>
-                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Short prompt buttons shown before the visitor sends their first message. Leave empty to use defaults.")}</p>
-                            <div className="mt-5 space-y-3">
-                                {((data.suggested_prompts?.length ? data.suggested_prompts : ['']).slice(0, 4)).map((prompt, index, rows) => (
-                                    <div key={index} className="flex gap-2">
-                                        <TextInput
-                                            id={`suggested_prompt_${index}`}
-                                            value={prompt}
-                                            onChange={(e) => {
-                                                const next = [...rows];
-                                                next[index] = e.target.value;
-                                                setData('suggested_prompts', next);
-                                            }}
-                                            className="block w-full"
-                                            placeholder={index === 0 ? t("How do I get started?") : t("Optional prompt")}
-                                        />
-                                        {rows.length > 1 && (
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setData(
-                                                        'suggested_prompts',
-                                                        rows.filter((_, i) => i !== index),
-                                                    );
-                                                }}
-                                                className="shrink-0 rounded-md border border-gray-200 px-3 text-sm text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                                            >{t("Remove")}</button>
-                                        )}
+                        <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                            <button type="button" aria-expanded={advancedOpen} aria-controls="advanced-widget-settings" onClick={() => setAdvancedOpen(!advancedOpen)} className="flex w-full items-center justify-between gap-3 text-start font-semibold">
+                                {t('Advanced settings')} <span aria-hidden="true">{advancedOpen ? '−' : '+'}</span>
+                            </button>
+                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t('Optional text, translations, languages, and layout.')}</p>
+                        </div>
+                        <div id="advanced-widget-settings" hidden={!advancedOpen} className="space-y-6">
+                            <section className="space-y-5 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                                <div>
+                                    <h3 className="text-base font-semibold">{t('Widget languages')}</h3>
+                                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t('Choose which languages visitors can use in this widget.')}</p>
+                                </div>
+                                <label className="flex items-center gap-3 text-sm">
+                                    <Checkbox checked={!data.enabled_locales?.length} onChange={(event) => setData({ ...data, enabled_locales: event.target.checked ? [] : languages.map((language) => language.code), default_locale: '' })} />
+                                    {t('Use global language settings')}
+                                </label>
+                                {!!data.enabled_locales?.length && (
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        {languages.map((language) => (
+                                            <label key={language.code} className="flex items-center gap-3 rounded-md border border-gray-200 p-3 text-sm dark:border-gray-700">
+                                                <Checkbox
+                                                    checked={data.enabled_locales.includes(language.code)}
+                                                    disabled={data.enabled_locales.length === 1 && data.enabled_locales.includes(language.code)}
+                                                    onChange={(event) => {
+                                                        const enabled = event.target.checked ? [...data.enabled_locales, language.code] : data.enabled_locales.filter((code) => code !== language.code);
+                                                        setData({ ...data, enabled_locales: enabled, default_locale: enabled.includes(data.default_locale) ? data.default_locale : (enabled.includes(language_settings?.default_locale) ? '' : enabled[0]) });
+                                                    }}
+                                                />
+                                                <span lang={language.code}>{language.native_name}</span>
+                                                <span className="ms-auto text-xs text-gray-500">{language.direction.toUpperCase()}</span>
+                                            </label>
+                                        ))}
                                     </div>
-                                ))}
-                                {(data.suggested_prompts?.length || 0) < 4 && (
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setData('suggested_prompts', [...(data.suggested_prompts || []), ''])
-                                        }
-                                        className="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
-                                    >{t("Add prompt")}</button>
                                 )}
-                                <InputError message={errors['suggested_prompts.0'] || errors.suggested_prompts} className="mt-1" />
-                            </div>
-                        </section>
+                                <InputError message={errors.enabled_locales || Object.entries(errors).find(([key]) => key.startsWith('enabled_locales.'))?.[1]} />
+                                <div>
+                                    <InputLabel htmlFor="widget_default_locale" value={t('Default language')} />
+                                    <select id="widget_default_locale" value={data.default_locale || ''} onChange={(event) => setData('default_locale', event.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                                        <option value="">{t('Use global default')}</option>
+                                        {effectiveLanguages.map((language) => <option key={language.code} value={language.code}>{language.native_name}</option>)}
+                                    </select>
+                                    <InputError message={errors.default_locale} className="mt-1" />
+                                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{t('Visitors can switch languages in the chat header. Persian and Arabic use RTL automatically.')}</p>
+                                </div>
+                                <div className="space-y-4 border-t border-gray-200 pt-5 dark:border-gray-700">
+                                    <div>
+                                        <InputLabel htmlFor="widget_translation_locale" value={t('Translated widget text')} />
+                                        <select id="widget_translation_locale" value={editingLocale} onChange={(event) => setEditingLocale(event.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                                            {languages.map((language) => <option key={language.code} value={language.code}>{language.native_name}</option>)}
+                                        </select>
+                                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{t('Built-in text is translated automatically. Add translations for your custom text here; blank fields use the base text.')}</p>
+                                    </div>
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        {[
+                                            ['title', 'Title'], ['subtitle', 'Subtitle'], ['launcher_label', 'Launcher callout'],
+                                            ['send_button_label', 'Send button'], ['input_placeholder', 'Input placeholder'],
+                                            ['welcome_message', 'Welcome message'], ['fallback_message', 'Fallback message'],
+                                        ].map(([field, label]) => (
+                                            <TextField key={`${editingLocale}-${field}`} id={`localized_${field}`} label={t(label)} value={localizedCopy[field] || ''} onChange={(value) => updateLocalizedCopy(field, value)} error={errors[`localized_content.${editingLocale}.${field}`]} dir={languages.find((language) => language.code === editingLocale)?.direction} />
+                                        ))}
+                                    </div>
+                                    <div>
+                                        <InputLabel htmlFor="localized_suggested_prompts" value={t('Conversation starters')} />
+                                        <textarea id="localized_suggested_prompts" value={(localizedCopy.suggested_prompts || []).join('\n')} onChange={(event) => updateLocalizedCopy('suggested_prompts', event.target.value.split('\n'))} rows={4} dir={languages.find((language) => language.code === editingLocale)?.direction} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100" />
+                                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('One prompt per line, up to four prompts.')}</p>
+                                        <InputError message={errors[`localized_content.${editingLocale}.suggested_prompts`] || Object.entries(errors).find(([key]) => key.startsWith(`localized_content.${editingLocale}.suggested_prompts.`))?.[1]} />
+                                    </div>
+                                </div>
+                            </section>
+                            <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                                <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Appearance")}</h3>
+                                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Optional colors and launcher details.")}</p>
+                                <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                                    <TextField id="subtitle" label={t("Subtitle")} value={data.subtitle} onChange={(v) => setData('subtitle', v)} error={errors.subtitle} />
+                                    <div className="sm:col-span-2">
+                                        <TextField id="launcher_label" label={t("Launcher callout")} value={data.launcher_label} onChange={(v) => setData('launcher_label', v)} error={errors.launcher_label} />
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                            {launcherTemplates.map((template) => (
+                                                <button
+                                                    key={t(template)}
+                                                    type="button"
+                                                    onClick={() => setData('launcher_label', t(template))}
+                                                    className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                                                        data.launcher_label === t(template)
+                                                            ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-950/50 dark:text-indigo-300'
+                                                            : 'border-gray-200 bg-white text-gray-600 hover:border-indigo-300 hover:text-indigo-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-indigo-500 dark:hover:text-indigo-300'
+                                                    }`}
+                                                >
+                                                    {t(template)}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <ColorField id="background_color" label={t("Messages background")} value={data.background_color} onChange={(v) => setData('background_color', v)} error={errors.background_color} />
+                                    <ColorField id="surface_color" label={t("Panel surface")} value={data.surface_color} onChange={(v) => setData('surface_color', v)} error={errors.surface_color} />
+                                    <ColorField id="text_color" label={t("Text color")} value={data.text_color} onChange={(v) => setData('text_color', v)} error={errors.text_color} />
+                                    <div>
+                                        <InputLabel htmlFor="launcher_icon" value={t("Launcher icon")} />
+                                        <select
+                                            id="launcher_icon"
+                                            value={data.launcher_icon}
+                                            onChange={(e) => setData('launcher_icon', e.target.value)}
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+                                        >
+                                            {icons.map((icon) => (
+                                                <option key={icon} value={icon}>
+                                                    {t(icon === 'help' ? 'Help' : icon === 'assistant' ? 'Assistant' : icon.charAt(0).toUpperCase() + icon.slice(1))}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <InputError message={errors.launcher_icon} className="mt-1" />
+                                    </div>
+                                </div>
+                            </section>
 
-                        <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Labels")}</h3>
-                            <div className="mt-5 grid gap-5 sm:grid-cols-2">
-                                <TextField
-                                    id="input_placeholder"
-                                    label={t("Input placeholder")}
-                                    value={data.input_placeholder}
-                                    onChange={(v) => setData('input_placeholder', v)}
-                                    error={errors.input_placeholder}
-                                />
-                                <TextField
-                                    id="send_button_label"
-                                    label={t("Send button")}
-                                    value={data.send_button_label}
-                                    onChange={(v) => setData('send_button_label', v)}
-                                    error={errors.send_button_label}
-                                />
-                            </div>
-                        </section>
+                            <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                                <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Layout")}</h3>
+                                <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                                    <RangeField
+                                        id="panel_width"
+                                        label={t("Panel width (px)")}
+                                        value={data.panel_width}
+                                        min={320}
+                                        max={480}
+                                        onChange={(v) => setData('panel_width', v)}
+                                        error={errors.panel_width}
+                                    />
+                                    <RangeField
+                                        id="launcher_size"
+                                        label={t("Launcher size (px)")}
+                                        value={data.launcher_size}
+                                        min={44}
+                                        max={72}
+                                        onChange={(v) => setData('launcher_size', v)}
+                                        error={errors.launcher_size}
+                                    />
+                                    <RangeField
+                                        id="border_radius"
+                                        label={t("Corner radius (px)")}
+                                        value={data.border_radius}
+                                        min={0}
+                                        max={32}
+                                        onChange={(v) => setData('border_radius', v)}
+                                        error={errors.border_radius}
+                                    />
+                                    <RangeField
+                                        id="offset_x"
+                                        label={t("Horizontal offset (px)")}
+                                        value={data.offset_x}
+                                        min={0}
+                                        max={80}
+                                        onChange={(v) => setData('offset_x', v)}
+                                        error={errors.offset_x}
+                                    />
+                                    <RangeField
+                                        id="offset_y"
+                                        label={t("Vertical offset (px)")}
+                                        value={data.offset_y}
+                                        min={0}
+                                        max={80}
+                                        onChange={(v) => setData('offset_y', v)}
+                                        error={errors.offset_y}
+                                    />
+                                    <div>
+                                        <InputLabel htmlFor="initial_open" value={t("Initial state")} />
+                                        <select
+                                            id="initial_open"
+                                            value={data.initial_open ? 'open' : 'closed'}
+                                            onChange={(e) => setData('initial_open', e.target.value === 'open')}
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+                                        >
+                                            <option value="closed">{t("Closed (launcher only)")}</option>
+                                            <option value="open">{t("Open (chat panel visible)")}</option>
+                                        </select>
+                                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("When open, visitors see the welcome message immediately on page load.")}</p>
+                                        <InputError message={errors.initial_open} className="mt-1" />
+                                    </div>
+                                </div>
+                            </section>
 
+                            <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                                <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Conversation starters")}</h3>
+                                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Short prompt buttons shown before the visitor sends their first message. Leave empty to use defaults.")}</p>
+                                <div className="mt-5 space-y-3">
+                                    {((data.suggested_prompts?.length ? data.suggested_prompts : ['']).slice(0, 4)).map((prompt, index, rows) => (
+                                        <div key={index} className="flex gap-2">
+                                            <TextInput
+                                                id={`suggested_prompt_${index}`}
+                                                value={prompt}
+                                                onChange={(e) => {
+                                                    const next = [...rows];
+                                                    next[index] = e.target.value;
+                                                    setData('suggested_prompts', next);
+                                                }}
+                                                className="block w-full"
+                                                placeholder={index === 0 ? t("How do I get started?") : t("Optional prompt")}
+                                            />
+                                            {rows.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setData(
+                                                            'suggested_prompts',
+                                                            rows.filter((_, i) => i !== index),
+                                                        );
+                                                    }}
+                                                    className="shrink-0 rounded-md border border-gray-200 px-3 text-sm text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                                >{t("Remove")}</button>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {(data.suggested_prompts?.length || 0) < 4 && (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setData('suggested_prompts', [...(data.suggested_prompts || []), ''])
+                                            }
+                                            className="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+                                        >{t("Add prompt")}</button>
+                                    )}
+                                    <InputError message={errors['suggested_prompts.0'] || errors.suggested_prompts} className="mt-1" />
+                                </div>
+                            </section>
+
+                            <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                                <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Labels")}</h3>
+                                <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                                    <TextField
+                                        id="input_placeholder"
+                                        label={t("Input placeholder")}
+                                        value={data.input_placeholder}
+                                        onChange={(v) => setData('input_placeholder', v)}
+                                        error={errors.input_placeholder}
+                                    />
+                                    <TextField
+                                        id="send_button_label"
+                                        label={t("Send button")}
+                                        value={data.send_button_label}
+                                        onChange={(v) => setData('send_button_label', v)}
+                                        error={errors.send_button_label}
+                                    />
+                                </div>
+                            </section>
+
+                        </div>
+                        {Object.keys(errors).length > 0 && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{t('Please review the highlighted settings before saving.')}</p>}
                         <div className="flex flex-wrap items-center gap-3">
                             <PrimaryButton disabled={processing}>{processing ? t("Saving…") : t("Save widget settings")}</PrimaryButton>
                             {recentlySuccessful && (
@@ -404,8 +438,8 @@ export default function Install({ bots, defaults, positions, icons, languages = 
                         </div>
                     </form>
 
-                    <aside className="space-y-6">
-                        <WidgetPreview config={previewConfig} initialOpen={data.initial_open} language={languages.find((language) => language.code === editingLocale)} />
+                    <aside className="space-y-6 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto">
+                        <WidgetPreview config={previewConfig} initialOpen={previewOpen} onToggle={() => setPreviewOpen(!previewOpen)} language={languages.find((language) => language.code === editingLocale)} />
                         <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
@@ -424,7 +458,7 @@ export default function Install({ bots, defaults, positions, icons, languages = 
                                 </button>
                             </div>
                             <pre className="mt-4 max-h-64 overflow-auto rounded-lg bg-gray-950 p-4 text-xs text-gray-100">{snippet}</pre>
-                            <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">{t("The script tag includes your current settings as data attributes. The widget also fetches saved settings from the server on load.")}</p>
+                            <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">{t("Save before installing. The widget loads your saved settings.")}</p>
                         </section>
                     </aside>
                 </div>
@@ -433,7 +467,7 @@ export default function Install({ bots, defaults, positions, icons, languages = 
     );
 }
 
-function WidgetPreview({ config, initialOpen, language }) {
+function WidgetPreview({ config, initialOpen, onToggle, language }) {
     const positionClass = {
         'bottom-right': 'items-end justify-end',
         'bottom-left': 'items-end justify-start',
@@ -449,7 +483,10 @@ function WidgetPreview({ config, initialOpen, language }) {
 
     return (
         <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Preview")}</h3>
+            <div className="flex items-center justify-between gap-3">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("Preview")}</h3>
+                <button type="button" onClick={onToggle} className="text-xs font-medium text-indigo-600 dark:text-indigo-400">{t(initialOpen ? 'Show launcher' : 'Show chat')}</button>
+            </div>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("Approximate look on your site (desktop).")}</p>
             <div
                 dir="ltr" className={`relative mt-4 flex h-96 overflow-hidden rounded-xl border border-gray-200 bg-gradient-to-br from-slate-100 to-slate-200 p-4 dark:border-gray-700 dark:from-gray-900 dark:to-gray-800 ${positionClass}`}
@@ -457,8 +494,9 @@ function WidgetPreview({ config, initialOpen, language }) {
                 {initialOpen && (
                 <div
                     dir={language?.direction || 'ltr'}
-                    className="flex w-[min(100%,280px)] flex-col overflow-hidden shadow-xl"
+                    className="flex max-w-full flex-col overflow-hidden shadow-xl"
                     style={{
+                        width: Math.round(config.panel_width * 0.7),
                         borderRadius: config.border_radius + 'px',
                         background: config.surface_color,
                         color: config.text_color,
@@ -549,8 +587,8 @@ function WidgetPreview({ config, initialOpen, language }) {
                             background: config.surface_color,
                             borderColor: config.text_color + '18',
                             color: config.text_color,
-                            ...(config.position.includes('right') && { right: Number(config.offset_x) + Number(config.launcher_size) + 12, bottom: Number(config.offset_y) + 12 }),
-                            ...(config.position.includes('left') && { left: Number(config.offset_x) + Number(config.launcher_size) + 12, bottom: Number(config.offset_y) + 12 }),
+                            ...(config.position.includes('right') && { right: Number(config.offset_x) + Number(config.launcher_size) + 12, ...(config.position.startsWith('top') ? { top: Number(config.offset_y) + 12 } : { bottom: Number(config.offset_y) + 12 }) }),
+                            ...(config.position.includes('left') && { left: Number(config.offset_x) + Number(config.launcher_size) + 12, ...(config.position.startsWith('top') ? { top: Number(config.offset_y) + 12 } : { bottom: Number(config.offset_y) + 12 }) }),
                         }}
                     >
                         {config.launcher_label}

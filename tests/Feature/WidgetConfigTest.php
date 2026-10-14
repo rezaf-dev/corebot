@@ -186,3 +186,28 @@ it('keeps the widget hidden until remote config is applied', function () {
         ->and(strpos($widgetSource, 'applyConfig(config);', strpos($widgetSource, 'loadRemoteConfig().then')))
         ->toBeLessThan(strpos($widgetSource, "crmRoot.dataset.configReady = 'true';"));
 });
+
+it('saves appearance and avatars through the browsers multipart method spoofing flow', function () {
+    Storage::fake('public');
+    $tenant = Tenant::factory()->create();
+    $user = User::factory()->create(['tenant_id' => $tenant->id, 'role' => 'tenant_admin']);
+    $bot = Bot::factory()->create(['tenant_id' => $tenant->id]);
+    $payload = array_replace(WidgetConfig::DEFAULTS, [
+        '_method' => 'put',
+        'primary_color' => '#aabbcc',
+        'launcher_icon' => 'assistant',
+        'position' => 'top-left',
+        'enabled_locales' => '[]',
+        'localized_content' => '{}',
+        'avatar' => UploadedFile::fake()->image('avatar.png'),
+    ]);
+
+    $this->actingAs($user)->post(route('widget.install.update', $bot), $payload)
+        ->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($bot->fresh()->resolvedWidgetConfig())
+        ->primary_color->toBe('#aabbcc')
+        ->launcher_icon->toBe('assistant')
+        ->position->toBe('top-left');
+    Storage::disk('public')->assertExists($bot->fresh()->widget_config['avatar_path']);
+});
