@@ -209,11 +209,6 @@ class PublicChatController extends Controller
             $conversation->update(['source_url' => $pageContext['url']]);
         }
 
-        $locale = app(Localization::class)->widgetLocalization($data['locale'] ?? $conversation->language, $bot)['locale'];
-        if ($conversation->language !== $locale) {
-            $conversation->update(['language' => $locale]);
-        }
-
         return [$bot, $conversation, $data['message'], $pageContext];
     }
 

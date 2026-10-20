@@ -142,15 +142,15 @@ it('translates built in base starters while preserving custom questions and loca
         ->welcome_message->toBe('خوش آمدید')->suggested_prompts->toBe(['Local question']);
 });
 
-it('changes conversation language only after authenticating the public session', function () {
+it('does not change conversation language from widget locale after authenticating the public session', function () {
     $conversation = ChatConversation::create(['tenant_id' => $this->tenant->id, 'bot_id' => $this->bot->id, 'language' => 'en', 'public_session_token' => hash('sha256', $token = Str::random(64))]);
-    $payload = ['bot_public_key' => $this->bot->public_key, 'conversation_id' => $conversation->id, 'conversation_token' => Str::random(64), 'message' => 'Hello', 'locale' => 'fa'];
+    $payload = ['bot_public_key' => $this->bot->public_key, 'conversation_id' => $conversation->id, 'conversation_token' => Str::random(64), 'message' => 'Hello', 'locale' => 'fa', 'language_changed' => true];
     $this->postJson('/api/public/chat/message', $payload)->assertNotFound();
     expect($conversation->fresh()->language)->toBe('en');
-    $this->mock(ChatAnswerService::class)->shouldReceive('answer')->once()->withArgs(fn ($bot, $received) => $received->language === 'fa')->andReturn(['message' => 'سلام']);
+    $this->mock(ChatAnswerService::class)->shouldReceive('answer')->once()->withArgs(fn ($bot, $received) => $received->language === 'en')->andReturn(['message' => 'سلام']);
     $payload['conversation_token'] = $token;
     $this->postJson('/api/public/chat/message', $payload)->assertSuccessful();
-    expect($conversation->fresh()->language)->toBe('fa');
+    expect($conversation->fresh()->language)->toBe('en');
 });
 
 it('instructs the model to answer in the selected language and uses localized fallbacks', function () {
@@ -171,10 +171,10 @@ it('uses translated default fallback on retrieval failures', function () {
 });
 
 it('uses the selected locale for streamed requests and fallbacks', function () {
-    $conversation = ChatConversation::create(['tenant_id' => $this->tenant->id, 'bot_id' => $this->bot->id, 'language' => 'en', 'public_session_token' => hash('sha256', $token = Str::random(64))]);
+    $conversation = ChatConversation::create(['tenant_id' => $this->tenant->id, 'bot_id' => $this->bot->id, 'language' => 'fa', 'public_session_token' => hash('sha256', $token = Str::random(64))]);
     $this->bot->update(['widget_config' => ['localized_content' => ['fa' => ['fallback_message' => 'پاسخی ندارم']]]]);
     $this->mock(SemanticSearchService::class)->shouldReceive('searchWithMeta')->once()->andThrow(new RuntimeException('Unavailable'));
-    $response = $this->postJson('/api/public/chat/message/stream', ['bot_public_key' => $this->bot->public_key, 'conversation_id' => $conversation->id, 'conversation_token' => $token, 'message' => 'Help', 'locale' => 'fa']);
+    $response = $this->postJson('/api/public/chat/message/stream', ['bot_public_key' => $this->bot->public_key, 'conversation_id' => $conversation->id, 'conversation_token' => $token, 'message' => 'Help', 'locale' => 'fa', 'language_changed' => true]);
     $response->assertStreamed();
     $response->streamedContent();
     expect($conversation->fresh()->language)->toBe('fa')

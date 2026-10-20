@@ -33,6 +33,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'city',
     'timezone',
     'language',
+    'language_detected',
     'utm_source',
     'utm_medium',
     'utm_campaign',
@@ -44,7 +45,7 @@ class ChatConversation extends Model
     /** @use HasFactory<ChatConversationFactory> */
     use HasFactory;
 
-    protected $attributes = ['support_mode' => 'ai', 'status' => 'open'];
+    protected $attributes = ['support_mode' => 'ai', 'status' => 'open', 'language_detected' => false];
 
     public function assignee(): BelongsTo
     {
@@ -90,6 +91,7 @@ class ChatConversation extends Model
     protected function casts(): array
     {
         return [
+            'language_detected' => 'boolean',
             'resolved_at' => 'datetime',
             'contact_notified_at' => 'datetime',
             'manual_handoff_notified_at' => 'datetime',
