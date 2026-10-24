@@ -744,5 +744,17 @@
     "sales@example.com": "sales@example.com",
     "selected": "انتخاب‌شده",
     "visitor ·": "بازدیدکننده ·",
-    "{parameter_name}": "{parameter_name}"
+    "{parameter_name}": "{parameter_name}",
+    "Disable tenant": "غیرفعال کردن مستأجر",
+    "Enable tenant": "فعال کردن مستأجر",
+    "Edit tenant :name": "ویرایش مستأجر :name",
+    ":action: :name": ":action: :name",
+    "Delete tenant :name": "حذف مستأجر :name",
+    "Delete tenant": "حذف مستأجر",
+    "Edit tenant": "ویرایش مستأجر",
+    "Disabling a tenant blocks staff access and public chat. Its data is preserved.": "غیرفعال کردن مستأجر، دسترسی کارکنان و گفتگوی عمومی را مسدود می‌کند. داده‌ها حفظ می‌شوند.",
+    "This permanently deletes the tenant, its bots, conversations, and knowledge. Staff accounts are deactivated. This cannot be undone.": "مستأجر، ربات‌ها، گفتگوها و دانش آن برای همیشه حذف می‌شوند. حساب‌های کارکنان غیرفعال می‌شوند. این کار قابل بازگشت نیست.",
+    "Enable this tenant to restore staff access and public chat.": "برای بازیابی دسترسی کارکنان و گفتگوی عمومی، این مستأجر را فعال کنید.",
+    "No tenants yet.": "هنوز مستأجری وجود ندارد.",
+    "Users": "کاربران"
 }

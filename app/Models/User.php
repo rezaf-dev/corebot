@@ -21,7 +21,7 @@ class User extends Authenticatable
 
     public function hasWorkspaceAccess(): bool
     {
-        return $this->is_active && ($this->isSuperAdmin() || (in_array($this->role, ['tenant_admin', 'agent'], true) && $this->tenant_id !== null && $this->tenant !== null));
+        return $this->is_active && ($this->isSuperAdmin() || (in_array($this->role, ['tenant_admin', 'agent'], true) && $this->tenant_id !== null && $this->tenant?->isActive()));
     }
 
     public function isAdmin(): bool

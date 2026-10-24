@@ -43,6 +43,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/tenants', [TenantController::class, 'index'])->name('tenants.index');
     Route::post('/tenants', [TenantController::class, 'store'])->name('tenants.store');
+    Route::put('/tenants/{tenant}', [TenantController::class, 'update'])->name('tenants.update');
+    Route::delete('/tenants/{tenant}', [TenantController::class, 'destroy'])->name('tenants.destroy');
 
     Route::get('/ai-settings', [AiSettingsController::class, 'edit'])->name('ai-settings.edit');
     Route::put('/ai-settings', [AiSettingsController::class, 'update'])->name('ai-settings.update');

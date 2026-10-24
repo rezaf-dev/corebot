@@ -744,5 +744,17 @@
     "sales@example.com": "sales@example.com",
     "selected": "seleccionado",
     "visitor ·": "visitante ·",
-    "{parameter_name}": "{parameter_name}"
+    "{parameter_name}": "{parameter_name}",
+    "Disable tenant": "Desactivar organización",
+    "Enable tenant": "Activar organización",
+    "Edit tenant :name": "Editar organización :name",
+    ":action: :name": ":action: :name",
+    "Delete tenant :name": "Eliminar organización :name",
+    "Delete tenant": "Eliminar organización",
+    "Edit tenant": "Editar organización",
+    "Disabling a tenant blocks staff access and public chat. Its data is preserved.": "Desactivar una organización bloquea el acceso del personal y el chat público. Sus datos se conservan.",
+    "This permanently deletes the tenant, its bots, conversations, and knowledge. Staff accounts are deactivated. This cannot be undone.": "Esto elimina permanentemente la organización, sus bots, conversaciones y conocimientos. Las cuentas del personal se desactivan. Esta acción no se puede deshacer.",
+    "Enable this tenant to restore staff access and public chat.": "Activa esta organización para restablecer el acceso del personal y el chat público.",
+    "No tenants yet.": "Aún no hay organizaciones.",
+    "Users": "Usuarios"
 }

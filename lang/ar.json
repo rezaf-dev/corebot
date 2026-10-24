@@ -744,5 +744,17 @@
     "sales@example.com": "sales@example.com",
     "selected": "محدد",
     "visitor ·": "الزائر ·",
-    "{parameter_name}": "{parameter_name}"
+    "{parameter_name}": "{parameter_name}",
+    "Disable tenant": "تعطيل المستأجر",
+    "Enable tenant": "تفعيل المستأجر",
+    "Edit tenant :name": "تعديل المستأجر :name",
+    ":action: :name": ":action: :name",
+    "Delete tenant :name": "حذف المستأجر :name",
+    "Delete tenant": "حذف المستأجر",
+    "Edit tenant": "تعديل المستأجر",
+    "Disabling a tenant blocks staff access and public chat. Its data is preserved.": "يؤدي تعطيل المستأجر إلى حظر وصول الموظفين والدردشة العامة. تُحفظ بياناته.",
+    "This permanently deletes the tenant, its bots, conversations, and knowledge. Staff accounts are deactivated. This cannot be undone.": "سيُحذف المستأجر وروبوتاته ومحادثاته ومعرفته نهائيًا. ستُعطّل حسابات الموظفين. لا يمكن التراجع عن هذا الإجراء.",
+    "Enable this tenant to restore staff access and public chat.": "فعّل هذا المستأجر لاستعادة وصول الموظفين والدردشة العامة.",
+    "No tenants yet.": "لا يوجد مستأجرون بعد.",
+    "Users": "المستخدمون"
 }

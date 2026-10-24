@@ -744,5 +744,17 @@
     "sales@example.com": "sales@example.com",
     "selected": "seçilen",
     "visitor ·": "ziyaretçi ·",
-    "{parameter_name}": "{parameter_name}"
+    "{parameter_name}": "{parameter_name}",
+    "Disable tenant": "Kiracıyı devre dışı bırak",
+    "Enable tenant": "Kiracıyı etkinleştir",
+    "Edit tenant :name": ":name kiracısını düzenle",
+    ":action: :name": ":action: :name",
+    "Delete tenant :name": ":name kiracısını sil",
+    "Delete tenant": "Kiracıyı sil",
+    "Edit tenant": "Kiracıyı düzenle",
+    "Disabling a tenant blocks staff access and public chat. Its data is preserved.": "Kiracıyı devre dışı bırakmak personel erişimini ve herkese açık sohbeti engeller. Verileri korunur.",
+    "This permanently deletes the tenant, its bots, conversations, and knowledge. Staff accounts are deactivated. This cannot be undone.": "Bu işlem kiracıyı, botlarını, konuşmalarını ve bilgi kaynaklarını kalıcı olarak siler. Personel hesapları devre dışı bırakılır. Bu işlem geri alınamaz.",
+    "Enable this tenant to restore staff access and public chat.": "Personel erişimini ve herkese açık sohbeti yeniden açmak için bu kiracıyı etkinleştirin.",
+    "No tenants yet.": "Henüz kiracı yok.",
+    "Users": "Kullanıcılar"
 }

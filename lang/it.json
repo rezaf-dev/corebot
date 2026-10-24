@@ -744,5 +744,17 @@
     "sales@example.com": "sales@example.com",
     "selected": "selezionato",
     "visitor ·": "visitatore ·",
-    "{parameter_name}": "{parameter_name}"
+    "{parameter_name}": "{parameter_name}",
+    "Disable tenant": "Disattiva tenant",
+    "Enable tenant": "Attiva tenant",
+    "Edit tenant :name": "Modifica tenant :name",
+    ":action: :name": ":action: :name",
+    "Delete tenant :name": "Elimina tenant :name",
+    "Delete tenant": "Elimina tenant",
+    "Edit tenant": "Modifica tenant",
+    "Disabling a tenant blocks staff access and public chat. Its data is preserved.": "La disattivazione del tenant blocca l’accesso del personale e la chat pubblica. I dati vengono conservati.",
+    "This permanently deletes the tenant, its bots, conversations, and knowledge. Staff accounts are deactivated. This cannot be undone.": "Questa azione elimina definitivamente il tenant, i suoi bot, le conversazioni e le conoscenze. Gli account del personale vengono disattivati. L’azione è irreversibile.",
+    "Enable this tenant to restore staff access and public chat.": "Attiva questo tenant per ripristinare l’accesso del personale e la chat pubblica.",
+    "No tenants yet.": "Nessun tenant ancora.",
+    "Users": "Utenti"
 }
